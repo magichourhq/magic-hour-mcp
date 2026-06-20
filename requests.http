@@ -1,0 +1,561 @@
+@baseUrlMock = https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0
+@baseUrlProd = https://api.magichour.ai
+@baseUrl = {{baseUrlMock}}
+@apiKey = {{$dotenv MAGIC_HOUR_API_KEY}}
+
+# Switch @baseUrl to {{baseUrlProd}} to hit the real API (spends real credits).
+# Mock mode accepts any string as the token.
+# Set MAGIC_HOUR_API_KEY in a local .env file (see .env.example).
+
+# After a create_* request, copy the returned `id` into the variable below
+# to use it in the matching get/delete request.
+@imageProjectId = REPLACE_WITH_ID
+@videoProjectId = REPLACE_WITH_ID
+@audioProjectId = REPLACE_WITH_ID
+@faceDetectionId = REPLACE_WITH_ID
+
+### ============ Files ============
+
+### Face Detection
+POST {{baseUrl}}/v1/face-detection
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "confidence_score": 0.5,
+  "assets": {
+    "target_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### Get face detection details
+GET {{baseUrl}}/v1/face-detection/{{faceDetectionId}}
+Authorization: Bearer {{apiKey}}
+
+
+### Generate asset upload urls
+POST {{baseUrl}}/v1/files/upload-urls
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "type": "video",
+      "extension": "mp4"
+    },
+    {
+      "type": "audio",
+      "extension": "mp3"
+    }
+  ]
+}
+
+
+### ============ Video Projects ============
+
+### AI Talking Photo
+POST {{baseUrl}}/v1/ai-talking-photo
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Talking Photo image",
+  "start_seconds": 0,
+  "end_seconds": 15,
+  "assets": {
+    "image_file_path": "api-assets/id/1234.png",
+    "audio_file_path": "api-assets/id/1234.mp3"
+  },
+  "style": {
+    "generation_mode": "realistic"
+  },
+  "max_resolution": 1024
+}
+
+
+### Animation
+POST {{baseUrl}}/v1/animation
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Animation video",
+  "fps": 12,
+  "end_seconds": 15,
+  "height": 960,
+  "width": 512,
+  "style": {
+    "art_style": "Painterly Illustration",
+    "camera_effect": "Simple Zoom In",
+    "prompt_type": "custom",
+    "prompt": "Cyberpunk city",
+    "transition_speed": 5
+  },
+  "assets": {
+    "audio_source": "file",
+    "audio_file_path": "api-assets/id/1234.mp3",
+    "image_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### Audio-to-Video
+POST {{baseUrl}}/v1/audio-to-video
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Audio To Video video",
+  "start_seconds": 0,
+  "end_seconds": 15,
+  "resolution": "720p",
+  "assets": {
+    "audio_file_path": "api-assets/id/1234.mp3",
+    "image_file_path": "api-assets/id/1234.png"
+  },
+  "style": {
+    "prompt": "Car driving through a city"
+  }
+}
+
+
+### Auto Subtitle Generator
+POST {{baseUrl}}/v1/auto-subtitle-generator
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Auto Subtitle video",
+  "start_seconds": 0,
+  "end_seconds": 15,
+  "assets": {
+    "video_file_path": "api-assets/id/1234.mp4"
+  },
+  "style": {
+    "custom_config": {
+      "font": "Noto Sans",
+      "font_size": 24,
+      "font_style": "normal",
+      "text_color": "#FFFFFF",
+      "highlighted_text_color": "#FFD700",
+      "stroke_color": "#000000",
+      "stroke_width": 1,
+      "vertical_position": "bottom",
+      "horizontal_position": "center"
+    }
+  }
+}
+
+
+### Face Swap Video
+POST {{baseUrl}}/v1/face-swap
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Face Swap video",
+  "start_seconds": 0,
+  "end_seconds": 15,
+  "style": {
+    "version": "default"
+  },
+  "assets": {
+    "face_swap_mode": "all-faces",
+    "image_file_path": "image/id/1234.png",
+    "face_mappings": [
+      {
+        "original_face": "api-assets/id/0-0.png",
+        "new_face": "api-assets/id/1234.png"
+      }
+    ],
+    "video_source": "file",
+    "video_file_path": "api-assets/id/1234.mp4"
+  }
+}
+
+
+### Image-to-Video
+POST {{baseUrl}}/v1/image-to-video
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Image To Video video",
+  "end_seconds": 5,
+  "model": "kling-3.0",
+  "resolution": "720p",
+  "audio": true,
+  "style": {
+    "prompt": "a dog running"
+  },
+  "assets": {
+    "image_file_path": "api-assets/id/1234.png",
+    "end_image_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### Lip Sync
+POST {{baseUrl}}/v1/lip-sync
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Lip Sync video",
+  "start_seconds": 0,
+  "end_seconds": 15,
+  "max_fps_limit": 12,
+  "assets": {
+    "audio_file_path": "api-assets/id/1234.mp3",
+    "video_source": "file",
+    "video_file_path": "api-assets/id/1234.mp4"
+  },
+  "style": {
+    "generation_mode": "lite"
+  }
+}
+
+
+### Text-to-Video
+POST {{baseUrl}}/v1/text-to-video
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Text To Video video",
+  "end_seconds": 5,
+  "aspect_ratio": "16:9",
+  "resolution": "720p",
+  "model": "kling-3.0",
+  "audio": true,
+  "style": {
+    "prompt": "a dog running"
+  }
+}
+
+
+### Get video details
+GET {{baseUrl}}/v1/video-projects/{{videoProjectId}}
+Authorization: Bearer {{apiKey}}
+
+
+### Delete video
+DELETE {{baseUrl}}/v1/video-projects/{{videoProjectId}}
+Authorization: Bearer {{apiKey}}
+
+
+### Video-to-Video
+POST {{baseUrl}}/v1/video-to-video
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Video To Video video",
+  "start_seconds": 0,
+  "end_seconds": 15,
+  "fps_resolution": "HALF",
+  "style": {
+    "art_style": "Minecraft",
+    "version": "default",
+    "prompt_type": "default",
+    "model": "default"
+  },
+  "assets": {
+    "video_source": "file",
+    "video_file_path": "api-assets/id/1234.mp4"
+  }
+}
+
+
+### ============ Image Projects ============
+
+### AI Clothes Changer
+POST {{baseUrl}}/v1/ai-clothes-changer
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Clothes Changer image",
+  "assets": {
+    "person_file_path": "api-assets/id/model.png",
+    "garment_file_path": "api-assets/id/outfit.png",
+    "garment_type": "entire_outfit"
+  }
+}
+
+
+### AI Face Editor
+POST {{baseUrl}}/v1/ai-face-editor
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Face Editor image",
+  "assets": {
+    "image_file_path": "api-assets/id/1234.png"
+  },
+  "style": {
+    "enhance_face": false,
+    "eyebrow_direction": 0,
+    "eye_gaze_horizontal": 0,
+    "eye_gaze_vertical": 0,
+    "eye_open_ratio": 0,
+    "lip_open_ratio": 0,
+    "head_roll": 0,
+    "mouth_grim": 0,
+    "mouth_pout": 0,
+    "mouth_purse": 0,
+    "mouth_smile": 0,
+    "mouth_position_horizontal": 0,
+    "mouth_position_vertical": 0,
+    "head_pitch": 0,
+    "head_yaw": 0
+  }
+}
+
+
+### AI GIF Generator
+POST {{baseUrl}}/v1/ai-gif-generator
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Ai Gif gif",
+  "style": {
+    "prompt": "Cute dancing cat, pixel art"
+  },
+  "output_format": "gif"
+}
+
+
+### AI Headshot Generator
+POST {{baseUrl}}/v1/ai-headshot-generator
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Ai Headshot image",
+  "style": {},
+  "assets": {
+    "image_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### AI Image Editor
+POST {{baseUrl}}/v1/ai-image-editor
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Ai Image Editor image",
+  "image_count": 1,
+  "model": "default",
+  "aspect_ratio": "1:1",
+  "resolution": "1k",
+  "style": {
+    "prompt": "Give me sunglasses"
+  },
+  "assets": {
+    "image_file_paths": [
+      "api-assets/id/1234.png",
+      "api-assets/id/1235.png"
+    ]
+  }
+}
+
+
+### AI Image Generator
+POST {{baseUrl}}/v1/ai-image-generator
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Ai Image image",
+  "image_count": 1,
+  "model": "default",
+  "aspect_ratio": "1:1",
+  "resolution": "auto",
+  "style": {
+    "prompt": "Cool image",
+    "tool": "ai-anime-generator"
+  }
+}
+
+
+### AI Image Upscaler
+POST {{baseUrl}}/v1/ai-image-upscaler
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Image Upscaler image",
+  "scale_factor": 2,
+  "style": {
+    "mode": "creative"
+  },
+  "assets": {
+    "image_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### AI Meme Generator
+POST {{baseUrl}}/v1/ai-meme-generator
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Funny Meme",
+  "style": {
+    "topic": "When the code finally works",
+    "template": "Drake Hotline Bling",
+    "searchWeb": false
+  }
+}
+
+
+### AI QR Code Generator
+POST {{baseUrl}}/v1/ai-qr-code-generator
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Qr Code image",
+  "content": "https://magichour.ai",
+  "style": {
+    "art_style": "Watercolor"
+  }
+}
+
+
+### Body Swap
+POST {{baseUrl}}/v1/body-swap
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Body Swap image",
+  "resolution": "1k",
+  "assets": {
+    "person_file_path": "api-assets/id/1234.png",
+    "scene_file_path": "api-assets/id/5678.png"
+  }
+}
+
+
+### Face Swap Photo
+POST {{baseUrl}}/v1/face-swap-photo
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Face Swap image",
+  "assets": {
+    "face_swap_mode": "all-faces",
+    "source_file_path": "api-assets/id/1234.png",
+    "face_mappings": [
+      {
+        "original_face": "api-assets/id/0-0.png",
+        "new_face": "api-assets/id/1234.png"
+      }
+    ],
+    "target_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### Head Swap
+POST {{baseUrl}}/v1/head-swap
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Head Swap image",
+  "max_resolution": 1024,
+  "assets": {
+    "body_file_path": "api-assets/id/1234.png",
+    "head_file_path": "api-assets/id/5678.png"
+  }
+}
+
+
+### Image Background Remover
+POST {{baseUrl}}/v1/image-background-remover
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Background Remover image",
+  "assets": {
+    "image_file_path": "api-assets/id/1234.png",
+    "background_image_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### Get image details
+GET {{baseUrl}}/v1/image-projects/{{imageProjectId}}
+Authorization: Bearer {{apiKey}}
+
+
+### Delete image
+DELETE {{baseUrl}}/v1/image-projects/{{imageProjectId}}
+Authorization: Bearer {{apiKey}}
+
+
+### Photo Colorizer
+POST {{baseUrl}}/v1/photo-colorizer
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Photo Colorizer image",
+  "assets": {
+    "image_file_path": "api-assets/id/1234.png"
+  }
+}
+
+
+### ============ Audio Projects ============
+
+### AI Voice Cloner
+POST {{baseUrl}}/v1/ai-voice-cloner
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Voice Cloner audio",
+  "assets": {
+    "audio_file_path": "api-assets/id/1234.mp3"
+  },
+  "style": {
+    "prompt": "Hello, this is my cloned voice."
+  }
+}
+
+
+### AI Voice Generator
+POST {{baseUrl}}/v1/ai-voice-generator
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "name": "My Voice Generator audio",
+  "style": {
+    "prompt": "Hello, how are you?",
+    "voice_name": "Elon Musk"
+  }
+}
+
+
+### Get audio details
+GET {{baseUrl}}/v1/audio-projects/{{audioProjectId}}
+Authorization: Bearer {{apiKey}}
+
+
+### Delete audio
+DELETE {{baseUrl}}/v1/audio-projects/{{audioProjectId}}
+Authorization: Bearer {{apiKey}}

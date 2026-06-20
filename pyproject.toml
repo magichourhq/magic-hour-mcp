@@ -1,0 +1,18 @@
+[project]
+name = "mcp-magichour"
+version = "0.1.0"
+description = "MCP server wrapping the Magic Hour API"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.17.0",
+    "magic_hour>=0.66.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["mcp_magichour*"]
