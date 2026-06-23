@@ -2,6 +2,24 @@
 
 Companion to [api-reference.md](api-reference.md) (full auth/endpoint/param reference) and [openapi.json](openapi.json) (raw spec). This doc is the phase-by-phase build plan.
 
+## Handoff summary (as of 2026-06-23)
+
+**What this is:** an MCP server wrapping the Magic Hour AI image/video/audio generation API, built to be mounted at `/mcp` on a startup's existing FastAPI backend. 35 tools total — 1:1 with Magic Hour's 34 raw API operations, plus a `ping` health check.
+
+**Status:** Phases 0-4 complete (scaffolding; auth/client plumbing; all `create_*` tools for image, video, and audio; shared `get_*_project`/`delete_*_project` pairs; the Files group). Phase 5 (hardening), Phase 6 (integration handoff doc), Phase 7 (future/optional) have not been started. Read the phase sections below in order — each records what was actually built/verified, not just planned, including a few real bugs found along the way.
+
+**Don't skip:** the [mounting/lifespan gotcha](#critical-mounting-gotcha-found-and-fixed-while-comparing-against-the-standalone-fastmcp-packages-docs) below — a mounted sub-app's `lifespan` is not run automatically by the host; skipping the merge makes every tool call 500 once this is actually mounted on a host app.
+
+**Known open items — not yet resolved, flagged here so they aren't lost:**
+- **Local file uploads.** Magic Hour's `create_*` tools that take `image_file_path`/`audio_file_path`/`video_file_path` only accept a direct URL or a `file_path` token from `generate_upload_urls` — never raw bytes. There is no clean way for a user's drag-and-drop chat attachment (claude.ai web, vanilla Desktop) to reach these tools today; only shell-capable agentic clients (Claude Code, Codex CLI) can bridge this, by calling `generate_upload_urls` then using their own Bash tool to `curl -T <local-file> "<upload_url>"` directly against the presigned URL (bypassing the MCP server and the model's context entirely for the byte transfer), then passing the returned `file_path` into the `create_*` call. This pattern is **not yet written into any tool docstring** — the calling agent currently has to figure it out unprompted. Worth adding explicit guidance to `generate_upload_urls`'s description before handoff.
+- **Codex CLI auth support, unverified.** The whole auth model depends on the calling MCP client sending a custom `Authorization: Bearer <key>` header to a remote HTTP server. Confirmed for Claude Code (`--header`/`.mcp.json`) and Claude Desktop (hand-edited config). Not checked for Codex CLI.
+- **Terminal rendering of embedded media, unverified.** `get_image_project`/`get_audio_project` embed results as MCP `ImageContent`/`AudioContent` blocks. This is confirmed rendering visually in MCP Inspector (browser GUI) and was confirmed by the user via a real screenshot in that same GUI context. Whether any CLI-based client (Claude Code's terminal, Codex CLI) actually renders these blocks visually rather than just printing raw base64/JSON is unverified — terminal image rendering depends on the specific terminal's protocol support and how the CLI chooses to handle MCP media content.
+- **OAuth for claude.ai web's Custom Connector flow.** Researched and fully deferred — bearer-passthrough doesn't work there since it's OAuth-only. Full writeup with three implementation paths: [docs/future-oauth-support.md](future-oauth-support.md).
+
+**Testing:** `README.md` has the up-to-date Inspector-based testing flow. Use `MAGIC_HOUR_ENVIRONMENT=mock` for free instant testing, but note mock-server download URLs are **not** fetchable (403) — verifying the image/audio byte-embedding behavior specifically requires a real API key.
+
+---
+
 ## Decisions locked in
 
 | Question | Decision |
@@ -45,8 +63,8 @@ mcp_magichour/
   tools/
     files.py                 # generate_upload_urls, detect_faces, get_face_detection [done]
     image_projects.py        # get_image_project, delete_image_project [done] + 14 create_* tools [Phase 2]
-    video_projects.py        # get_video_project, delete_video_project [done] + 9 create_* tools [Phase 3]
-    audio_projects.py        # get_audio_project, delete_audio_project [done] + 2 create_* tools [Phase 4]
+    video_projects.py        # get_video_project, delete_video_project, 9 create_* tools [done]
+    audio_projects.py        # get_audio_project, delete_audio_project, 2 create_* tools [done]
 main.py                      # dev entry point (`python main.py`), serves at "/" not "/mcp" (see instance.py note)
 requests.http                # manual test requests for every raw Magic Hour endpoint (mock server by default)
 .env.example, .gitignore     # MAGIC_HOUR_API_KEY placeholder for requests.http
@@ -146,8 +164,8 @@ Discussed how images actually get from the API to whatever's calling this MCP se
 
 - [x] `tools/image_projects.py`: `get_image_project` now returns `[status_response, Image(...), Image(...), ...]` — one inline image per completed download. Required dropping the `-> V1ImageProjectsGetResponse` return-type annotation and using `@mcp.tool(structured_output=False)` instead, because FastMCP's structured-output path runs `output_model.model_validate(result)` unconditionally based on the static annotation, which would crash on a list. Tradeoff: lose the parallel machine-readable `structuredContent` field; the text content (JSON dump) is unaffected and still has everything.
 - [x] `_fetch_image(url)` helper: downloads via `httpx`, determines image format from the response's `Content-Type` header (falls back to the URL path's suffix, defaulting to `png`). First version derived the extension from the raw URL string with `rsplit(".", 1)` and broke on domains like `videos.magichour.ai` (grabbed `org/image/png` from the domain instead of the path) — fixed by parsing `httpx.URL(url).path` specifically and preferring `Content-Type` as the authoritative source.
-- [x] Verified `_fetch_image` against a real public image URL (correct mime detection, correct byte count) and verified the list-mixing behavior is exactly what FastMCP's `_convert_to_content` does by design (read directly in the installed `mcp` package's source). **Not independently verified end-to-end with a real Magic Hour image** — the mock server's example download URLs are fake placeholders (403 on actual fetch), and testing against the real API would spend real credits. Worth a real-key smoke test before this ships.
-- [ ] **Open, not yet decided:** same question applies to audio (MCP has an `AudioContent` block type too) — currently still URL-only on `get_audio_project`. Video has no MCP content block type, so it stays URL-only regardless of any future decision here.
+- [x] Verified `_fetch_image` against a real public image URL, then verified the full path with a real Magic Hour API key via MCP Inspector (2026-06-20): `create_ai_image_generator` → `get_image_project` → `status: complete` with a real signed GCS download URL → Inspector rendered the actual generated image inline below the status JSON. Confirms the real end-to-end pipeline (download → Content-Type detection → base64 → `ImageContent` → client renders), not just the isolated pieces.
+- [x] **Decided 2026-06-23: same treatment for audio.** MCP has a real `AudioContent` block type (and the `mcp` SDK ships an `Audio` helper class with the identical `path`/`data`/`format` interface as `Image`), so `get_audio_project` now mirrors `get_image_project` exactly: `_fetch_audio(url)` downloads via `httpx`, picks the format from the response's `Content-Type` header (falling back to the URL path's suffix, defaulting to `mp3`), and `get_audio_project` returns `[status_response, Audio(...), ...]` via `@mcp.tool(structured_output=False)`. Verified `_fetch_audio` against a real public mp3 URL (correct `audio/mpeg` detected). Video remains the only one that stays URL-only, since MCP has no video content block at all.
 
 ---
 
@@ -165,10 +183,13 @@ Discussed how images actually get from the API to whatever's calling this MCP se
 | `create_face_swap` | `POST /v1/face-swap` | video version of face swap; same `face_mappings` pattern as photo version |
 | `create_lip_sync` | `POST /v1/lip-sync` | |
 
-- [ ] Implement all 9. Several share a `video_source: file|youtube` + `video_file_path`/`youtube_url` pattern (`face_swap`, `lip_sync`, `video_to_video`) — share a small params fragment if it stays simple.
-- [ ] Video jobs are the slowest to render — this is the category where the create/poll separation (vs. blocking) matters most. Confirm `get_video_project` polling works comfortably across a real (not mock) multi-minute render before calling this phase done, not just against instant mock responses.
+- [x] Implemented all 9 in `tools/video_projects.py`, same pattern as Phase 2: Pydantic `assets`/`style` models grounded in the installed SDK's param TypedDicts (introspected live), `omit_none` for unset optionals, enum-sizing rule applied (`video_to_video`'s 75-value `art_style` and `animation`'s 47-value `art_style`/52-value `camera_effect` stayed plain `str`; everything else ≤15 values became `Literal[...]`, including the 14-value video `model` enum shared by `text_to_video`/`image_to_video`).
+- [x] `face_swap`/`lip_sync`/`video_to_video` each kept their own separate `video_source: file|youtube` assets model rather than a shared base — same call as Phase 2's image tools, the field never diverged enough to be worth abstracting.
+- [x] Video `create_face_swap` defines its own local `FaceMapping` model (identical shape to the photo version's) rather than importing across modules — avoids a cross-file dependency between `image_projects.py` and `video_projects.py` for a two-field model.
+- [x] Smoke-tested all 9 directly against `MOCK_SERVER` (raw SDK calls with the exact param shapes our Pydantic models produce), plus the two trickiest nested shapes specifically: `face_swap`'s `individual-faces` mode with a `face_mappings` list, and `auto_subtitle_generator`'s `custom_config` object. All returned correct `{id, credits_charged}`.
+- [ ] Not yet done: a real (non-mock) end-to-end render-and-poll cycle for one video tool, to validate `get_video_project` polling against actual multi-minute render times rather than mock's instant response. Needs a real API key — same as the Phase 2 image verification, this is on the user to run via MCP Inspector when ready.
 
-**Definition of done:** all 9 create tools tested against mock mode, plus at least one real (non-mock) end-to-end render-and-poll cycle for one video tool to validate real-world timing.
+**Definition of done:** ✅ all 9 create tools registered (33 total: 24 from Phases 1-2 + 9 here) and verified against mock mode. ⏳ real end-to-end render-and-poll timing check still open.
 
 ---
 
@@ -179,9 +200,15 @@ Discussed how images actually get from the API to whatever's calling this MCP se
 | `create_ai_voice_generator` | `POST /v1/ai-voice-generator` | `voice_name` enum has 494 values — do not inline the full list into the tool description; let the model pass a name string and surface a lookup/validation error from the API if invalid, or trim to a curated subset in the description |
 | `create_ai_voice_cloner` | `POST /v1/ai-voice-cloner` | needs a source audio file |
 
-- [ ] Implement both. Decide how to handle the 494-value `voice_name` enum in the tool schema (full enum will bloat every tool listing sent to the model on every turn) — recommend treating it as a free-text string with a short illustrative list in the description rather than a literal 494-item enum.
+- [x] Implemented both in `tools/audio_projects.py`. `voice_name` confirmed as a 494-value `Literal` in the SDK's own TypedDict — kept it as plain `str` per the plan's recommendation, with a few illustrative examples in the description, to avoid bloating the tool schema sent to the model every turn.
+- [x] **Bug found and fixed during real-key testing:** the SDK enforces `voice_name` as a strict case-sensitive `Literal` at its own serialization layer, so a near-miss like `"Morgan freeman"` (wrong case) bypassed our `str` field but then failed deep in the SDK with a wall-of-text error dumping all 494 valid values. Fixed with `_resolve_voice_name()`: builds a `{lowercased: canonical}` lookup from the SDK's own type hints at import time (not hand-duplicated), matches case-insensitively, and raises a short `ValueError` naming just the bad input if there's truly no match. Schema stays small; matching got more forgiving; failures got readable.
+- [x] Smoke-tested both against `MOCK_SERVER` (raw SDK calls with the exact param shapes our Pydantic models produce) — both returned correct `{id, credits_charged}`.
 
-**Definition of done:** both tools tested against mock mode.
+**Definition of done:** ✅ both tools registered (35 total: 33 from Phases 1-3 + 2 here) and verified against mock mode.
+
+### Decision: `get_audio_project` returns audio bytes inline too (2026-06-23)
+
+Resolved the open question left at the end of Phase 2 — MCP has a real `AudioContent` block type (unlike video), and the `mcp` SDK ships an `Audio` helper class with the exact same `path`/`data`/`format` interface as `Image`. `get_audio_project` (`tools/audio_projects.py`) now mirrors `get_image_project` exactly: a `_fetch_audio(url)` helper downloads via `httpx` and picks the format from the response's `Content-Type` header (falling back to the URL path's suffix, defaulting to `mp3`), and the tool returns `[status_response, Audio(...), ...]` via `@mcp.tool(structured_output=False)`. Verified `_fetch_audio` against a real public mp3 URL (correctly detected `audio/mpeg`). Video remains the only output type that stays URL-only, since MCP has no video content block at all.
 
 ---
 
@@ -208,3 +235,4 @@ Discussed how images actually get from the API to whatever's calling this MCP se
 - Webhook-based completion notification as an alternative to polling, if long video-job tool-call latency becomes a real problem.
 - Reconsider tool consolidation if 34 tools proves to hurt the calling agent's tool-selection accuracy in practice.
 - Expose pricing/model tables (the big enums trimmed out of tool descriptions in Phase 4/2) as an MCP **resource** instead, so the agent can look them up on demand without them bloating every tool listing.
+- **OAuth support for claude.ai web's "Custom Connector" flow** — bearer-passthrough (current design) doesn't work there; it's OAuth-only. Full research, three implementation paths, and the open question that decides between them: [docs/future-oauth-support.md](future-oauth-support.md).
