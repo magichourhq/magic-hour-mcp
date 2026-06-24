@@ -52,8 +52,11 @@ async def _fetch_image(url: str) -> Image:
 async def get_image_project(id: str, ctx: Context):
     """Check the status of an image project.
 
-    Once status is complete, the generated image(s) are returned inline
-    (in addition to the status json) so they can be viewed directly.
+    After an image `create_*` call, clients should usually wait briefly and poll
+    this tool automatically until status becomes `complete`, `error`, or `canceled`.
+    Once status is complete, `downloads` contains direct URLs and the generated
+    image(s) are also returned inline (in addition to the status json) so clients
+    can show both a downloadable link and an inline preview.
     """
     async with get_client(ctx) as client:
         response = await client.v1.image_projects.get(id=id)
@@ -109,7 +112,7 @@ async def create_ai_image_generator(
     name: Optional[str] = None,
     resolution: Optional[Literal["640px", "1k", "2k", "4k", "auto"]] = None,
 ) -> V1AiImageGeneratorCreateResponse:
-    """Create AI image(s) from a text prompt. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Create AI image(s) from a text prompt. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_image_generator.create(
             image_count=image_count,
@@ -146,7 +149,7 @@ async def create_ai_image_editor(
     name: Optional[str] = None,
     resolution: Optional[Literal["auto", "640px", "1k", "2k", "4k"]] = None,
 ) -> V1AiImageEditorCreateResponse:
-    """Edit existing image(s) with an AI prompt. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Edit existing image(s) with an AI prompt. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_image_editor.create(
             assets=assets.model_dump(exclude_none=True),
@@ -180,7 +183,7 @@ async def create_ai_image_upscaler(
     ctx: Context,
     name: Optional[str] = None,
 ) -> V1AiImageUpscalerCreateResponse:
-    """Upscale an image. scale_factor must be 2 or 4 (4x needs Creator/Pro/Business tier). Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Upscale an image. scale_factor must be 2 or 4 (4x needs Creator/Pro/Business tier). Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_image_upscaler.create(
             assets=assets.model_dump(exclude_none=True),
@@ -205,7 +208,7 @@ class ClothesChangerAssets(BaseModel):
 async def create_ai_clothes_changer(
     assets: ClothesChangerAssets, ctx: Context, name: Optional[str] = None
 ) -> V1AiClothesChangerCreateResponse:
-    """Change the outfit on a person in a photo. 25 credits per photo. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Change the outfit on a person in a photo. 25 credits per photo. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_clothes_changer.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)
@@ -243,7 +246,7 @@ class FaceEditorStyle(BaseModel):
 async def create_ai_face_editor(
     assets: FaceEditorAssets, style: FaceEditorStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiFaceEditorCreateResponse:
-    """Tweak facial features (eyes, mouth, head angle) on an image. Costs 1 frame. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Tweak facial features (eyes, mouth, head angle) on an image. Costs 1 frame. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_face_editor.create(
             assets=assets.model_dump(exclude_none=True),
@@ -266,7 +269,7 @@ async def create_ai_gif_generator(
     name: Optional[str] = None,
     output_format: Optional[Literal["gif", "mp4", "webm"]] = None,
 ) -> V1AiGifGeneratorCreateResponse:
-    """Create an animated GIF from a prompt. 50 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Create an animated GIF from a prompt. 50 credits. Returns `{id, credits_charged}` immediately; if the user wants the finished asset, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_gif_generator.create(
             style=style.model_dump(exclude_none=True), **omit_none(name=name, output_format=output_format)
@@ -291,7 +294,7 @@ async def create_ai_headshot_generator(
     name: Optional[str] = None,
     style: Optional[HeadshotStyle] = None,
 ) -> V1AiHeadshotGeneratorCreateResponse:
-    """Generate a professional headshot from a photo. 50 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Generate a professional headshot from a photo. 50 credits. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_headshot_generator.create(
             assets=assets.model_dump(exclude_none=True),
@@ -316,7 +319,7 @@ class MemeGeneratorStyle(BaseModel):
 async def create_ai_meme_generator(
     style: MemeGeneratorStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiMemeGeneratorCreateResponse:
-    """Create an AI generated meme. 10 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Create an AI generated meme. 10 credits. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_meme_generator.create(
             style=style.model_dump(exclude_none=True), **omit_none(name=name)
@@ -336,7 +339,7 @@ class QrCodeStyle(BaseModel):
 async def create_ai_qr_code_generator(
     content: str, style: QrCodeStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiQrCodeGeneratorCreateResponse:
-    """Create an artistic QR code that still scans. content is the URL/text it encodes. 0 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Create an artistic QR code that still scans. content is the URL/text it encodes. 0 credits. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.ai_qr_code_generator.create(
             content=content, style=style.model_dump(exclude_none=True), **omit_none(name=name)
@@ -358,7 +361,7 @@ async def create_body_swap(
     ctx: Context,
     name: Optional[str] = None,
 ) -> V1BodySwapCreateResponse:
-    """Swap a person into a scene image. Credits scale with resolution (from 100 credits). Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Swap a person into a scene image. Credits scale with resolution (from 100 credits). Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.body_swap.create(
             assets=assets.model_dump(exclude_none=True), resolution=resolution, **omit_none(name=name)
@@ -388,7 +391,7 @@ class FaceSwapPhotoAssets(BaseModel):
 async def create_face_swap_photo(
     assets: FaceSwapPhotoAssets, ctx: Context, name: Optional[str] = None
 ) -> V1FaceSwapPhotoCreateResponse:
-    """Swap face(s) in a photo. 10 credits per photo. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Swap face(s) in a photo. 10 credits per photo. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.face_swap_photo.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)
@@ -410,7 +413,7 @@ async def create_head_swap(
     max_resolution: Optional[int] = None,
     name: Optional[str] = None,
 ) -> V1HeadSwapCreateResponse:
-    """Swap a head onto a body image. 10 credits per image. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Swap a head onto a body image. 10 credits per image. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.head_swap.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(max_resolution=max_resolution, name=name)
@@ -431,7 +434,7 @@ class BackgroundRemoverAssets(BaseModel):
 async def create_image_background_remover(
     assets: BackgroundRemoverAssets, ctx: Context, name: Optional[str] = None
 ) -> V1ImageBackgroundRemoverCreateResponse:
-    """Remove (or replace) the background of an image. 5 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Remove (or replace) the background of an image. 5 credits. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.image_background_remover.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)
@@ -449,7 +452,7 @@ class PhotoColorizerAssets(BaseModel):
 async def create_photo_colorizer(
     assets: PhotoColorizerAssets, ctx: Context, name: Optional[str] = None
 ) -> V1PhotoColorizerCreateResponse:
-    """Colorize a black-and-white photo. 10 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
+    """Colorize a black-and-white photo. 10 credits. Returns `{id, credits_charged}` immediately; if the user wants the finished image, wait briefly and then poll with get_image_project until completion."""
     async with get_client(ctx) as client:
         return await client.v1.photo_colorizer.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)

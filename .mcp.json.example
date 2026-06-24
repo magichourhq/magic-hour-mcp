@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "magic-hour": {
+      "type": "http",
+      "url": "http://127.0.0.1:8000/",
+      "headers": {
+        "Authorization": "Bearer API_KEY_FOR_TESTING_LOCALLY"
+      }
+    }
+  }
+}

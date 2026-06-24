@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .venv/
 *.egg-info/
+.mcp.json
+CLAUDE.md
