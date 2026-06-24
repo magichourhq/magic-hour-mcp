@@ -1,4 +1,5 @@
 import typing
+import logging
 from typing import Optional
 
 import httpx
@@ -8,9 +9,12 @@ from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.utilities.types import Audio
 from pydantic import BaseModel, Field
 
-from ..client import get_client
+from ..client import build_http_client, get_client
+from ..errors import MagicHourToolError, translate_http_error
 from ..instance import mcp
 from ..util import omit_none
+
+logger = logging.getLogger(__name__)
 
 _VOICE_NAMES_BY_LOWER = {
     name.lower(): name
@@ -28,9 +32,12 @@ def _resolve_voice_name(voice_name: str) -> str:
 
 async def _fetch_audio(url: str) -> Audio:
     """Download a completed audio clip so it can be embedded directly in the tool result."""
-    async with httpx.AsyncClient() as http_client:
-        response = await http_client.get(url)
-        response.raise_for_status()
+    try:
+        async with build_http_client(follow_redirects=True) as http_client:
+            response = await http_client.get(url)
+            response.raise_for_status()
+    except httpx.HTTPError as error:
+        raise translate_http_error(error, during="downloading generated audio output") from error
 
     content_type = response.headers.get("content-type", "")
     if content_type.startswith("audio/"):
@@ -53,8 +60,17 @@ async def get_audio_project(id: str, ctx: Context):
 
     result = [response]
     if response.status == "complete":
-        for download in response.downloads:
-            result.append(await _fetch_audio(download.url))
+        for index, download in enumerate(response.downloads, start=1):
+            try:
+                result.append(await _fetch_audio(download.url))
+            except MagicHourToolError as error:
+                logger.warning(
+                    "Failed to embed audio output for project %s download %s: %s",
+                    id,
+                    index,
+                    error,
+                )
+                await ctx.warning(str(error))
     return result
 
 
@@ -81,7 +97,7 @@ class VoiceGeneratorStyle(BaseModel):
 async def create_ai_voice_generator(
     style: VoiceGeneratorStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiVoiceGeneratorCreateResponse:
-    """Generate speech audio from text using a preset voice. 0.05 credits per character. Returns immediately with an id; poll with get_audio_project."""
+    """Generate speech audio from text using a preset voice. 0.05 credits per character. Returns `{id, credits_charged}` immediately; poll with get_audio_project."""
     voice_style = style.model_dump(exclude_none=True)
     voice_style["voice_name"] = _resolve_voice_name(style.voice_name)
     async with get_client(ctx) as client:
@@ -103,7 +119,7 @@ class VoiceClonerStyle(BaseModel):
 async def create_ai_voice_cloner(
     assets: VoiceClonerAssets, style: VoiceClonerStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiVoiceClonerCreateResponse:
-    """Clone a voice from an audio sample and generate speech. 0.05 credits per character. Returns immediately with an id; poll with get_audio_project."""
+    """Clone a voice from an audio sample and generate speech. 0.05 credits per character. Returns `{id, credits_charged}` immediately; poll with get_audio_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_voice_cloner.create(
             assets=assets.model_dump(exclude_none=True),

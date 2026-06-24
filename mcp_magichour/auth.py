@@ -1,8 +1,6 @@
 from mcp.server.fastmcp import Context
 
-
-class AuthError(Exception):
-    """Missing or malformed Authorization header."""
+from .errors import AuthError
 
 
 def get_api_key(ctx: Context) -> str:

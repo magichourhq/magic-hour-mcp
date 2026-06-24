@@ -23,8 +23,9 @@ async def generate_upload_urls(
 ) -> V1FilesUploadUrlsCreateResponse:
     """Get pre-signed URLs to upload local files to Magic Hour storage.
 
-    PUT the raw file bytes to each returned `upload_url`, then use the
-    matching `file_path` in a create_* tool's *_file_path field.
+    PUT the raw file bytes to each returned `upload_url` outside MCP
+    (for example with curl), then use the matching `file_path` in a
+    create_* tool's *_file_path field. This tool mints URLs only.
     """
     async with get_client(ctx) as client:
         return await client.v1.files.upload_urls.create(

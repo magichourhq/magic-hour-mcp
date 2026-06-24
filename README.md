@@ -1,6 +1,6 @@
 # mcp-magichour
 
-MCP server wrapping the Magic Hour API. See `docs/implementation-plan.md` for the build plan and `docs/api-reference.md` for the full endpoint reference.
+MCP server wrapping the Magic Hour API. See `docs/implementation-plan.md` for the build plan, `docs/api-reference.md` for the full endpoint reference, and `docs/integration-handoff.md` for the FastAPI mounting guide used by the host backend team.
 
 ## Setup
 

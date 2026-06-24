@@ -1,3 +1,4 @@
+import logging
 from typing import List, Literal, Optional
 
 from magic_hour.types.models import (
@@ -21,16 +22,22 @@ import httpx
 from mcp.server.fastmcp.utilities.types import Image
 from pydantic import BaseModel, Field
 
-from ..client import get_client
+from ..client import build_http_client, get_client
+from ..errors import MagicHourToolError, translate_http_error
 from ..instance import mcp
 from ..util import omit_none
+
+logger = logging.getLogger(__name__)
 
 
 async def _fetch_image(url: str) -> Image:
     """Download a completed image so it can be embedded directly in the tool result."""
-    async with httpx.AsyncClient() as http_client:
-        response = await http_client.get(url)
-        response.raise_for_status()
+    try:
+        async with build_http_client(follow_redirects=True) as http_client:
+            response = await http_client.get(url)
+            response.raise_for_status()
+    except httpx.HTTPError as error:
+        raise translate_http_error(error, during="downloading generated image output") from error
 
     content_type = response.headers.get("content-type", "")
     if content_type.startswith("image/"):
@@ -53,8 +60,17 @@ async def get_image_project(id: str, ctx: Context):
 
     result = [response]
     if response.status == "complete":
-        for download in response.downloads:
-            result.append(await _fetch_image(download.url))
+        for index, download in enumerate(response.downloads, start=1):
+            try:
+                result.append(await _fetch_image(download.url))
+            except MagicHourToolError as error:
+                logger.warning(
+                    "Failed to embed image output for project %s download %s: %s",
+                    id,
+                    index,
+                    error,
+                )
+                await ctx.warning(str(error))
     return result
 
 
@@ -93,7 +109,7 @@ async def create_ai_image_generator(
     name: Optional[str] = None,
     resolution: Optional[Literal["640px", "1k", "2k", "4k", "auto"]] = None,
 ) -> V1AiImageGeneratorCreateResponse:
-    """Create AI image(s) from a text prompt. Returns immediately with an id; poll with get_image_project."""
+    """Create AI image(s) from a text prompt. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_image_generator.create(
             image_count=image_count,
@@ -130,7 +146,7 @@ async def create_ai_image_editor(
     name: Optional[str] = None,
     resolution: Optional[Literal["auto", "640px", "1k", "2k", "4k"]] = None,
 ) -> V1AiImageEditorCreateResponse:
-    """Edit existing image(s) with an AI prompt. Returns immediately with an id; poll with get_image_project."""
+    """Edit existing image(s) with an AI prompt. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_image_editor.create(
             assets=assets.model_dump(exclude_none=True),
@@ -164,7 +180,7 @@ async def create_ai_image_upscaler(
     ctx: Context,
     name: Optional[str] = None,
 ) -> V1AiImageUpscalerCreateResponse:
-    """Upscale an image. scale_factor must be 2 or 4 (4x needs Creator/Pro/Business tier)."""
+    """Upscale an image. scale_factor must be 2 or 4 (4x needs Creator/Pro/Business tier). Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_image_upscaler.create(
             assets=assets.model_dump(exclude_none=True),
@@ -189,7 +205,7 @@ class ClothesChangerAssets(BaseModel):
 async def create_ai_clothes_changer(
     assets: ClothesChangerAssets, ctx: Context, name: Optional[str] = None
 ) -> V1AiClothesChangerCreateResponse:
-    """Change the outfit on a person in a photo. 25 credits per photo."""
+    """Change the outfit on a person in a photo. 25 credits per photo. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_clothes_changer.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)
@@ -227,7 +243,7 @@ class FaceEditorStyle(BaseModel):
 async def create_ai_face_editor(
     assets: FaceEditorAssets, style: FaceEditorStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiFaceEditorCreateResponse:
-    """Tweak facial features (eyes, mouth, head angle) on an image. Costs 1 frame."""
+    """Tweak facial features (eyes, mouth, head angle) on an image. Costs 1 frame. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_face_editor.create(
             assets=assets.model_dump(exclude_none=True),
@@ -250,7 +266,7 @@ async def create_ai_gif_generator(
     name: Optional[str] = None,
     output_format: Optional[Literal["gif", "mp4", "webm"]] = None,
 ) -> V1AiGifGeneratorCreateResponse:
-    """Create an animated GIF from a prompt. 50 credits."""
+    """Create an animated GIF from a prompt. 50 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_gif_generator.create(
             style=style.model_dump(exclude_none=True), **omit_none(name=name, output_format=output_format)
@@ -275,7 +291,7 @@ async def create_ai_headshot_generator(
     name: Optional[str] = None,
     style: Optional[HeadshotStyle] = None,
 ) -> V1AiHeadshotGeneratorCreateResponse:
-    """Generate a professional headshot from a photo. 50 credits."""
+    """Generate a professional headshot from a photo. 50 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_headshot_generator.create(
             assets=assets.model_dump(exclude_none=True),
@@ -300,7 +316,7 @@ class MemeGeneratorStyle(BaseModel):
 async def create_ai_meme_generator(
     style: MemeGeneratorStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiMemeGeneratorCreateResponse:
-    """Create an AI generated meme. 10 credits."""
+    """Create an AI generated meme. 10 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_meme_generator.create(
             style=style.model_dump(exclude_none=True), **omit_none(name=name)
@@ -320,7 +336,7 @@ class QrCodeStyle(BaseModel):
 async def create_ai_qr_code_generator(
     content: str, style: QrCodeStyle, ctx: Context, name: Optional[str] = None
 ) -> V1AiQrCodeGeneratorCreateResponse:
-    """Create an artistic QR code that still scans. content is the URL/text it encodes. 0 credits."""
+    """Create an artistic QR code that still scans. content is the URL/text it encodes. 0 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_qr_code_generator.create(
             content=content, style=style.model_dump(exclude_none=True), **omit_none(name=name)
@@ -342,7 +358,7 @@ async def create_body_swap(
     ctx: Context,
     name: Optional[str] = None,
 ) -> V1BodySwapCreateResponse:
-    """Swap a person into a scene image. Credits scale with resolution (from 100 credits)."""
+    """Swap a person into a scene image. Credits scale with resolution (from 100 credits). Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.body_swap.create(
             assets=assets.model_dump(exclude_none=True), resolution=resolution, **omit_none(name=name)
@@ -372,7 +388,7 @@ class FaceSwapPhotoAssets(BaseModel):
 async def create_face_swap_photo(
     assets: FaceSwapPhotoAssets, ctx: Context, name: Optional[str] = None
 ) -> V1FaceSwapPhotoCreateResponse:
-    """Swap face(s) in a photo. 10 credits per photo."""
+    """Swap face(s) in a photo. 10 credits per photo. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.face_swap_photo.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)
@@ -394,7 +410,7 @@ async def create_head_swap(
     max_resolution: Optional[int] = None,
     name: Optional[str] = None,
 ) -> V1HeadSwapCreateResponse:
-    """Swap a head onto a body image. 10 credits per image."""
+    """Swap a head onto a body image. 10 credits per image. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.head_swap.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(max_resolution=max_resolution, name=name)
@@ -415,7 +431,7 @@ class BackgroundRemoverAssets(BaseModel):
 async def create_image_background_remover(
     assets: BackgroundRemoverAssets, ctx: Context, name: Optional[str] = None
 ) -> V1ImageBackgroundRemoverCreateResponse:
-    """Remove (or replace) the background of an image. 5 credits."""
+    """Remove (or replace) the background of an image. 5 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.image_background_remover.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)
@@ -433,7 +449,7 @@ class PhotoColorizerAssets(BaseModel):
 async def create_photo_colorizer(
     assets: PhotoColorizerAssets, ctx: Context, name: Optional[str] = None
 ) -> V1PhotoColorizerCreateResponse:
-    """Colorize a black-and-white photo. 10 credits."""
+    """Colorize a black-and-white photo. 10 credits. Returns `{id, credits_charged}` immediately; poll with get_image_project."""
     async with get_client(ctx) as client:
         return await client.v1.photo_colorizer.create(
             assets=assets.model_dump(exclude_none=True), **omit_none(name=name)

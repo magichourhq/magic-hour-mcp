@@ -60,7 +60,7 @@ async def create_text_to_video(
     orientation: Optional[Literal["landscape", "portrait", "square"]] = None,
     resolution: Optional[Literal["480p", "720p", "1080p", "4k"]] = None,
 ) -> V1TextToVideoCreateResponse:
-    """Generate a video purely from a text prompt. end_seconds: 1-60. Returns immediately with an id; poll with get_video_project."""
+    """Generate a video purely from a text prompt. end_seconds: 1-60. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.text_to_video.create(
             end_seconds=end_seconds,
@@ -101,7 +101,7 @@ async def create_image_to_video(
     style: Optional[ImageToVideoStyle] = None,
     width: Optional[int] = None,
 ) -> V1ImageToVideoCreateResponse:
-    """Animate an image into a video. end_seconds: 1-60. Sora 2 only supports 9:16 or 16:9 source images. Returns immediately with an id; poll with get_video_project."""
+    """Animate an image into a video. end_seconds: 1-60. Sora 2 only supports 9:16 or 16:9 source images. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.image_to_video.create(
             assets=assets.model_dump(exclude_none=True),
@@ -151,7 +151,7 @@ async def create_video_to_video(
     name: Optional[str] = None,
     width: Optional[int] = None,
 ) -> V1VideoToVideoCreateResponse:
-    """Restyle an existing video clip with an art style. Returns immediately with an id; poll with get_video_project."""
+    """Restyle an existing video clip with an art style. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.video_to_video.create(
             assets=assets.model_dump(exclude_none=True),
@@ -194,7 +194,7 @@ async def create_animation(
     ctx: Context,
     name: Optional[str] = None,
 ) -> V1AnimationCreateResponse:
-    """Create an AI animation video. Credit cost scales with fps and end_seconds. Returns immediately with an id; poll with get_video_project."""
+    """Create an AI animation video. Credit cost scales with fps and end_seconds. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.animation.create(
             assets=assets.model_dump(exclude_none=True),
@@ -233,7 +233,7 @@ async def create_ai_talking_photo(
     name: Optional[str] = None,
     style: Optional[TalkingPhotoStyle] = None,
 ) -> V1AiTalkingPhotoCreateResponse:
-    """Animate a photo to talk in sync with an audio clip. Max clip length depends on style.generation_mode: realistic 180s, prompted 45s. Returns immediately with an id; poll with get_video_project."""
+    """Animate a photo to talk in sync with an audio clip. Max clip length depends on style.generation_mode: realistic 180s, prompted 45s. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.ai_talking_photo.create(
             assets=assets.model_dump(exclude_none=True),
@@ -265,7 +265,7 @@ async def create_audio_to_video(
     start_seconds: Optional[float] = None,
     style: Optional[AudioToVideoStyle] = None,
 ) -> V1AudioToVideoCreateResponse:
-    """Generate a video visualization driven by an audio clip. Returns immediately with an id; poll with get_video_project."""
+    """Generate a video visualization driven by an audio clip. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.audio_to_video.create(
             assets=assets.model_dump(exclude_none=True),
@@ -314,7 +314,7 @@ async def create_auto_subtitle_generator(
     ctx: Context,
     name: Optional[str] = None,
 ) -> V1AutoSubtitleGeneratorCreateResponse:
-    """Automatically generate and burn in subtitles for a video. Returns immediately with an id; poll with get_video_project."""
+    """Automatically generate and burn in subtitles for a video. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.auto_subtitle_generator.create(
             assets=assets.model_dump(exclude_none=True),
@@ -363,7 +363,7 @@ async def create_face_swap(
     style: Optional[VideoFaceSwapStyle] = None,
     width: Optional[int] = None,
 ) -> V1FaceSwapCreateResponse:
-    """Swap face(s) in a video clip. Returns immediately with an id; poll with get_video_project."""
+    """Swap face(s) in a video clip. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.face_swap.create(
             assets=assets.model_dump(exclude_none=True),
@@ -401,7 +401,7 @@ async def create_lip_sync(
     style: Optional[LipSyncStyle] = None,
     width: Optional[int] = None,
 ) -> V1LipSyncCreateResponse:
-    """Sync a video's mouth movement to an audio track. Returns immediately with an id; poll with get_video_project."""
+    """Sync a video's mouth movement to an audio track. Returns `{id, credits_charged}` immediately; poll with get_video_project."""
     async with get_client(ctx) as client:
         return await client.v1.lip_sync.create(
             assets=assets.model_dump(exclude_none=True),
