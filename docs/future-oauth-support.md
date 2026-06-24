@@ -1,64 +1,62 @@
 # Future: OAuth support for claude.ai web
 
-Not implemented. Researched 2026-06-20 because bearer-passthrough (our current auth model) doesn't cover every Claude surface. Revisit this doc if/when that becomes a real requirement.
+Not implemented. Keep this doc only if the team later needs claude.ai web or Claude's Connectors UI.
 
-## Why this might matter later
+## Current support
 
-Confirmed against Anthropic's own docs/support articles (not guessed):
-
-| Surface | Static bearer token / custom header? |
+| Surface | Static bearer token or custom header? |
 |---|---|
-| Claude Code (CLI, `--header` flag or `.mcp.json` `headers` field) | ✅ Yes — this is what we've been testing with |
-| Claude Desktop, added by hand-editing `.mcp.json`/`~/.claude.json` | ✅ Yes — same config files as CLI |
-| Claude Desktop's point-and-click **Connectors UI** | ❌ No header field exposed |
-| Claude.ai web **Custom Connector** setup | ❌ OAuth only (Advanced settings exposes Client ID/Secret, nothing else) |
+| Claude Code CLI | Yes |
+| Hand-edited Claude Desktop config | Yes |
+| Claude Desktop Connectors UI | No |
+| claude.ai web Custom Connector | No. OAuth only |
 
-So today's design covers developer-facing usage (Claude Code, hand-edited config) but not the polished "click to connect" flow in claude.ai web or Desktop's Connectors UI. Whether that gap matters depends on who actually uses this — developers comfortable with config files, or general users who'd want the one-click flow.
+Today this server fits developer workflows such as Claude Code. It does not fit the one-click web connector flow.
 
-## What the MCP spec requires for OAuth
+## Why
 
-From `modelcontextprotocol.io`'s authorization spec:
+This server uses bearer passthrough:
 
-- The MCP server (resource server) **must** implement **OAuth 2.0 Protected Resource Metadata** ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)) at `/.well-known/oauth-protected-resource`, advertising where its authorization server lives.
-- The authorization server **must** implement **OAuth 2.1** with **PKCE** (mandatory, prevents auth-code interception).
-- Authorization servers and clients **should** support **Dynamic Client Registration** ([RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591)) — this is what lets claude.ai auto-register itself with no manual client ID/secret entry. Without DCR, the user has to manually create an OAuth app and paste a client ID/secret into claude.ai's "Advanced settings" — which is the fallback the existing UI exposes today, but a worse experience.
-- Tokens **must** be validated for audience (RFC 8707 resource indicators) — a server must reject tokens not issued for it specifically.
+```text
+Authorization: Bearer <magic_hour_api_key>
+```
 
-## What the official `mcp` SDK gives us
+claude.ai web Custom Connectors expect OAuth, not an arbitrary static bearer header.
 
-Two distinct primitives (`mcp.server.auth.provider`), selectable via `FastMCP(auth=AuthSettings(...), auth_server_provider=..., token_verifier=...)`:
+## If OAuth becomes necessary
 
-- **`TokenVerifier`** — minimal: just `async def verify_token(token) -> AccessToken | None`. Used when an *external* authorization server already exists and we only need to validate the tokens it issues.
-- **`OAuthAuthorizationServerProvider`** — the full thing: `register_client` (DCR), `authorize`, `exchange_authorization_code`, `load_access_token`, etc. Used when *we* are the authorization server.
+There are three realistic paths:
 
-Both are real protocols already present in the installed `mcp` package — no new dependency needed to use either.
+### 1. Self-contained OAuth server
 
-## Three implementation paths
+Build an `OAuthAuthorizationServerProvider` in this service. The auth page could ask the user for a Magic Hour API key, then mint an access token mapped to that key.
 
-### Path 1 — Self-contained authorization server (recommended default)
+Best when:
 
-We implement `OAuthAuthorizationServerProvider` ourselves. The `/authorize` step doesn't need real identity infrastructure — it can just be a form asking the user to paste their Magic Hour API key, and we mint an opaque access token mapped to that key (needs a small persistent store: token → key, e.g. a simple table with expiry). claude.ai auto-discovers us via Protected Resource Metadata and auto-registers via DCR — no manual client ID ever shown to the user.
+- the startup has no existing OAuth system
+- the goal is a working claude.ai web connector with minimal outside dependencies
 
-- **Depends on:** nothing external. Self-sufficient.
-- **New work:** `register_client`, `authorize` (+ a basic HTML form), `exchange_authorization_code`, `load_access_token`, a token↔key store.
-- **Why default:** doesn't require knowing anything about the startup's infrastructure that we don't already know.
+### 2. Validate the startup's existing auth
 
-### Path 2 — Resource-server-only, validating the startup's *own* existing auth
+Implement only `TokenVerifier`, validate the startup's own OAuth or OIDC tokens, then map the authenticated user to their Magic Hour key.
 
-We implement only `TokenVerifier`. claude.ai redirects users to log in with their actual startup account; `verify_token` validates that token (e.g. JWT signature check or an introspection call) and looks up the corresponding Magic Hour key from wherever the startup stores per-user keys.
+Best when:
 
-- **Depends on:** the startup already having (or building) a real OAuth/OIDC-compliant authorization server with the right discovery endpoints, *and* exposing an internal way for us to resolve "this validated user → their Magic Hour key."
-- **New work on our side:** comparatively little (just `verify_token` + a lookup call).
-- **New work on their side:** potentially a lot, if this auth server doesn't already exist.
-- **Why consider it:** this is the "real" multi-tenant model or actual per-user accounts, not just "anyone holding a Magic Hour key." It's the per-tenant-lookup idea from the original auth discussion, resurfacing here specifically for the claude.ai-web case — it didn't fit bearer-passthrough, but it does fit this path.
+- the startup already has a real OAuth-capable login system
+- they already store or can resolve a per-user Magic Hour key
 
-### Path 3 — OAuth proxy in front of a third-party IdP (Auth0, WorkOS, GitHub, etc.)
+### 3. Use a third-party IdP
 
-If the startup has no IdP of their own and doesn't want to build one. Our server proxies the OAuth dance to an off-the-shelf identity provider. The standalone `fastmcp` package (evaluated and declined earlier — see `reference_fastmcp_packages` memory) has pre-built one-liner provider classes for several of these (`GitHubProvider`, etc.) that would meaningfully cut code here — this is the one place where that package's auth utilities would actually pay for themselves, unlike the rest of this project's scope.
+Proxy auth through Auth0, WorkOS, GitHub, or a similar provider, then solve the same user-to-Magic-Hour-key mapping step.
 
-- **Depends on:** picking and paying for a third-party IdP.
-- **New work:** still need the token→Magic-Hour-key lookup (same problem as Path 2), plus IdP integration (less if using `fastmcp`'s pre-built classes, more if hand-rolled against the official SDK's `OAuthAuthorizationServerProvider`).
+Best when:
 
-## Open question before starting any of this
+- the startup has no IdP
+- they do not want to build one
 
-Does the startup already have an OAuth-capable login system of their own? That fact alone decides between Path 1 (no, build it self-contained) and Path 2 (yes, just validate against it). Path 3 only makes sense if the answer is "no, and we don't want to build one either."
+## Open question
+
+Does the startup already have an OAuth-capable login system?
+
+- If yes, path 2 is likely best.
+- If no, path 1 is usually the simplest default.
