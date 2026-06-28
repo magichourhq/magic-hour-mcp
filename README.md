@@ -2,6 +2,19 @@
 
 MCP server for Magic Hour image, video, and audio generation.
 
+## Supported Today
+
+- Local MCP Inspector
+- Claude Code
+- Manual Claude Desktop style configs that allow custom headers
+- Backend mounted HTTP MCP at `/mcp`
+
+## Not Included In This Repo
+
+- OAuth or web connector auth
+- Chat native file upload UI
+- A server side upload bridge for web chat clients
+
 Core docs:
 
 - `integration-handoff.md` - FastAPI mount and smoke test guide
@@ -73,3 +86,15 @@ Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
 3. Pass the returned `file_path` into the `create_*` tool
 
 Claude Code can handle this because it has shell access. Plain chat attachments do not map cleanly to this API.
+
+## Upload Example For Future Chat UIs
+
+For an upload based tool such as `create_image_to_video`:
+
+1. Call `generate_upload_urls` for an `image`
+2. Upload the local file bytes to the returned `upload_url`
+3. Pass the returned `file_path` into `create_image_to_video.assets.image_file_path`
+
+This repo stops at step 1. The caller or host app must do step 2.
+
+For future web chat work, see `docs/future-chat-ui-handoff.md`.

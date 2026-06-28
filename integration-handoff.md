@@ -40,6 +40,19 @@ app = FastAPI(lifespan=combined_lifespan)
 app.mount("/mcp", mcp_app)
 ```
 
+## Router setup checklist
+
+When wiring this into the real backend:
+
+1. Mount the MCP app at `/mcp`
+2. Merge `mcp_lifespan` into the host app lifespan
+3. Make sure the public route keeps the incoming `Authorization` header
+4. Put any gateway auth, rate limits, or logging in front of `/mcp`
+5. Exclude raw bearer tokens from logs
+6. Smoke test with MCP Inspector before handing it to other teams
+
+If the host app uses a reverse proxy or ingress, make sure `/mcp/` forwards to the mounted app unchanged.
+
 ## Auth model
 
 `/mcp` reads the incoming Magic Hour API key directly from:
@@ -56,6 +69,34 @@ Important:
 - If you want rate limits, gateway auth, or analytics on `/mcp`, add them in front of this route
 
 Never log the raw `Authorization` header.
+
+What this means:
+
+- This repo supports developer style clients now
+- Web connector style auth is out of scope here
+- If the product later needs OAuth, add it in the host app or in a future auth layer
+
+## Auth setup options for the host app
+
+### Option 1: Keep current bearer passthrough
+
+Use this now if the goal is:
+
+- Claude Code
+- MCP Inspector
+- manual desktop or CLI setups
+
+This is the lightest path.
+
+### Option 2: Add an auth adapter later
+
+Use this later if the goal is:
+
+- web chat
+- connector style flows
+- one click user setup
+
+The auth adapter should live outside this repo unless the team chooses to add OAuth directly here.
 
 ## Environment
 
@@ -164,6 +205,20 @@ Expected result:
 ## Upload behavior
 
 `generate_upload_urls` only mints presigned URLs. File bytes must be uploaded outside MCP. Then the returned `file_path` is passed into the `create_*` tool.
+
+This repo does not provide a browser upload UI or a chat upload bridge.
+
+## Future popup or chat upload flow
+
+If the team later wants ChatGPT, Claude Chat, or another web chat surface:
+
+1. User asks for a tool that needs a file
+2. Chat UI opens an upload popup, modal, or widget
+3. User selects a file
+4. Frontend or backend uploads the file
+5. Chat flow resumes with a hosted URL or Magic Hour `file_path`
+
+This is future phase work. See `docs/future-chat-ui-handoff.md`.
 
 ## Checklist
 

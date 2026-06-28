@@ -54,6 +54,19 @@ Best when:
 - the startup has no IdP
 - they do not want to build one
 
+## What the backend team would still need after OAuth
+
+OAuth only solves auth.
+
+If the product later wants web chat or connector style uploads, the team will still need:
+
+- a browser upload UI
+- a popup, modal, or embedded upload surface
+- a frontend or backend upload bridge
+- resume logic so chat continues after upload completes
+
+See `docs/future-chat-ui-handoff.md`.
+
 ## Open question
 
 Does the startup already have an OAuth-capable login system?
