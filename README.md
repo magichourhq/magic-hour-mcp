@@ -6,6 +6,7 @@ MCP server for Magic Hour image, video, and audio generation.
 
 - Local MCP Inspector
 - Claude Code
+- Codex CLI with remote HTTP MCP
 - Manual Claude Desktop style configs that allow custom headers
 - Backend mounted HTTP MCP at `/mcp`
 
@@ -76,6 +77,38 @@ claude mcp add --scope project --transport http magic-hour http://127.0.0.1:8000
 ```
 
 Then start a new Claude Code session in this repo.
+
+## Test with Codex CLI
+
+Codex supports streamable HTTP MCP servers and bearer token auth.
+
+1. Start the server:
+   ```sh
+   MAGIC_HOUR_ENVIRONMENT=mock python main.py
+   ```
+2. Set a temporary API key env var:
+   ```sh
+   export MAGIC_HOUR_API_KEY=test-key
+   ```
+   On PowerShell:
+   ```powershell
+   $env:MAGIC_HOUR_API_KEY = "test-key"
+   ```
+3. Register the MCP server:
+   ```sh
+   codex mcp add magic-hour --url http://127.0.0.1:8000/ --bearer-token-env-var MAGIC_HOUR_API_KEY
+   ```
+4. Verify the config:
+   ```sh
+   codex mcp get magic-hour --json
+   ```
+5. Start a new Codex session in this repo and ask it to call `ping`.
+
+Notes:
+
+- This works with the current API key passthrough model. OAuth is not required for Codex CLI.
+- In this repo, mock mode accepts any bearer token string.
+- Start Codex from the same shell where `MAGIC_HOUR_API_KEY` is set. Codex must inherit that environment for the MCP server to appear and authenticate correctly.
 
 ## File uploads
 

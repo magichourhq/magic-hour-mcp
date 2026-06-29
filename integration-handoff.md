@@ -82,11 +82,14 @@ What this means:
 
 Use this now if the goal is:
 
+- Codex CLI
 - Claude Code
 - MCP Inspector
 - manual desktop or CLI setups
 
 This is the lightest path.
+
+For Codex CLI, launch Codex from the same shell where the bearer token env var is set so the MCP server appears and authenticates correctly.
 
 ### Option 2: Add an auth adapter later
 
