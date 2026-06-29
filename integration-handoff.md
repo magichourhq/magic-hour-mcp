@@ -2,6 +2,10 @@
 
 Use this when mounting the server into an existing FastAPI app.
 
+If the receiving team wants a more explicit sequence, use `docs/detailed-step-by-step-integration.md`.
+
+If they want to give instructions directly to an AI coding agent, use `docs/ai-agent-go-live-instructions.md`.
+
 ## What to mount
 
 - Import `app` from `mcp_magichour.server`

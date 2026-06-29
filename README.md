@@ -19,6 +19,8 @@ MCP server for Magic Hour image, video, and audio generation.
 Core docs:
 
 - `integration-handoff.md` - FastAPI mount and smoke test guide
+- `docs/detailed-step-by-step-integration.md` - step-by-step backend integration guide
+- `docs/ai-agent-go-live-instructions.md` - instructions to give another AI agent for product integration
 
 ## Setup
 
