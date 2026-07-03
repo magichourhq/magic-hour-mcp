@@ -69,18 +69,18 @@ out.append("""- Every request requires `Authorization: Bearer <api_key>`.
 - Get a key at https://magichour.ai/developer?tab=api-keys (Developer Hub → API Keys → Create key). Key is shown once.
 - Base URL: `https://api.magichour.ai` (all paths below are relative to this, e.g. `/v1/ai-image-generator`).
 - No API-level OAuth/session — it's a single static bearer token per account.
-- **Mock server for dev/testing** (Python SDK): `Environment.MOCK_SERVER` (`https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0`) — returns instant mock data, any string works as the token, zero credits consumed. Use this while building/testing the MCP server.
+- **Mock server for dev/testing** (Python SDK): `Environment.MOCK_SERVER` (`https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0`) returns instant mock data, accepts any token string, and spends no credits. For this MCP server, point `MAGIC_HOUR_API_BASE_URL` at that URL when you want mock API behavior.
 """)
 
 out.append("## Async job lifecycle (applies to every `create`/generation endpoint)\n")
 out.append("""1. `POST /v1/<tool>` → returns immediately with `{id, credits_charged}`. Credits are charged at request time (refunded if the job later errors).
-2. Poll `GET /v1/{image,video,audio}-projects/{id}` until `status` leaves `queued`/`rendering`.
+2. Poll `GET /v1/{image,video,audio}-projects/{id}` until `status` leaves `queued`/`rendering`, or use the matching custom wait helper: `wait_for_image_project`, `wait_for_video_project`, or `wait_for_audio_project`.
 3. Status enum: `draft | queued | rendering | complete | error | canceled`.
 4. On `complete`, `downloads[]` is populated: `{url, expires_at}` — **download URLs expire after 24h**; re-call GET for fresh ones.
 5. On `error`, the `error: {message, code}` object is populated and credits are refunded.
 6. `DELETE /v1/{image,video,audio}-projects/{id}` permanently deletes rendered output (irreversible).
 
-This means every category (image/video/audio) needs exactly one shared `get_details(id)` and one shared `delete(id)` tool — they're identical in shape across all ~28 "create" tools in that category.
+The generated project detail and delete tools come from OpenAPI. The custom wait helpers wrap project details polling and return sanitized `exact_download_urls` separately from expiration metadata.
 """)
 
 out.append("## File inputs — 3 supported methods\n")
@@ -92,11 +92,16 @@ out.append("""Any `*_file_path` field in a request body accepts one of:
    - `PUT` the raw file bytes to `upload_url`.
    - Use the returned `file_path` in the actual generation call.
 
-**MCP design implication:** an LLM tool-call argument is JSON text, not binary — so an MCP tool generally can't accept raw file bytes directly. In practice tools should accept a URL string for `*_file_path` params; the presigned-upload flow (`/v1/files/upload-urls`) is only useful as an MCP tool if the *host application* uploads bytes out-of-band and just needs the MCP server to mint the URL, or if the calling agent already has a hosted URL for the asset. Worth confirming with the user whether raw upload needs to be in scope.
+**MCP design implication:** an LLM tool call is JSON text, not binary. Raw file bytes must be uploaded out-of-band. In this server, the expected flow is `videoAssets_generatePresignedUrl` -> upload bytes -> pass `file_path` into the generated create tool. `videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` tool despite the generated name, and it accepts `video`, `audio`, and `image` items.
 """)
 
 out.append("## Output delivery\n")
-out.append("- Downloads are URLs (not bytes) with `expires_at` ~24h out — same MCP constraint as above applies in reverse: tools should return the URL/metadata, not attempt to stream file bytes back through the tool result, unless the MCP host explicitly supports binary resources.\n")
+out.append("""- Magic Hour always returns download URLs with `expires_at`.
+- This MCP server returns sanitized `exact_download_urls` for completed projects when using `wait_for_*_project`.
+- Use `exact_download_urls[n]` or the exact `downloads[n].url` value as the link. Never append `expires_at` or `download_expiration_metadata` to signed URLs.
+- For image and audio projects, this MCP server also returns inline bytes when the client supports MCP image or audio content blocks.
+- Video projects stay URL-only because MCP has no native video content block.
+""")
 
 out.append("## Official Python SDK shape (`pip install magic_hour`)\n")
 out.append("""Useful if the MCP server wraps the SDK instead of calling `httpx`/`requests` directly (matches \"we just need to instantiate a client\").
@@ -111,6 +116,12 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 - `client.v1.image_projects` / `.video_projects` / `.audio_projects` — each has `.get(id=...)`, `.delete(id=...)`, `.check_result(id=..., wait_for_completion, download_outputs, download_directory)`.
 - `client.v1.files.upload_urls.create(...)`, `client.v1.face_detection.create(...)` / `.get(id=...)`.
 - Both sync (`Client`) and async (`AsyncClient`) variants exist with identical method shapes — `AsyncClient` is the natural fit inside an async MCP server (e.g. FastMCP).
+""")
+
+out.append("## Voice presets\n")
+out.append("""- The Magic Hour API accepts `voice_name` as a string for AI voice generation.
+- The runtime OpenAPI MCP server does not maintain a custom per-voice list tool.
+- Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `aiVoiceGenerator_createAudio`.
 """)
 
 out.append("## Note: Magic Hour's own official MCP server is documentation-only\n")

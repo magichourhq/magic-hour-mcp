@@ -32,11 +32,13 @@ The MCP repo already provides:
 
 - an HTTP MCP server
 - Magic Hour API key passthrough via `Authorization: Bearer <magic_hour_api_key>`
-- image, video, audio, and file tools
-- `generate_upload_urls`
+- runtime OpenAPI tool generation from `docs/openapi.json`
+- generated image, video, audio, and file tools named from OpenAPI `operationId`
+- `videoAssets_generatePresignedUrl`, the generated shared upload-URL tool for `/v1/files/upload-urls`
 - async create and poll flows
+- custom `wait_for_video_project`, `wait_for_image_project`, and `wait_for_audio_project` helpers
 - inline image and audio results where MCP clients support them
-- video download URLs
+- sanitized image, audio, and video download URLs
 
 The current MCP app exports:
 
@@ -215,7 +217,7 @@ Do not spend Magic Hour credits in automated tests.
 Use mock mode for test environments if needed:
 
 ```text
-MAGIC_HOUR_ENVIRONMENT=mock
+MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0
 ```
 
 ## Phase 2: Verify with MCP clients
@@ -239,8 +241,8 @@ Use:
 Call:
 
 1. `ping`
-2. `generate_upload_urls`
-3. one safe `get_*_project` call with a known id if available
+2. `videoAssets_generatePresignedUrl` with image, audio, and video item types
+3. one safe `imageProjects_getDetails`, `videoProjects_getDetails`, or `audioProjects_getDetails` call with a known id if available
 
 Expected `ping` result:
 
@@ -250,7 +252,7 @@ pong
 
 ### Step 2: Test real auth without spending generation credits
 
-Call `generate_upload_urls`:
+Call `videoAssets_generatePresignedUrl` with representative image, audio, and video items:
 
 ```json
 {
@@ -258,6 +260,14 @@ Call `generate_upload_urls`:
     {
       "type": "image",
       "extension": "png"
+    },
+    {
+      "type": "audio",
+      "extension": "mp3"
+    },
+    {
+      "type": "video",
+      "extension": "mp4"
     }
   ]
 }
@@ -275,7 +285,7 @@ This proves the bearer key reaches the real Magic Hour API.
 
 Only do this if credit spending is approved.
 
-Call `create_ai_image_generator`:
+Call `aiImageGenerator_createImage`:
 
 ```json
 {
@@ -286,7 +296,7 @@ Call `create_ai_image_generator`:
 }
 ```
 
-Then poll `get_image_project` until status is:
+Then pass the returned `id` to `wait_for_image_project` until status is:
 
 - `complete`
 - `error`
@@ -295,7 +305,9 @@ Then poll `get_image_project` until status is:
 Expected complete result:
 
 - project status is `complete`
-- `downloads` contains at least one URL
+- `exact_download_urls` contains at least one full signed URL
+- `download_expiration_metadata` is separate metadata and must not be appended to the URL
+- image and audio wait helpers may also include inline MCP media content
 
 ### Step 4: Test Codex CLI if it is part of rollout
 
@@ -403,7 +415,7 @@ Backend flow:
 1. validate product user
 2. validate file type
 3. validate file size
-4. call Magic Hour `generate_upload_urls`
+4. call Magic Hour `videoAssets_generatePresignedUrl` or the underlying `/v1/files/upload-urls` endpoint; this generated tool accepts image, audio, and video item types
 5. upload raw bytes to returned `upload_url`
 6. return `file_path` to the frontend
 
@@ -423,7 +435,7 @@ When the user asks for a tool that needs a file:
 Example mapping:
 
 ```text
-create_image_to_video.assets.image_file_path = file_path
+imageToVideo_createVideo.assets.image_file_path = file_path
 ```
 
 Do not send base64 file bytes through the LLM prompt.
@@ -516,10 +528,11 @@ https://<product-domain>/mcp/
 
 Document this behavior for AI clients:
 
-1. after `create_*`, poll the matching `get_*_project`
+1. after a generated create tool, call the matching `wait_for_*_project` helper
 2. stop polling only when status is `complete`, `error`, or `canceled`
-3. show `downloads` URLs to the user
-4. for uploads, call `generate_upload_urls`, upload bytes outside MCP, then pass `file_path` to the create tool
+3. show `exact_download_urls` or exact `downloads[n].url` values to the user
+4. never append `expires_at` or `download_expiration_metadata` to signed URLs
+5. for uploads, call `videoAssets_generatePresignedUrl`, upload bytes outside MCP, then pass `file_path` to the create tool; despite the generated name, this is the shared file upload-URL tool
 
 ### Step 5: Add a user-facing limitations section
 
@@ -569,7 +582,7 @@ Before marking this complete, verify:
 3. `Authorization` reaches the MCP app
 4. raw bearer tokens are not logged
 5. `ping` works through MCP Inspector
-6. `generate_upload_urls` works with a real Magic Hour key
+6. `videoAssets_generatePresignedUrl` works with a real Magic Hour key for image, audio, and video item types
 7. a bad key returns a clean auth error
 8. at least one generation flow was tested if approved
 9. final download URLs are shown to the user

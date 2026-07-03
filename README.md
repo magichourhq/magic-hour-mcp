@@ -92,6 +92,7 @@ Notes:
 - The runtime OpenAPI server no longer hand-registers every endpoint.
 - Generated creation tools return immediately with `id` and `credits_charged`.
 - We intentionally do not maintain per-endpoint friendly aliases. FastMCP derives tool names from OpenAPI `operationId`, for example `textToVideo_createVideo` and `imageProjects_getDetails`.
+- The shared `/v1/files/upload-urls` endpoint is currently exposed as `videoAssets_generatePresignedUrl` because that is the upstream OpenAPI `operationId`; it accepts `video`, `audio`, and `image` items.
 - Use the matching generated project details tool or custom `wait_for_*_project` helper to retrieve finished `downloads`.
 - `wait_for_video_project`, `wait_for_image_project`, and `wait_for_audio_project` return sanitized download fields so signed URLs stay separate from expiration metadata.
 - `wait_for_image_project` and `wait_for_audio_project` also try to inline completed media in the same response while still returning the full project JSON.
@@ -144,7 +145,7 @@ Notes:
 
 Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
 
-1. Call the generated upload-URL tool, currently `videoAssets_generatePresignedUrl`
+1. Call the generated shared upload-URL tool, currently `videoAssets_generatePresignedUrl`
 2. Upload the file bytes to the returned `upload_url`
 3. Pass the returned `file_path` into the generated creation tool
 
@@ -154,7 +155,7 @@ Claude Code can handle this because it has shell access. Plain chat attachments 
 
 For an upload based tool such as `imageToVideo_createVideo`:
 
-1. Call `videoAssets_generatePresignedUrl` for an `image`
+1. Call `videoAssets_generatePresignedUrl` for an `image`; the same tool also accepts `video` and `audio`
 2. Upload the local file bytes to the returned `upload_url`
 3. Pass the returned `file_path` into `imageToVideo_createVideo.assets.image_file_path`
 

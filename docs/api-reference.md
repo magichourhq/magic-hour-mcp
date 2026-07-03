@@ -1,42 +1,43 @@
-﻿# Magic Hour API Reference (for MCP tool design)
+# Magic Hour API Reference (for MCP tool design)
 
 Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
 
 ## Authentication
 
 - Every request requires `Authorization: Bearer <api_key>`.
-- Get a key at https://magichour.ai/developer?tab=api-keys (Developer Hub -> API Keys -> Create key). Key is shown once.
+- Get a key at https://magichour.ai/developer?tab=api-keys (Developer Hub → API Keys → Create key). Key is shown once.
 - Base URL: `https://api.magichour.ai` (all paths below are relative to this, e.g. `/v1/ai-image-generator`).
-- No API-level OAuth or session. It is a single static bearer token per account.
-- **Mock server for dev/testing** (Python SDK): `Environment.MOCK_SERVER` (`https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0`) returns instant mock data, accepts any token string, and spends no credits.
+- No API-level OAuth/session — it's a single static bearer token per account.
+- **Mock server for dev/testing** (Python SDK): `Environment.MOCK_SERVER` (`https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0`) returns instant mock data, accepts any token string, and spends no credits. For this MCP server, point `MAGIC_HOUR_API_BASE_URL` at that URL when you want mock API behavior.
 
 ## Async job lifecycle (applies to every `create`/generation endpoint)
 
-1. `POST /v1/<tool>` returns immediately with `{id, credits_charged}`. Credits are charged at request time and refunded if the job later errors.
-2. Poll `GET /v1/{image,video,audio}-projects/{id}` until `status` leaves `queued`/`rendering`.
+1. `POST /v1/<tool>` → returns immediately with `{id, credits_charged}`. Credits are charged at request time (refunded if the job later errors).
+2. Poll `GET /v1/{image,video,audio}-projects/{id}` until `status` leaves `queued`/`rendering`, or use the matching custom wait helper: `wait_for_image_project`, `wait_for_video_project`, or `wait_for_audio_project`.
 3. Status enum: `draft | queued | rendering | complete | error | canceled`.
-4. On `complete`, `downloads[]` is populated: `{url, expires_at}`. Download URLs expire after 24 hours, so call GET again if you need fresh ones.
+4. On `complete`, `downloads[]` is populated: `{url, expires_at}` — **download URLs expire after 24h**; re-call GET for fresh ones.
 5. On `error`, the `error: {message, code}` object is populated and credits are refunded.
 6. `DELETE /v1/{image,video,audio}-projects/{id}` permanently deletes rendered output (irreversible).
 
-This means every category (image, video, audio) needs one shared `get_details(id)` and one shared `delete(id)` tool.
+The generated project detail and delete tools come from OpenAPI. The custom wait helpers wrap project details polling and return sanitized `exact_download_urls` separately from expiration metadata.
 
-## File inputs - 3 supported methods
+## File inputs — 3 supported methods
 
 Any `*_file_path` field in a request body accepts one of:
 1. A direct public URL to the file.
 2. A Magic Hour library reference (file from a prior generation/upload in the account).
 3. A `file_path` obtained via the presigned-upload flow:
-   - `POST /v1/files/upload-urls` with `{"items":[{"type":"video","extension":"mp4"}]}` returns `{upload_url, expires_at, file_path}` per item.
+   - `POST /v1/files/upload-urls` with `{"items":[{"type":"video","extension":"mp4"}]}` → returns `{upload_url, expires_at, file_path}` per item.
    - `PUT` the raw file bytes to `upload_url`.
    - Use the returned `file_path` in the actual generation call.
 
-**MCP design implication:** an LLM tool call is JSON text, not binary. Raw file bytes must be uploaded out-of-band. In this server, the expected flow is `generate_upload_urls` -> upload bytes -> pass `file_path` into the `create_*` tool.
+**MCP design implication:** an LLM tool call is JSON text, not binary. Raw file bytes must be uploaded out-of-band. In this server, the expected flow is `videoAssets_generatePresignedUrl` -> upload bytes -> pass `file_path` into the generated create tool. `videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` tool despite the generated name, and it accepts `video`, `audio`, and `image` items.
 
 ## Output delivery
 
 - Magic Hour always returns download URLs with `expires_at`.
-- This MCP server surfaces those URLs to the user for every completed project.
+- This MCP server returns sanitized `exact_download_urls` for completed projects when using `wait_for_*_project`.
+- Use `exact_download_urls[n]` or the exact `downloads[n].url` value as the link. Never append `expires_at` or `download_expiration_metadata` to signed URLs.
 - For image and audio projects, this MCP server also returns inline bytes when the client supports MCP image or audio content blocks.
 - Video projects stay URL-only because MCP has no native video content block.
 
@@ -49,21 +50,21 @@ from magic_hour import Client          # or AsyncClient
 client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER for testing
 ```
 
-- `client.v1.<resource>.create(**params)` - 1:1 with each POST endpoint below. Returns immediately with `id` and `credits_charged`.
-- `client.v1.<resource>.generate(**params, wait_for_completion=True, download_outputs=True, download_directory=".")` - convenience wrapper that calls `create`, polls `check_result`, and downloads files to local disk. This is not suitable as-is for an MCP server because "local disk" means the server's filesystem, not the caller's.
-- `client.v1.image_projects` / `.video_projects` / `.audio_projects` - each has `.get(id=...)`, `.delete(id=...)`, `.check_result(...)`.
+- `client.v1.<resource>.create(**params)` — 1:1 with each POST endpoint below. Returns immediately (`id`, `credits_charged`). Resource names are the snake_case form of the path, e.g. `client.v1.ai_image_generator.create(...)`, `client.v1.face_swap_photo.create(...)`.
+- `client.v1.<resource>.generate(**params, wait_for_completion=True, download_outputs=True, download_directory=".")` — convenience wrapper: calls `create`, polls `check_result` internally (default poll interval 0.5s, override via `MAGIC_HOUR_POLL_INTERVAL` env var), and **downloads files to local disk**. ⚠️ Not directly reusable server-side as-is: "local disk" means the MCP server's disk, not the end caller's — would need `download_outputs=False` and return the URLs instead if exposed as an MCP tool.
+- `client.v1.image_projects` / `.video_projects` / `.audio_projects` — each has `.get(id=...)`, `.delete(id=...)`, `.check_result(id=..., wait_for_completion, download_outputs, download_directory)`.
 - `client.v1.files.upload_urls.create(...)`, `client.v1.face_detection.create(...)` / `.get(id=...)`.
-- Both sync (`Client`) and async (`AsyncClient`) variants exist with identical method shapes. `AsyncClient` is the natural fit inside an async MCP server.
+- Both sync (`Client`) and async (`AsyncClient`) variants exist with identical method shapes — `AsyncClient` is the natural fit inside an async MCP server (e.g. FastMCP).
 
 ## Voice presets
 
-- The Magic Hour SDK exposes 494 preset voices for `ai_voice_generator`.
-- This MCP server keeps `voice_name` as a plain string to avoid a huge schema.
-- Use `list_ai_voice_presets` to browse or filter valid preset names before calling `create_ai_voice_generator`.
+- The Magic Hour API accepts `voice_name` as a string for AI voice generation.
+- The runtime OpenAPI MCP server does not maintain a custom per-voice list tool.
+- Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `aiVoiceGenerator_createAudio`.
 
 ## Note: Magic Hour's own official MCP server is documentation-only
 
-Magic Hour hosts `https://docs.magichour.ai/mcp`. That server is for docs lookup only. It does not execute Magic Hour API calls or expose action tools.
+Magic Hour hosts `https://docs.magichour.ai/mcp` — an MCP server that lets coding assistants (Cursor/VS Code/Claude Code) pull accurate docs/code snippets while *writing integration code*. It does **not** execute API calls or expose action tools. It's unrelated to (and won't conflict with) the action-execution MCP server we're building, which lets an agent actually *call* the Magic Hour API at runtime. Worth knowing so nobody confuses the two.
 
 ## Webhooks (likely out of scope for v1)
 
@@ -282,7 +283,7 @@ Automatically generate subtitles for your video in multiple languages.
 - `style` (object, optional): Style of the face swap video.
   - `version` (string, optional) enum=['v1', 'v2', 'default']: * `v1` - May preserve skin detail and texture better, but weaker identity preservation. * `v2` - Faster, sharper, better handling of hair and glasses. stronger identity preservation. * `default` - Use the version we...
 - `assets` (object, required): Provide the assets for face swap. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) - swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** - specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
   - `image_file_path` (string, optional): The path of the input image with the face to be swapped. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
@@ -364,7 +365,7 @@ Automatically generate subtitles for your video in multiple languages.
 #### GET /v1/video-projects/{id}
 `operationId: videoProjects.getDetails`
 
-Check the progress of a video project. The `downloads` field is populated after a successful render. **Statuses** - `queued` - waiting to start - `rendering` - in progress - `complete` - ready; see `downloads` - `error` - a failure occurred (see `error`) - `canceled` - user canceled - `draft` - not used
+Check the progress of a video project. The `downloads` field is populated after a successful render. **Statuses** - `queued` — waiting to start - `rendering` — in progress - `complete` — ready; see `downloads` - `error` — a failure occurred (see `error`) - `canceled` — user canceled - `draft` — not used
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the video project. This value is returned by all of the POST APIs that create a video.
@@ -629,7 +630,7 @@ Create a face swap photo. Each photo costs 10 credits. The height/width of the o
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for face swap photo
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) - swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** - specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
   - `source_file_path` (string, optional): This is the image from which the face is extracted. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
@@ -677,7 +678,7 @@ Remove background from image. Each image costs 5 credits.
 #### GET /v1/image-projects/{id}
 `operationId: imageProjects.getDetails`
 
-Check the progress of a image project. The `downloads` field is populated after a successful render. **Statuses** - `queued` - waiting to start - `rendering` - in progress - `complete` - ready; see `downloads` - `error` - a failure occurred (see `error`) - `canceled` - user canceled - `draft` - not used
+Check the progress of a image project. The `downloads` field is populated after a successful render. **Statuses** - `queued` — waiting to start - `rendering` — in progress - `complete` — ready; see `downloads` - `error` — a failure occurred (see `error`) - `canceled` — user canceled - `draft` — not used
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the image project. This value is returned by all of the POST APIs that create an image.
@@ -761,7 +762,7 @@ Generate speech from text. Each character costs 0.05 credits. The cost is rounde
 #### GET /v1/audio-projects/{id}
 `operationId: audioProjects.getDetails`
 
-Check the progress of a audio project. The `downloads` field is populated after a successful render. **Statuses** - `queued` - waiting to start - `rendering` - in progress - `complete` - ready; see `downloads` - `error` - a failure occurred (see `error`) - `canceled` - user canceled - `draft` - not used
+Check the progress of a audio project. The `downloads` field is populated after a successful render. **Statuses** - `queued` — waiting to start - `rendering` — in progress - `complete` — ready; see `downloads` - `error` — a failure occurred (see `error`) - `canceled` — user canceled - `draft` — not used
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the audio project. This value is returned by all of the POST APIs that create an audio.

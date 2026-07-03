@@ -7,6 +7,8 @@ This guide is for the path we support today:
 - mount the MCP server into an existing FastAPI app
 - pass through the user's Magic Hour API key as a bearer token
 - test with MCP Inspector, Codex CLI, or Claude Code
+- generate endpoint tools from `docs/openapi.json` at startup with `FastMCP.from_openapi()`
+- keep only small custom helper tools for polling, upload bridging, and inline image/audio fetches
 
 This guide is not for:
 
@@ -198,9 +200,9 @@ Use these settings:
 Then test in this order:
 
 1. Call `ping`
-2. Call `generate_upload_urls`
-3. Call one `create_*` tool
-4. Poll the matching `get_*_project` tool
+2. Call `videoAssets_generatePresignedUrl`, the shared upload-URL tool for image/audio/video assets
+3. Call one generated create tool, such as `aiImageGenerator_createImage`
+4. Poll with the matching custom `wait_for_*_project` helper
 
 Expected `ping` result:
 
@@ -208,7 +210,7 @@ Expected `ping` result:
 
 ## Step 11: Verify an authenticated tool
 
-Call `generate_upload_urls` with:
+Call `videoAssets_generatePresignedUrl` with representative image, audio, and video items:
 
 ```json
 {
@@ -216,6 +218,14 @@ Call `generate_upload_urls` with:
     {
       "type": "image",
       "extension": "png"
+    },
+    {
+      "type": "audio",
+      "extension": "mp3"
+    },
+    {
+      "type": "video",
+      "extension": "mp4"
     }
   ]
 }
@@ -231,7 +241,7 @@ This is a good auth check because it exercises the real Magic Hour API path with
 
 ## Step 12: Verify a real generation flow
 
-Call `create_ai_image_generator` with:
+Call `aiImageGenerator_createImage` with:
 
 ```json
 {
@@ -242,17 +252,22 @@ Call `create_ai_image_generator` with:
 }
 ```
 
-Then poll `get_image_project` until the project completes.
+Then pass the returned `id` to `wait_for_image_project`.
+
+You can also poll manually with `imageProjects_getDetails`, but prefer the custom wait helper for AI clients.
 
 Expected result:
 
-1. `create_ai_image_generator` returns an `id`
-2. `get_image_project` returns project status
-3. on `complete`, the response includes direct download URLs
+1. `aiImageGenerator_createImage` returns an `id`
+2. `wait_for_image_project` waits until `complete`, `error`, `canceled`, or timeout
+3. on `complete`, the response includes `exact_download_urls`
+4. image and audio wait helpers also try to return inline MCP media content
 
 Important:
 
 - real `create_*` calls may spend credits
+- use `exact_download_urls[n]` or the exact `downloads[n].url` value as the link
+- never append `expires_at` or `download_expiration_metadata` to a signed URL
 
 ## Step 13: Verify the bad key path once
 
@@ -262,7 +277,7 @@ Run this once against the real API:
 Authorization: Bearer not-a-real-magic-hour-key
 ```
 
-Then call `generate_upload_urls` again.
+Then call `videoAssets_generatePresignedUrl` again.
 
 Expected result:
 
@@ -276,19 +291,20 @@ This MCP server does not accept raw file bytes directly inside tool arguments.
 
 The upload flow is:
 
-1. Call `generate_upload_urls`
+1. Call `videoAssets_generatePresignedUrl`, the generated shared upload-URL tool for `/v1/files/upload-urls`
 2. Upload the file bytes to the returned `upload_url`
-3. Pass the returned `file_path` into the `create_*` tool
+3. Pass the returned `file_path` into the generated create tool
 
 Example:
 
-1. call `generate_upload_urls` for an image
+1. call `videoAssets_generatePresignedUrl` for an image; the same tool also accepts audio and video items
 2. upload the bytes outside MCP
-3. pass the returned `file_path` into `create_image_to_video.assets.image_file_path`
+3. pass the returned `file_path` into `imageToVideo_createVideo.assets.image_file_path`
 
 Important:
 
-- this repo mints upload URLs
+- this repo mints upload URLs with `videoAssets_generatePresignedUrl`; despite the generated name, it is not video-only
+- the custom `upload_file_to_presigned_url` helper can upload local files for CLI testing when the MCP server can read the path
 - this repo does not upload the bytes for browser chat users
 - CLI style clients can handle this more easily because they can access local files
 
@@ -338,7 +354,7 @@ Before telling another team the integration is done, confirm:
 3. the `Authorization` header is preserved
 4. bearer tokens are not logged
 5. MCP Inspector can call `ping`
-6. MCP Inspector can call `generate_upload_urls`
+6. MCP Inspector can call `videoAssets_generatePresignedUrl` with image, audio, and video item types
 7. at least one real `create_*` flow was tested if credit-spending validation is required
 8. Codex CLI or Claude Code testing was verified if those clients are part of the rollout
 

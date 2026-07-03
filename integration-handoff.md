@@ -14,6 +14,32 @@ If they want to give instructions directly to an AI coding agent, use `docs/ai-a
 
 The internal FastMCP app is intentionally configured for `/`, not `/mcp`.
 
+## What this server generates
+
+At startup, the server reads `docs/openapi.json` and builds tools with `FastMCP.from_openapi()`.
+
+The generated tool names come from OpenAPI `operationId` values. Examples:
+
+- `videoAssets_generatePresignedUrl`
+- `aiImageGenerator_createImage`
+- `imageProjects_getDetails`
+- `videoProjects_getDetails`
+
+`videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` endpoint even though the generated name says `videoAssets`. It accepts `video`, `audio`, and `image` asset items.
+
+Do not hand-register every Magic Hour endpoint in the host backend. New endpoints should flow in by updating `docs/openapi.json`, then restarting the MCP server.
+
+This repo only keeps a small custom layer for cross-cutting behavior:
+
+- `wait_for_video_project`
+- `wait_for_image_project`
+- `wait_for_audio_project`
+- `fetch_image_download`
+- `fetch_audio_download`
+- `upload_file_to_presigned_url`
+
+The OpenAPI policy layer adds broad agent guidance by endpoint group, not one-off per-endpoint mappings.
+
 ## Required lifespan wiring
 
 In FastAPI and Starlette, `lifespan` means app startup and shutdown logic.
@@ -109,10 +135,16 @@ The auth adapter should live outside this repo unless the team chooses to add OA
 
 Default behavior uses the real Magic Hour API.
 
-Use mock mode for local or staging tests that should not spend credits:
+Use an alternate API base for local or staging tests that should not spend credits:
 
 ```text
-MAGIC_HOUR_ENVIRONMENT=mock
+MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0
+```
+
+Optional:
+
+```text
+MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
 ```
 
 ## Smoke test
@@ -145,7 +177,7 @@ Expected result:
 
 ### 4. Verify an authenticated tool
 
-Call `generate_upload_urls` with:
+Call `videoAssets_generatePresignedUrl` with representative image, audio, and video items:
 
 ```json
 {
@@ -153,6 +185,14 @@ Call `generate_upload_urls` with:
     {
       "type": "image",
       "extension": "png"
+    },
+    {
+      "type": "audio",
+      "extension": "mp3"
+    },
+    {
+      "type": "video",
+      "extension": "mp4"
     }
   ]
 }
@@ -161,11 +201,11 @@ Call `generate_upload_urls` with:
 Expected result:
 
 - Real mode: returns `upload_url`, `expires_at`, and `file_path`
-- Mock mode: returns a successful mock response
+- Alternate API base or mock mode: returns a successful mock response
 
 ### 5. Verify create and poll
 
-Call:
+Call `aiImageGenerator_createImage`:
 
 ```json
 {
@@ -176,13 +216,16 @@ Call:
 }
 ```
 
-with `create_ai_image_generator`, then poll with `get_image_project`.
+Then pass the returned `id` to `wait_for_image_project`.
+
+You can also poll with the generated `imageProjects_getDetails` tool, but the custom wait helper is easier for AI clients because it waits until the project reaches a terminal state and normalizes download links.
 
 Expected result:
 
 - Create returns `{id, credits_charged}`
-- Poll returns project status
-- On `complete`, the response includes direct download URLs
+- Wait returns project status
+- On `complete`, the response includes `exact_download_urls`
+- `download_expiration_metadata` is separate metadata and must not be appended to the URL
 - Image projects also include inline image bytes when the client supports them
 
 ### 6. Verify the bad-token path
@@ -195,7 +238,7 @@ Use:
 Authorization: Bearer not-a-real-magic-hour-key
 ```
 
-Call `generate_upload_urls` again.
+Call `videoAssets_generatePresignedUrl` again.
 
 Expected result:
 
@@ -205,13 +248,17 @@ Expected result:
 
 ## Output behavior
 
-- `get_image_project` returns status, direct download URLs, and inline image bytes
-- `get_audio_project` returns status, direct download URLs, and inline audio bytes
-- `get_video_project` returns status and direct download URLs
+- `wait_for_image_project` returns status, sanitized download fields, and inline image bytes when supported
+- `wait_for_audio_project` returns status, sanitized download fields, and inline audio bytes when supported
+- `wait_for_video_project` returns status and sanitized download fields
+- For every completed project, use `exact_download_urls[n]` or the exact `downloads[n].url` value as the shareable link
+- Never append `expires_at` or `download_expiration_metadata` values to a signed URL
 
 ## Upload behavior
 
-`generate_upload_urls` only mints presigned URLs. File bytes must be uploaded outside MCP. Then the returned `file_path` is passed into the `create_*` tool.
+`videoAssets_generatePresignedUrl` is the shared generated tool for `/v1/files/upload-urls`; despite the name, it mints presigned URLs for image, audio, and video assets. File bytes must be uploaded outside MCP. Then the returned `file_path` is passed into the generated create tool.
+
+For local CLI testing, `upload_file_to_presigned_url` can upload a file that exists on the MCP server's filesystem.
 
 This repo does not provide a browser upload UI or a chat upload bridge.
 
@@ -231,6 +278,7 @@ This is future phase work. See `docs/future-chat-ui-handoff.md`.
 
 - Mount `mcp_magichour.server.app` at `/mcp`
 - Merge `mcp_magichour.server.lifespan`
-- Decide whether staging should use `MAGIC_HOUR_ENVIRONMENT=mock`
+- Decide whether staging should override `MAGIC_HOUR_API_BASE_URL`
+- Verify `videoAssets_generatePresignedUrl` with at least one `image`, `audio`, and `video` item
 - Add any gateway-level auth, rate limits, or analytics needed on `/mcp`
 - Run the smoke test above
