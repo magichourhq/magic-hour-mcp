@@ -93,8 +93,10 @@ Notes:
 - Generated creation tools return immediately with `id` and `credits_charged`.
 - We intentionally do not maintain per-endpoint friendly aliases. FastMCP derives tool names from OpenAPI `operationId`, for example `textToVideo_createVideo` and `imageProjects_getDetails`.
 - Use the matching generated project details tool or custom `wait_for_*_project` helper to retrieve finished `downloads`.
-- `wait_for_image_project` and `wait_for_audio_project` try to inline completed media in the same response while still returning the full project JSON.
+- `wait_for_video_project`, `wait_for_image_project`, and `wait_for_audio_project` return sanitized download fields so signed URLs stay separate from expiration metadata.
+- `wait_for_image_project` and `wait_for_audio_project` also try to inline completed media in the same response while still returning the full project JSON.
 - `fetch_image_download` and `fetch_audio_download` remain available as fallback tools if you want to retry a specific `downloads[n].url`.
+- For custom wait tools, use `exact_download_urls[n]` as the clickable/downloadable URL. Expiration timestamps are returned separately in `download_expiration_metadata` and must never be appended to URLs.
 
 ## Test with Claude Code
 
@@ -161,14 +163,16 @@ the custom `upload_file_to_presigned_url` helper can perform step 2 if the MCP
 server can read the local file path. For remote/web chat, the caller or host app
 still needs to handle the upload bridge.
 
-## Inline media fetch
+## Inline Media And Signed URLs
 
 For Inspector testing after a project is complete:
 
-1. Call `wait_for_image_project` or `wait_for_audio_project`
-2. Look at the same response for the project JSON and inline media blocks
-3. If a particular download did not inline cleanly, retry it with `fetch_image_download` or `fetch_audio_download`
+1. Call `wait_for_video_project`, `wait_for_image_project`, or `wait_for_audio_project`
+2. Use `exact_download_urls[n]` as the exact link to share or open
+3. For image/audio projects, look at the same response for inline media blocks
+4. If a particular image/audio download did not inline cleanly, retry it with `fetch_image_download` or `fetch_audio_download`
 
-The wait helpers now try to download and return generated media as MCP image/audio content instead of making you juggle a second tool in the happy path.
+The image/audio wait helpers now try to download and return generated media as MCP image/audio content instead of making you juggle a second tool in the happy path.
+When sharing links, use only `exact_download_urls[n]` or the exact `downloads[n].url` value. Do not append `expires_at` or `download_expiration_metadata` values to the URL.
 
 For future web chat work, see `docs/future-chat-ui-handoff.md`.

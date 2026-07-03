@@ -20,12 +20,19 @@ from starlette.middleware.cors import CORSMiddleware
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
 
+ProjectType = Literal["video", "image", "audio"]
+
 DEFAULT_API_BASE_URL = "https://api.magichour.ai"
 DEFAULT_OPENAPI_PATH = Path(__file__).resolve().parent.parent / "docs" / "openapi.json"
 API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0)
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
+TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
+SIGNED_DOWNLOAD_GUIDANCE = (
+    "Returns sanitized download fields. Use `exact_download_urls[n]` or `downloads[n].url` exactly as returned; "
+    "do not shorten it, remove query parameters, or append expiration metadata."
+)
 
 
 def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
@@ -69,18 +76,20 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="wait_for_video_project",
-        description="Poll a video project until it completes, errors, is canceled, or times out. Returns the final project JSON including downloads when available.",
+        description=(
+            "Poll a video project until it completes, errors, is canceled, or times out. "
+            f"{SIGNED_DOWNLOAD_GUIDANCE}"
+        ),
     )
-    async def wait_for_video_project(id: str, poll_interval_seconds: float = 2.0, timeout_seconds: float = 300.0) -> dict[str, Any]:
-        return await _wait_for_project("video", id, poll_interval_seconds, timeout_seconds)
+    async def wait_for_video_project(id: str, poll_interval_seconds: float = 2.0, timeout_seconds: float = 300.0) -> ToolResult:
+        return await _wait_for_project_result("video", id, poll_interval_seconds, timeout_seconds)
 
     @mcp.tool(
         name="wait_for_image_project",
         description=(
             "Poll an image project until it completes, errors, is canceled, or times out. Returns the final "
             "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
-            "clients. Treat each `downloads[n].url` as an exact signed URL: do not shorten it, remove query "
-            "parameters, or append `expires_at` onto the URL string."
+            f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
     )
     async def wait_for_image_project(
@@ -91,10 +100,11 @@ def register_custom_tools(mcp: FastMCP) -> None:
         max_inline_downloads: int = 4,
         max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
     ) -> ToolResult:
-        project = await _wait_for_project("image", id, poll_interval_seconds, timeout_seconds)
-        return await _project_to_tool_result(
+        return await _wait_for_project_result(
             "image",
-            project,
+            id,
+            poll_interval_seconds,
+            timeout_seconds,
             include_inline_downloads=include_inline_downloads,
             max_inline_downloads=max_inline_downloads,
             max_bytes_per_download=max_bytes_per_download,
@@ -105,8 +115,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         description=(
             "Poll an audio project until it completes, errors, is canceled, or times out. Returns the final "
             "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
-            "clients. Treat each `downloads[n].url` as an exact signed URL: do not shorten it, remove query "
-            "parameters, or append `expires_at` onto the URL string."
+            f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
     )
     async def wait_for_audio_project(
@@ -117,10 +126,11 @@ def register_custom_tools(mcp: FastMCP) -> None:
         max_inline_downloads: int = 4,
         max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
     ) -> ToolResult:
-        project = await _wait_for_project("audio", id, poll_interval_seconds, timeout_seconds)
-        return await _project_to_tool_result(
+        return await _wait_for_project_result(
             "audio",
-            project,
+            id,
+            poll_interval_seconds,
+            timeout_seconds,
             include_inline_downloads=include_inline_downloads,
             max_inline_downloads=max_inline_downloads,
             max_bytes_per_download=max_bytes_per_download,
@@ -144,39 +154,28 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
         return {"uploaded": True, "status_code": response.status_code, "local_file_path": str(path)}
 
-    @mcp.tool(
-        name="fetch_image_download",
-        description=(
-            "Fetch an image `downloads[n].url` from a completed image project and return it as inline MCP image "
-            "content for Inspector or compatible clients. Pass the exact full signed URL from `downloads[n].url` "
-            "without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
-        ),
-    )
-    async def fetch_image_download(
-        download_url: str,
-        max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
-    ):
-        data, mime_type = await _fetch_media_bytes(download_url, expected_prefix="image/", max_bytes=max_bytes)
-        return Image(data=data).to_image_content(mime_type=mime_type)
+    _register_media_fetch_tool(mcp, "image")
+    _register_media_fetch_tool(mcp, "audio")
 
-    @mcp.tool(
-        name="fetch_audio_download",
-        description=(
-            "Fetch an audio `downloads[n].url` from a completed audio project and return it as inline MCP audio "
-            "content for Inspector or compatible clients. Pass the exact full signed URL from `downloads[n].url` "
-            "without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
-        ),
+
+def _register_media_fetch_tool(mcp: FastMCP, media_type: Literal["image", "audio"]) -> None:
+    tool_name = f"fetch_{media_type}_download"
+    description = (
+        f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as inline MCP "
+        f"{media_type} content for Inspector or compatible clients. Pass the exact full signed URL from "
+        "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
     )
-    async def fetch_audio_download(
-        download_url: str,
-        max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
-    ):
-        data, mime_type = await _fetch_media_bytes(download_url, expected_prefix="audio/", max_bytes=max_bytes)
-        return Audio(data=data).to_audio_content(mime_type=mime_type)
+
+    @mcp.tool(name=tool_name, description=description)
+    async def fetch_download(download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES):
+        data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
+        if media_type == "image":
+            return _media_content("image", data, mime_type)
+        return _media_content("audio", data, mime_type)
 
 
 async def _wait_for_project(
-    project_type: Literal["video", "image", "audio"],
+    project_type: ProjectType,
     project_id: str,
     poll_interval_seconds: float,
     timeout_seconds: float,
@@ -191,7 +190,7 @@ async def _wait_for_project(
             project = response.json()
             status = project.get("status")
 
-            if status in {"complete", "error", "canceled"}:
+            if status in TERMINAL_PROJECT_STATUSES:
                 return project
 
             if asyncio.get_running_loop().time() >= deadline:
@@ -202,6 +201,26 @@ async def _wait_for_project(
                 }
 
             await asyncio.sleep(max(poll_interval_seconds, 0.5))
+
+
+async def _wait_for_project_result(
+    project_type: ProjectType,
+    project_id: str,
+    poll_interval_seconds: float,
+    timeout_seconds: float,
+    *,
+    include_inline_downloads: bool = False,
+    max_inline_downloads: int = 0,
+    max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
+) -> ToolResult:
+    project = await _wait_for_project(project_type, project_id, poll_interval_seconds, timeout_seconds)
+    return await _project_to_tool_result(
+        project_type,
+        project,
+        include_inline_downloads=include_inline_downloads,
+        max_inline_downloads=max_inline_downloads,
+        max_bytes_per_download=max_bytes_per_download,
+    )
 
 
 async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:
@@ -229,7 +248,7 @@ async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes:
 
 
 async def _project_to_tool_result(
-    project_type: Literal["image", "audio"],
+    project_type: ProjectType,
     project: dict[str, Any],
     *,
     include_inline_downloads: bool,
@@ -243,19 +262,22 @@ async def _project_to_tool_result(
     download_urls = _project_download_urls(project)
     status = str(project.get("status", "unknown"))
 
-    if status == "complete" and include_inline_downloads and max_inline_downloads > 0:
-        if download_urls:
-            content.append(
-                TextContent(
-                    type="text",
-                    text=_project_download_guidance_text(project_type, project, download_urls),
-                )
+    if status == "complete" and download_urls:
+        content.append(
+            TextContent(
+                type="text",
+                text=_project_download_guidance_text(project_type, project),
             )
+        )
+
+    if status == "complete" and _can_inline_media(project_type, include_inline_downloads, max_inline_downloads):
+        media_project_type = project_type
+        assert media_project_type in {"image", "audio"}
         for index, download_url in enumerate(download_urls[:max_inline_downloads], start=1):
             try:
                 data, mime_type = await _fetch_media_bytes(
                     download_url,
-                    expected_prefix=f"{project_type}/",
+                    expected_prefix=f"{media_project_type}/",
                     max_bytes=max_bytes_per_download,
                 )
             except Exception as exc:
@@ -267,10 +289,10 @@ async def _project_to_tool_result(
                 )
                 continue
 
-            if project_type == "image":
-                content.append(Image(data=data).to_image_content(mime_type=mime_type))
+            if media_project_type == "image":
+                content.append(_media_content("image", data, mime_type))
             else:
-                content.append(Audio(data=data).to_audio_content(mime_type=mime_type))
+                content.append(_media_content("audio", data, mime_type))
 
         remaining_downloads = len(download_urls) - max_inline_downloads
         if remaining_downloads > 0:
@@ -288,7 +310,17 @@ async def _project_to_tool_result(
             )
         )
 
-    return ToolResult(content=content, structured_content=project)
+    return ToolResult(content=content, structured_content=_project_structured_content_for_agent(project))
+
+
+def _can_inline_media(project_type: ProjectType, include_inline_downloads: bool, max_inline_downloads: int) -> bool:
+    return include_inline_downloads and max_inline_downloads > 0 and project_type in {"image", "audio"}
+
+
+def _media_content(media_type: Literal["image", "audio"], data: bytes, mime_type: str) -> Any:
+    if media_type == "image":
+        return Image(data=data).to_image_content(mime_type=mime_type)
+    return Audio(data=data).to_audio_content(mime_type=mime_type)
 
 
 def _project_download_urls(project: dict[str, Any]) -> list[str]:
@@ -303,6 +335,42 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
             if isinstance(url, str) and url:
                 urls.append(url)
     return urls
+
+
+def _project_structured_content_for_agent(project: dict[str, Any]) -> dict[str, Any]:
+    structured_project = dict(project)
+    downloads = project.get("downloads")
+    if not isinstance(downloads, list):
+        return structured_project
+
+    exact_download_urls: list[str] = []
+    download_expiration_metadata: list[dict[str, str]] = []
+    normalized_downloads: list[dict[str, str]] = []
+
+    for index, item in enumerate(downloads):
+        if not isinstance(item, dict):
+            continue
+
+        url = item.get("url")
+        expires_at = item.get("expires_at")
+
+        if isinstance(url, str) and url:
+            exact_download_urls.append(url)
+            normalized_downloads.append({"url": url})
+
+        if isinstance(expires_at, str) and expires_at:
+            download_expiration_metadata.append(
+                {
+                    "download_index": str(index),
+                    "expires_at": expires_at,
+                    "note": "Metadata only. Do not append this value to the download URL.",
+                }
+            )
+
+    structured_project["downloads"] = normalized_downloads
+    structured_project["exact_download_urls"] = exact_download_urls
+    structured_project["download_expiration_metadata"] = download_expiration_metadata
+    return structured_project
 
 
 def _project_status_text(project_type: str, project: dict[str, Any]) -> str:
@@ -333,14 +401,14 @@ def _project_status_text(project_type: str, project: dict[str, Any]) -> str:
 def _project_download_guidance_text(
     project_type: str,
     project: dict[str, Any],
-    download_urls: list[str],
 ) -> str:
     downloads = project.get("downloads")
     lines = [
-        f"Use the exact full signed {project_type} download URL from `downloads[n].url`.",
+        f"IMPORTANT: Use only `downloads[n].url` as the exact full signed {project_type} download URL.",
         "Do not shorten the URL.",
         "Do not remove query parameters.",
-        "Do not append `expires_at` to the URL; it is separate metadata.",
+        "Do not append `downloads[n].expires_at` to the URL.",
+        "`expires_at` is metadata only and is never part of the clickable/downloadable URL.",
     ]
 
     if isinstance(downloads, list):
@@ -350,9 +418,11 @@ def _project_download_guidance_text(
             url = item.get("url")
             expires_at = item.get("expires_at")
             if isinstance(url, str) and url:
-                lines.append(f"downloads[{index - 1}].url = {url}")
+                lines.append(f"EXACT_DOWNLOAD_URL[{index - 1}] = {url}")
             if isinstance(expires_at, str) and expires_at:
-                lines.append(f"downloads[{index - 1}].expires_at = {expires_at}")
+                lines.append(
+                    f"EXPIRES_AT[{index - 1}] = {expires_at} (metadata only; do not append to the URL)"
+                )
 
     return "\n".join(lines)
 

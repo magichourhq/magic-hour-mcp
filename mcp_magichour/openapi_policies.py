@@ -57,7 +57,8 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
             f"This starts an async {asset_type} generation job and returns `id` plus `credits_charged` immediately. "
             f"If the user wants the finished result, call the `{wait_tool}` helper with the returned id, or poll "
             f"the matching `GET /v1/{asset_type}-projects/{{id}}` endpoint until status is `complete`, `error`, "
-            "or `canceled`. Completed projects include `downloads` with direct URLs."
+            "or `canceled`. Completed projects include `downloads` with direct URLs. The custom wait helper also "
+            "returns `exact_download_urls` separately from expiration metadata."
         )
 
     if method == "GET" and path in PROJECT_DETAIL_PATHS:
