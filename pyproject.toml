@@ -1,13 +1,14 @@
 [project]
 name = "mcp-magichour"
 version = "0.1.0"
-description = "MCP server wrapping the Magic Hour API"
+description = "OpenAPI-backed MCP server wrapping the Magic Hour API"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.17.0",
-    "magic_hour>=0.66.0",
-    "pydantic>=2.0.0",
+    "fastmcp>=3.0.0",
+    "httpx>=0.28.1",
     "python-dotenv>=1.0.0",
+    "starlette>=1.0.1",
+    "uvicorn>=0.35.0",
 ]
 
 [build-system]

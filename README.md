@@ -1,6 +1,11 @@
 # mcp-magichour
 
-MCP server for Magic Hour image, video, and audio generation.
+OpenAPI-backed MCP server for Magic Hour image, video, and audio generation.
+
+At startup, this server reads `docs/openapi.json` and builds MCP tools with
+`FastMCP.from_openapi()`. The OpenAPI spec supplies endpoint coverage, while
+Magic Hour MCP policies add agent-facing guidance for async polling, uploads,
+and project downloads.
 
 ## Supported Today
 
@@ -9,6 +14,7 @@ MCP server for Magic Hour image, video, and audio generation.
 - Codex CLI with remote HTTP MCP
 - Manual Claude Desktop style configs that allow custom headers
 - Backend mounted HTTP MCP at `/mcp`
+- Runtime OpenAPI tool generation via standalone `fastmcp`
 
 ## Not Included In This Repo
 
@@ -42,13 +48,30 @@ http://127.0.0.1:8000/
 
 This local dev server runs at `/`, not `/mcp`. The host app adds `/mcp` when it mounts the server.
 
-Use the free mock backend for local testing:
+By default this calls the real Magic Hour API at:
 
-```sh
-MAGIC_HOUR_ENVIRONMENT=mock python main.py
+```text
+https://api.magichour.ai
 ```
 
-In mock mode, any bearer token string works and no real credits are spent.
+Every MCP request must include your Magic Hour API key:
+
+```text
+Authorization: Bearer <magic_hour_api_key>
+```
+
+Optional environment variables:
+
+```sh
+MAGIC_HOUR_API_BASE_URL=https://api.magichour.ai
+MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
+```
+
+You can still point at a mock or alternate API base by overriding `MAGIC_HOUR_API_BASE_URL`:
+
+```sh
+MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0 python main.py
+```
 
 ## Test with MCP Inspector
 
@@ -62,13 +85,16 @@ In mock mode, any bearer token string works and no real credits are spent.
    - URL: `http://127.0.0.1:8000/`
    - Header: `Authorization: Bearer <magic_hour_api_key>`
 4. Call `ping`.
-5. Call a `create_*` tool, then the matching `get_*_project` tool.
+5. Call a generated OpenAPI tool such as `videoAssets_generatePresignedUrl` or `textToVideo_createVideo`, or one of the custom `wait_for_*_project` tools.
 
 Notes:
 
-- Mock download URLs are not fetchable media. Use a real key if you need to verify inline image or audio rendering.
-- Completed image and audio results include inline media plus direct download URLs.
-- Completed video results include direct download URLs.
+- The runtime OpenAPI server no longer hand-registers every endpoint.
+- Generated creation tools return immediately with `id` and `credits_charged`.
+- We intentionally do not maintain per-endpoint friendly aliases. FastMCP derives tool names from OpenAPI `operationId`, for example `textToVideo_createVideo` and `imageProjects_getDetails`.
+- Use the matching generated project details tool or custom `wait_for_*_project` helper to retrieve finished `downloads`.
+- `wait_for_image_project` and `wait_for_audio_project` try to inline completed media in the same response while still returning the full project JSON.
+- `fetch_image_download` and `fetch_audio_download` remain available as fallback tools if you want to retry a specific `downloads[n].url`.
 
 ## Test with Claude Code
 
@@ -86,7 +112,7 @@ Codex supports streamable HTTP MCP servers and bearer token auth.
 
 1. Start the server:
    ```sh
-   MAGIC_HOUR_ENVIRONMENT=mock python main.py
+   python main.py
    ```
 2. Set a temporary API key env var:
    ```sh
@@ -109,27 +135,40 @@ Codex supports streamable HTTP MCP servers and bearer token auth.
 Notes:
 
 - This works with the current API key passthrough model. OAuth is not required for Codex CLI.
-- In this repo, mock mode accepts any bearer token string.
+- Real API calls may spend Magic Hour credits.
 - Start Codex from the same shell where `MAGIC_HOUR_API_KEY` is set. Codex must inherit that environment for the MCP server to appear and authenticate correctly.
 
 ## File uploads
 
 Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
 
-1. Call `generate_upload_urls`
+1. Call the generated upload-URL tool, currently `videoAssets_generatePresignedUrl`
 2. Upload the file bytes to the returned `upload_url`
-3. Pass the returned `file_path` into the `create_*` tool
+3. Pass the returned `file_path` into the generated creation tool
 
 Claude Code can handle this because it has shell access. Plain chat attachments do not map cleanly to this API.
 
 ## Upload Example For Future Chat UIs
 
-For an upload based tool such as `create_image_to_video`:
+For an upload based tool such as `imageToVideo_createVideo`:
 
-1. Call `generate_upload_urls` for an `image`
+1. Call `videoAssets_generatePresignedUrl` for an `image`
 2. Upload the local file bytes to the returned `upload_url`
-3. Pass the returned `file_path` into `create_image_to_video.assets.image_file_path`
+3. Pass the returned `file_path` into `imageToVideo_createVideo.assets.image_file_path`
 
-This repo stops at step 1. The caller or host app must do step 2.
+The generated upload-URL tool stops at step 1. For local CLI testing,
+the custom `upload_file_to_presigned_url` helper can perform step 2 if the MCP
+server can read the local file path. For remote/web chat, the caller or host app
+still needs to handle the upload bridge.
+
+## Inline media fetch
+
+For Inspector testing after a project is complete:
+
+1. Call `wait_for_image_project` or `wait_for_audio_project`
+2. Look at the same response for the project JSON and inline media blocks
+3. If a particular download did not inline cleanly, retry it with `fetch_image_download` or `fetch_audio_download`
+
+The wait helpers now try to download and return generated media as MCP image/audio content instead of making you juggle a second tool in the happy path.
 
 For future web chat work, see `docs/future-chat-ui-handoff.md`.
