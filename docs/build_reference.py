@@ -83,14 +83,15 @@ out.append("""1. `POST /v1/<tool>` → returns immediately with `{id, credits_ch
 The generated project detail and delete tools come from OpenAPI. The custom wait helpers wrap project details polling and return sanitized `exact_download_urls` separately from expiration metadata.
 """)
 
-out.append("## File inputs — 3 supported methods\n")
-out.append("""Any `*_file_path` field in a request body accepts one of:
-1. A direct public URL to the file.
-2. A Magic Hour library reference (file from a prior generation/upload in the account).
-3. A `file_path` obtained via the presigned-upload flow:
-   - `POST /v1/files/upload-urls` with `{"items":[{"type":"video","extension":"mp4"}]}` → returns `{upload_url, expires_at, file_path}` per item.
+out.append("## File inputs - supported methods\n")
+out.append("""Any `*_file_path` field in a request body should preferably use one of:
+1. A Magic Hour library reference (file from a prior generation/upload in the account).
+2. A `file_path` obtained via the presigned-upload flow:
+   - `POST /v1/files/upload-urls` with `{"items":[{"type":"video","extension":"mp4"}]}` -> returns `{upload_url, expires_at, file_path}` per item.
    - `PUT` the raw file bytes to `upload_url`.
    - Use the returned `file_path` in the actual generation call.
+
+Direct public media URLs can also work when they are stable, fetchable, and return raw file bytes. Treat them as best-effort rather than the default path, because hotlinked URLs can fail or return HTML/auth/redirect responses instead of the file.
 
 **MCP design implication:** an LLM tool call is JSON text, not binary. Raw file bytes must be uploaded out-of-band. In this server, the expected flow is `videoAssets_generatePresignedUrl` -> upload bytes -> pass `file_path` into the generated create tool. `videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` tool despite the generated name, and it accepts `video`, `audio`, and `image` items.
 """)

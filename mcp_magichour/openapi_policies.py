@@ -73,8 +73,10 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if _operation_mentions_file_path(operation):
         additions.append(
-            "Any `*_file_path` value can be a public URL, an existing Magic Hour file path, or a `file_path` "
-            "returned by the upload-URL endpoint after the file bytes are uploaded."
+            "For `*_file_path` values, prefer an existing Magic Hour file path or a `file_path` returned by "
+            "the upload-URL endpoint after the file bytes are uploaded. Direct public media URLs may work when "
+            "they are stable, fetchable, and return raw file bytes, but hotlinked URLs can fail; when in doubt, "
+            "use the presigned upload flow first and pass the returned `file_path`."
         )
 
     if additions:

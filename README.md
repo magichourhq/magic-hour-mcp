@@ -7,6 +7,8 @@ At startup, this server reads `docs/openapi.json` and builds MCP tools with
 Magic Hour MCP policies add agent-facing guidance for async polling, uploads,
 and project downloads.
 
+User facing guide is detailed here: `user.md`
+
 ## Supported Today
 
 - Local MCP Inspector
@@ -24,6 +26,7 @@ and project downloads.
 
 Core docs:
 
+- `user.md` - hosted endpoint user guide
 - `integration-handoff.md` - FastAPI mount and smoke test guide
 - `docs/detailed-step-by-step-integration.md` - step-by-step backend integration guide
 - `docs/ai-agent-go-live-instructions.md` - instructions to give another AI agent for product integration
@@ -148,6 +151,8 @@ Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
 1. Call the generated shared upload-URL tool, currently `videoAssets_generatePresignedUrl`
 2. Upload the file bytes to the returned `upload_url`
 3. Pass the returned `file_path` into the generated creation tool
+
+Direct public media URLs may work when they are stable and fetchable, but the upload flow is the reliable path for local files, hotlinked assets, or anything that may not return raw file bytes consistently.
 
 Claude Code can handle this because it has shell access. Plain chat attachments do not map cleanly to this API.
 

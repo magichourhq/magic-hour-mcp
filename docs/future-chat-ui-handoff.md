@@ -8,7 +8,7 @@ Keep this doc only if the team later wants ChatGPT, Claude Chat, or another web 
 - Bearer passthrough to the Magic Hour API key
 - Runtime OpenAPI-generated tools such as `videoAssets_generatePresignedUrl` and `imageToVideo_createVideo`
 - Custom wait helpers that return sanitized `exact_download_urls`
-- Generated create tools that accept hosted URLs or Magic Hour `file_path` values
+- Generated create tools that accept Magic Hour `file_path` values, with direct public media URLs as a best-effort fallback
 
 ## What this repo does not give you
 
@@ -48,6 +48,8 @@ The current upload model is:
 
 That works in local or CLI clients because they can access local files and perform the upload step.
 
+Direct public media URLs can work when they are stable, fetchable, and return raw file bytes. Hotlinked URLs are not reliable enough to use as the default integration path.
+
 For web chat, the team needs a UI layer that handles the file selection and upload step for the user.
 
 ## Recommended future architecture
@@ -77,9 +79,9 @@ Flow:
 3. User drops a file into the popup
 4. Frontend uploads the file to the startup's own backend
 5. Backend either:
-   - stores the file and returns a hosted URL, or
+   - stores the file and returns a stable hosted raw-file URL, or
    - calls `videoAssets_generatePresignedUrl` or `/v1/files/upload-urls`, uploads the bytes to Magic Hour storage, and returns the resulting `file_path`
-6. MCP flow resumes with that hosted URL or `file_path`
+6. MCP flow resumes with that hosted URL or, preferably, the Magic Hour `file_path`
 
 Best when:
 
@@ -97,6 +99,17 @@ Why:
 - backend can log uploads
 - backend can hide storage details from the frontend
 - backend can standardize behavior across ChatGPT, Claude Chat, and future clients
+
+## Optional: URL import bridge
+
+If the team wants public media URLs to behave like uploads, add a backend bridge that fetches a user-provided URL, validates it, uploads the bytes through `videoAssets_generatePresignedUrl`, and returns the Magic Hour `file_path`.
+
+This should be a backend feature, not only MCP prompting, because arbitrary URL fetching needs guardrails:
+
+- block private IPs and internal hostnames
+- limit redirects, timeout, and maximum bytes
+- allow only expected image/audio/video content types
+- return clear errors when the URL returns HTML, auth pages, or unsupported content
 
 ## What the frontend team would need to build
 

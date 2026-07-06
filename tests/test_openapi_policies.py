@@ -48,6 +48,8 @@ class OpenApiPolicyTests(unittest.TestCase):
 
         self.assertIn("upload-URL endpoint", description)
         self.assertIn("file_path", description)
+        self.assertIn("Direct public media URLs may work", description)
+        self.assertIn("hotlinked URLs can fail", description)
 
     def test_custom_component_adds_group_tags(self):
         class Route:

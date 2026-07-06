@@ -295,6 +295,8 @@ The upload flow is:
 2. Upload the file bytes to the returned `upload_url`
 3. Pass the returned `file_path` into the generated create tool
 
+Direct public media URLs can work when they are stable and return raw file bytes, but treat them as best-effort. For local files, user-uploaded files, and hotlinked assets, prefer uploading first and using the returned Magic Hour `file_path`.
+
 Example:
 
 1. call `videoAssets_generatePresignedUrl` for an image; the same tool also accepts audio and video items
