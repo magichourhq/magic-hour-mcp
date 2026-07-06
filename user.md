@@ -89,44 +89,25 @@ pong
 
 Ask naturally. You do not need to mention MCP tools.
 
-Examples:
+## Mini Cookbook
 
-```text
-Create one square anime-style image of a ramen shop at night.
-```
+These examples cover the most-used Magic Hour endpoints. For inputs, use uploaded files or existing Magic Hour `file_path` values when possible.
 
-```text
-Generate a 5 second 16:9 video of a dragon flying over snowy mountains.
-```
+| Endpoint | Example prompt | You provide | You get |
+|---|---|---|---|
+| Face Swap (image) | `Swap the face from my source image onto the person in my target image.` | Source face image, target image | Edited image |
+| Face Swap (video) | `Swap this source face onto the person in this video for the first 10 seconds.` | Source face image, video | Face-swapped video |
+| AI Image | `Create a square cinematic image of a neon ramen shop at night.` | Text prompt | Generated image |
+| AI Image Editor | `Add stylish sunglasses to my uploaded photo and keep it realistic.` | Image, edit prompt | Edited image |
+| Image to Video | `Turn my uploaded image into a 5 second video with gentle camera movement.` | Image, motion prompt | Generated video |
+| Photo Editor / Colorizer | `Colorize this old black-and-white photo naturally.` | Photo | Colorized image |
+| Talking Photo | `Make this portrait say my uploaded audio in a realistic style.` | Portrait image, audio | Talking photo video |
+| Background Remover | `Remove the background from my uploaded product photo.` | Image | Cutout image |
+| Face Editor | `Make this portrait smile slightly and look toward the camera.` | Face image, edit request | Edited portrait |
+| Head Swap | `Place the head from this photo onto the body in this other photo.` | Head image, body image | Head-swapped image |
+| Voice Generator | `Generate audio saying "Welcome to Magic Hour" with a warm narrator voice.` | Script, voice preference | Generated audio |
 
-```text
-Generate audio saying "Believe it!" with the Naruto Uzumaki voice if available.
-```
-
-```text
-Remove the background from my uploaded image.
-```
-
-```text
-Upscale my uploaded image 2x.
-```
-
-```text
-Turn my uploaded image into a 5 second video with subtle camera movement.
-```
-
-## Common Recipes
-
-| Goal | Example prompt |
-|---|---|
-| Create an image | `Create a cinematic image of a futuristic cafe in Tokyo at night.` |
-| Create a video | `Create a 5 second video of a robot walking through a neon city.` |
-| Create voice audio | `Create audio saying "Welcome to Magic Hour" with a warm narrator voice.` |
-| Image to video | `Turn my uploaded image into a 5 second video with gentle motion.` |
-| Remove background | `Remove the background from my uploaded image.` |
-| Upscale image | `Upscale my uploaded image 2x.` |
-
-For file-based workflows, an uploaded Magic Hour `file_path` is most reliable. Direct public media URLs can work, but hotlinked URLs may fail if they do not return stable raw file bytes.
+Direct public media URLs can work, but uploaded Magic Hour `file_path` inputs are more reliable.
 
 ## Download Links
 
