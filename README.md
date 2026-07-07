@@ -1,4 +1,4 @@
-# mcp-magichour
+# Magic Hour MCP Server
 
 OpenAPI-backed MCP server for Magic Hour image, video, and audio generation.
 
@@ -73,7 +73,7 @@ MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
 You can still point at a mock or alternate API base by overriding `MAGIC_HOUR_API_BASE_URL`:
 
 ```sh
-MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0 python main.py
+MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/latest python main.py
 ```
 
 ## Test with MCP Inspector
