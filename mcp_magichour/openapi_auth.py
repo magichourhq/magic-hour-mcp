@@ -20,6 +20,8 @@ class AuthError(Exception):
 
 _authorization_header: ContextVar[str | None] = ContextVar("magic_hour_authorization_header", default=None)
 _request_id: ContextVar[str] = ContextVar("magic_hour_request_id", default="-")
+_UPSTREAM_BLOCKED_HEADERS = {"cookie", "forwarded", "origin", "referer"}
+_UPSTREAM_BLOCKED_PREFIXES = ("x-forwarded-", "x-vercel-")
 
 
 def current_authorization_header() -> str:
@@ -48,6 +50,15 @@ class BearerPassthroughAuth(httpx.Auth):
     """Forward the inbound MCP bearer token to the upstream Magic Hour API."""
 
     def auth_flow(self, request: httpx.Request):
+        # FastMCP copies most inbound MCP headers onto generated OpenAPI
+        # requests. Never let deployment/browser routing headers influence the
+        # Magic Hour API host or leak cookies to it.
+        for name in list(request.headers):
+            lower_name = name.lower()
+            if lower_name in _UPSTREAM_BLOCKED_HEADERS or lower_name.startswith(
+                _UPSTREAM_BLOCKED_PREFIXES
+            ):
+                del request.headers[name]
         request.headers["Authorization"] = current_authorization_header()
         yield request
 
