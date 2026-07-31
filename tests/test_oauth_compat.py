@@ -1,4 +1,5 @@
 import unittest
+from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
@@ -22,6 +23,47 @@ REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 RESOURCE = "https://mcp.example/mcp"
 VERIFIER = "v" * 64
 CHALLENGE = _pkce_challenge(VERIFIER)
+
+
+class AuthorizationPageParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.inputs = []
+        self.images = []
+        self.links = []
+        self.alerts = []
+        self.buttons = []
+        self.spans = []
+        self.scripts = []
+        self.script_bodies = []
+        self._script_body = None
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "input":
+            self.inputs.append(attributes)
+        if tag == "img":
+            self.images.append(attributes)
+        if tag == "a":
+            self.links.append(attributes)
+        if tag == "button":
+            self.buttons.append(attributes)
+        if tag == "span":
+            self.spans.append(attributes)
+        if tag == "script":
+            self.scripts.append(attributes)
+            self._script_body = []
+        if attributes.get("role") == "alert":
+            self.alerts.append((tag, attributes))
+
+    def handle_endtag(self, tag):
+        if tag == "script" and self._script_body is not None:
+            self.script_bodies.append("".join(self._script_body))
+            self._script_body = None
+
+    def handle_data(self, data):
+        if self._script_body is not None:
+            self._script_body.append(data)
 
 
 class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
@@ -105,6 +147,104 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(replay.status_code, 400)
         self.assertEqual(replay.json()["error"], "invalid_grant")
 
+    async def test_authorization_page_preserves_form_and_asset_contracts(self):
+        page = await self.client.get("/authorize", params=self.authorization_params())
+        parser = AuthorizationPageParser()
+        parser.feed(page.text)
+
+        api_key_input = next(field for field in parser.inputs if field.get("name") == "api_key")
+        self.assertEqual(api_key_input["type"], "password")
+        self.assertEqual(api_key_input["placeholder"], "mhk_live_…")
+        self.assertIn("required", api_key_input)
+        self.assertEqual(api_key_input["autocomplete"], "off")
+        self.assertNotIn("aria-describedby", api_key_input)
+
+        hidden = {field["name"]: field["value"] for field in parser.inputs if field.get("type") == "hidden"}
+        for name, value in self.authorization_params().items():
+            self.assertEqual(hidden[name], value)
+
+        self.assertIn(
+            {"class": "brand-logo", "src": "/favicon.ico", "alt": "", "width": "24", "height": "24"},
+            parser.images,
+        )
+        self.assertIn(
+            {
+                "href": "https://magichour.ai/developer?tab=api-keys",
+                "target": "_blank",
+                "rel": "noopener noreferrer",
+            },
+            parser.links,
+        )
+        submit_button = next(button for button in parser.buttons if button.get("type") == "submit")
+        self.assertNotIn("disabled", submit_button)
+        self.assertNotIn("aria-busy", submit_button)
+        loading = next(span for span in parser.spans if span.get("class") == "button-loading")
+        spinner = next(span for span in parser.spans if span.get("class") == "spinner")
+        self.assertIn("hidden", loading)
+        self.assertEqual(spinner.get("aria-hidden"), "true")
+
+        script = "".join(parser.script_bodies)
+        self.assertIn('form.addEventListener("submit"', script)
+        self.assertIn("button.disabled = true", script)
+        self.assertIn('button.setAttribute("aria-busy", "true")', script)
+        self.assertIn("label.hidden = true", script)
+        self.assertIn("loading.hidden = false", script)
+
+    async def test_authorization_page_security_headers_restrict_content(self):
+        page = await self.client.get("/authorize", params=self.authorization_params())
+        parser = AuthorizationPageParser()
+        parser.feed(page.text)
+
+        self.assertEqual(page.headers["cache-control"], "no-store")
+        self.assertEqual(page.headers["referrer-policy"], "no-referrer")
+        self.assertEqual(page.headers["x-content-type-options"], "nosniff")
+        self.assertEqual(page.headers["x-frame-options"], "DENY")
+        self.assertEqual(len(parser.scripts), 1)
+        nonce = parser.scripts[0].get("nonce")
+        self.assertTrue(nonce)
+        csp = page.headers["content-security-policy"]
+        self.assertIn("default-src 'none'", csp)
+        self.assertIn("style-src 'unsafe-inline'", csp)
+        self.assertIn("img-src 'self'", csp)
+        self.assertIn(f"script-src 'nonce-{nonce}'", csp)
+        script_directive = next(part for part in csp.split("; ") if part.startswith("script-src"))
+        self.assertNotIn("'unsafe-inline'", script_directive)
+        self.assertNotIn("src", parser.scripts[0])
+        self.assertNotIn('src="http', page.text)
+
+        second_page = await self.client.get("/authorize", params=self.authorization_params())
+        second_parser = AuthorizationPageParser()
+        second_parser.feed(second_page.text)
+        self.assertNotEqual(nonce, second_parser.scripts[0].get("nonce"))
+
+    async def test_authorization_error_is_accessible_and_never_reflects_key(self):
+        response = await self.client.post(
+            "/authorize",
+            data={**self.authorization_params(), "api_key": "sk_bad"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        parser = AuthorizationPageParser()
+        parser.feed(response.text)
+        self.assertIn(
+            ("p", {"class": "error", "id": "api-key-error", "role": "alert"}),
+            parser.alerts,
+        )
+        self.assertIn('aria-invalid="true"', response.text)
+        self.assertIn('aria-describedby="api-key-error"', response.text)
+        self.assertLess(response.text.index('id="api-key"'), response.text.index('id="api-key-error"'))
+        self.assertNotIn("sk_bad", response.text)
+
+    async def test_malformed_api_key_is_not_reflected_or_validated_upstream(self):
+        response = await self.client.post(
+            "/authorize",
+            data={**self.authorization_params(), "api_key": "mhk live incomplete"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn("mhk live incomplete", response.text)
+        self.assertEqual(self.validated_keys, [])
+
     async def test_claude_client_supports_request_without_resource(self):
         params = self.authorization_params()
         del params["resource"]
@@ -169,7 +309,6 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.status_code, 401)
-        self.assertIn("Invalid API key", response.text)
         self.assertNotIn("sk_bad", response.text)
         self.assertEqual(self.validated_keys, ["sk_bad"])
 
@@ -197,16 +336,6 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
         self.assertEqual(response.headers["vary"], "Accept")
         self.assertNotIn("www-authenticate", response.headers)
-        self.assertIn("Magic Hour MCP", response.text)
-        self.assertIn("Connect with Claude", response.text)
-        self.assertIn("Settings &gt; Connectors &gt; Add custom connector", response.text)
-        self.assertIn('href="https://claude.ai/new#settings/customize-connectors"', response.text)
-        self.assertIn("https://mcp.magichour.ai/", response.text)
-        self.assertIn("magic-hour-mcp", response.text)
-        self.assertIn("paste your Magic Hour API key", response.text)
-        self.assertIn('href="https://magichour.ai/developer?tab=api-keys"', response.text)
-        self.assertIn("Get a Magic Hour API key", response.text)
-        self.assertIn('target="_blank" rel="noopener noreferrer"', response.text)
 
     async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")

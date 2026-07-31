@@ -28,6 +28,9 @@ MAX_FORM_BYTES = 16 * 1024
 MAX_PENDING_CODES = 1_000
 MAX_CODES_PER_API_KEY = 3
 MAX_CONCURRENT_VALIDATIONS = 10
+API_KEY_VERIFICATION_ERROR = (
+    "We couldn't verify this API key. Check that you copied the full key and try again."
+)
 CLAUDE_CLIENT_ID = "magic-hour-mcp"
 CLAUDE_REDIRECT_URIS = [
     "https://claude.ai/api/mcp/auth_callback",
@@ -178,7 +181,7 @@ class OAuthCompatibilityServer:
         if not api_key:
             return _authorization_page(page_params, "API key is required.", status_code=400)
         if len(api_key) > 512 or any(character.isspace() for character in api_key):
-            return _authorization_page(page_params, "Invalid API key.", status_code=401)
+            return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
         if not self.codes.has_capacity(api_key):
             return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
 
@@ -198,7 +201,7 @@ class OAuthCompatibilityServer:
                 status_code=503,
             )
         if not valid:
-            return _authorization_page(page_params, "Invalid API key.", status_code=401)
+            return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
 
         try:
             code = self.codes.issue(
@@ -531,25 +534,135 @@ def _authorization_page(
     *,
     status_code: int = 200,
 ) -> HTMLResponse:
+    script_nonce = secrets.token_urlsafe(18)
     fields = "".join(
         f'<input type="hidden" name="{html.escape(name)}" value="{html.escape(value or "")}">'
         for name, value in authorization.items()
         if value is not None
     )
-    error_html = f'<p role="alert">{html.escape(error)}</p>' if error else ""
+    error_html = (
+        f'<p class="error" id="api-key-error" role="alert">'
+        f"{html.escape(error)}</p>"
+        if error
+        else ""
+    )
+    error_attributes = ' aria-invalid="true" aria-describedby="api-key-error"' if error else ""
     body = f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Connect Magic Hour</title></head>
-<body><main><h1>Connect Magic Hour</h1>
-<p>Paste your Magic Hour API key to authorize this connector.</p>{error_html}
-<form method="post" action="">{fields}
-<label>API key <input name="api_key" type="password" required autocomplete="off"></label>
-<button type="submit">Connect</button></form></main></body></html>"""
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Connect to Magic Hour MCP</title>
+<style>
+  :root {{
+    color-scheme: dark;
+    --background: hsl(234.55 31.43% 6.86%);
+    --foreground: white;
+    --card: hsl(235.71 25.93% 10.59%);
+    --card-foreground: white;
+    --primary: hsl(259.29 100% 50%);
+    --primary-foreground: white;
+    --muted: hsl(235.71 21.21% 12.94%);
+    --muted-foreground: hsl(235 11.11% 57.65%);
+    --border: hsl(232.17 22.77% 19.8%);
+    --input: hsl(236 19% 15%);
+    --ring: white;
+    --destructive: hsl(0 100% 68.24%);
+    --radius: .625rem;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
+    padding: 24px; color: var(--foreground); background: var(--background);
+  }}
+  .card {{
+    width: min(100%, 440px); padding: 36px; color: var(--card-foreground); background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
+  }}
+  .brand {{
+    display: flex; align-items: center; gap: 9px; margin-bottom: 30px;
+    color: var(--card-foreground); font-size: 14px; font-weight: 650;
+  }}
+  .brand-logo {{ width: 24px; height: 24px; flex: 0 0 auto; border-radius: calc(var(--radius) - .1875rem); }}
+  h1 {{ margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -.025em; }}
+  .intro {{ margin: 12px 0 26px; color: var(--muted-foreground); font-size: 14px; line-height: 1.55; }}
+  .error {{ margin: 8px 0 0; color: var(--destructive); font-size: 12px; line-height: 1.5; }}
+  .field-header {{ display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }}
+  label {{ font-size: 13px; font-weight: 650; }}
+  .field-header a {{ color: var(--muted-foreground); font-size: 12px; text-underline-offset: 3px; }}
+  .field-header a:hover {{ color: var(--foreground); }}
+  .field-header a:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }}
+  input[type="password"] {{
+    width: 100%; height: 46px; padding: 0 13px; color: var(--foreground); background: var(--input);
+    border: 1px solid var(--border); border-radius: var(--radius); outline: none; font: inherit;
+  }}
+  input[type="password"]::placeholder {{ color: var(--muted-foreground); opacity: 1; }}
+  input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
+  input[aria-invalid="true"] {{ border-color: var(--destructive); }}
+  button {{
+    width: 100%; min-height: 46px; margin-top: 22px; display: inline-flex; align-items: center;
+    justify-content: center; border: 0; border-radius: var(--radius);
+    color: var(--primary-foreground); background: var(--primary);
+    font-family: inherit; font-size: 14px; font-weight: 650; line-height: 1.25; cursor: pointer;
+  }}
+  button:not(:disabled):hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
+  button:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 3px; }}
+  button:disabled {{ cursor: wait; opacity: .72; }}
+  .button-label, .button-loading {{
+    font-family: inherit; font-size: inherit; font-weight: inherit; line-height: inherit;
+  }}
+  .button-label {{ display: inline-flex; align-items: center; justify-content: center; }}
+  .button-loading {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; }}
+  .button-label[hidden], .button-loading[hidden] {{ display: none; }}
+  .spinner {{
+    width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: spin .7s linear infinite;
+  }}
+  @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+  @media (prefers-reduced-motion: reduce) {{ .spinner {{ animation: none; }} }}
+  @media (max-width: 480px) {{ body {{ padding: 16px; }} .card {{ padding: 28px 24px; }} }}
+</style>
+</head><body>
+<main class="card">
+  <div class="brand"><img class="brand-logo" src="/favicon.ico" alt="" width="24" height="24">Magic Hour</div>
+  <h1>Connect to Magic Hour MCP</h1>
+  <p class="intro">Enter your API key to use Magic Hour tools in Claude.</p>
+  <form id="authorization-form" method="post" action="">{fields}
+    <div class="field-header">
+      <label for="api-key">API key</label>
+      <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a>
+    </div>
+    <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{error_attributes}>
+    {error_html}
+    <button id="connect-button" type="submit">
+      <span class="button-label">Connect</span>
+      <span class="button-loading" hidden><span class="spinner" aria-hidden="true"></span><span>Connecting…</span></span>
+    </button>
+  </form>
+</main>
+<script nonce="{script_nonce}">
+  const form = document.getElementById("authorization-form");
+  const button = document.getElementById("connect-button");
+  const label = button.querySelector(".button-label");
+  const loading = button.querySelector(".button-loading");
+  form.addEventListener("submit", () => {{
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    label.hidden = true;
+    loading.hidden = false;
+  }});
+</script>
+</body></html>"""
     return HTMLResponse(
         body,
         status_code=status_code,
         headers={
             "Cache-Control": "no-store",
-            "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+            "Content-Security-Policy": (
+                "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
+                f"script-src 'nonce-{script_nonce}'; base-uri 'none'; frame-ancestors 'none'"
+            ),
             "Referrer-Policy": "no-referrer",
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
