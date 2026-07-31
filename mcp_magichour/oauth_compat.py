@@ -9,7 +9,7 @@ import logging
 import os
 import re
 import secrets
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from threading import Lock
 from time import monotonic
@@ -20,7 +20,7 @@ import httpx
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from starlette.routing import Mount, Route
+from starlette.routing import BaseRoute, Mount, Route
 
 
 CODE_TTL_SECONDS = 300
@@ -406,6 +406,7 @@ def create_oauth_compatibility_app(
     *,
     settings: OAuthSettings | None = None,
     api_key_validator: ApiKeyValidator | None = None,
+    public_routes: Sequence[BaseRoute] = (),
 ) -> Starlette:
     oauth = OAuthCompatibilityServer(
         settings=settings,
@@ -413,7 +414,7 @@ def create_oauth_compatibility_app(
     )
     protected_mcp = MCPBearerChallengeMiddleware(mcp_app, oauth)
     return Starlette(
-        routes=[*oauth.routes(), Mount("/", app=protected_mcp)],
+        routes=[*oauth.routes(), *public_routes, Mount("/", app=protected_mcp)],
         lifespan=mcp_app.lifespan,
     )
 
