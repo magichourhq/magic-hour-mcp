@@ -601,14 +601,19 @@ def _authorization_page(
   input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
   input[aria-invalid="true"] {{ border-color: var(--destructive); }}
   button {{
-    width: 100%; min-height: 46px; margin-top: 22px; border: 0; border-radius: var(--radius);
+    width: 100%; min-height: 46px; margin-top: 22px; display: inline-flex; align-items: center;
+    justify-content: center; border: 0; border-radius: var(--radius);
     color: var(--primary-foreground); background: var(--primary);
-    font: inherit; font-size: 14px; font-weight: 650; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 650; line-height: 1.25; cursor: pointer;
   }}
-  button:hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
+  button:not(:disabled):hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
   button:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 3px; }}
-  button:disabled {{ cursor: wait; opacity: .9; }}
-  .button-loading {{ display: inline-flex; align-items: center; gap: 8px; }}
+  button:disabled {{ cursor: wait; opacity: .72; }}
+  .button-label, .button-loading {{
+    font-family: inherit; font-size: inherit; font-weight: inherit; line-height: inherit;
+  }}
+  .button-label {{ display: inline-flex; align-items: center; justify-content: center; }}
+  .button-loading {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; }}
   .button-loading[hidden] {{ display: none; }}
   .spinner {{
     width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
