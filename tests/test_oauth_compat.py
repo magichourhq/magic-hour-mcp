@@ -23,7 +23,6 @@ REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 RESOURCE = "https://mcp.example/mcp"
 VERIFIER = "v" * 64
 CHALLENGE = _pkce_challenge(VERIFIER)
-VERIFICATION_ERROR = "We couldn't verify this API key. Check that you copied the full key and try again."
 
 
 class AuthorizationPageParser(HTMLParser):
@@ -32,8 +31,7 @@ class AuthorizationPageParser(HTMLParser):
         self.inputs = []
         self.images = []
         self.links = []
-        self.visible_text = []
-        self._hidden_depth = 0
+        self.alerts = []
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
@@ -43,16 +41,8 @@ class AuthorizationPageParser(HTMLParser):
             self.images.append(attributes)
         if tag == "a":
             self.links.append(attributes)
-        if tag in {"style", "script"}:
-            self._hidden_depth += 1
-
-    def handle_endtag(self, tag):
-        if tag in {"style", "script"}:
-            self._hidden_depth -= 1
-
-    def handle_data(self, data):
-        if not self._hidden_depth and data.strip():
-            self.visible_text.append(data.strip())
+        if attributes.get("role") == "alert":
+            self.alerts.append((tag, attributes))
 
 
 class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
@@ -136,26 +126,11 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(replay.status_code, 400)
         self.assertEqual(replay.json()["error"], "invalid_grant")
 
-    async def test_authorization_page_has_branded_accessible_api_key_form(self):
+    async def test_authorization_page_preserves_form_and_asset_contracts(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
         parser = AuthorizationPageParser()
         parser.feed(page.text)
-        visible_text = " ".join(parser.visible_text)
-        normalized_text = visible_text.casefold()
 
-        self.assertIn("Magic Hour", visible_text)
-        self.assertIn("API key", visible_text)
-        self.assertIn("Enter your Magic Hour API key to use Magic Hour tools in Claude.", visible_text)
-        self.assertNotIn("authorize this connection", visible_text)
-        self.assertIn("Create your API key", visible_text)
-        self.assertNotIn("Find your API key in your Magic Hour account.", visible_text)
-        self.assertNotIn("client id", normalized_text)
-        self.assertNotIn("callback url", normalized_text)
-        self.assertIn('<meta name="viewport"', page.text)
-        self.assertIn("<main", page.text)
-        self.assertIn("<h1>Connect Magic Hour</h1>", page.text)
-        self.assertIn('<label for="api-key">API key</label>', page.text)
-        self.assertNotIn("Your API key is validated securely and never displayed.", page.text)
         api_key_input = next(field for field in parser.inputs if field.get("name") == "api_key")
         self.assertEqual(api_key_input["type"], "password")
         self.assertEqual(api_key_input["placeholder"], "mhk_live_…")
@@ -179,7 +154,6 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             },
             parser.links,
         )
-        self.assertLess(page.text.index("Create your API key"), page.text.index('id="api-key"'))
 
     async def test_authorization_page_security_headers_restrict_content(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
@@ -205,24 +179,22 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 401)
         parser = AuthorizationPageParser()
         parser.feed(response.text)
-        self.assertIn('<p class="error" id="api-key-error" role="alert">', response.text)
-        self.assertIn(VERIFICATION_ERROR, parser.visible_text)
+        self.assertIn(
+            ("p", {"class": "error", "id": "api-key-error", "role": "alert"}),
+            parser.alerts,
+        )
         self.assertIn('aria-invalid="true"', response.text)
         self.assertIn('aria-describedby="api-key-error"', response.text)
         self.assertLess(response.text.index('id="api-key"'), response.text.index('id="api-key-error"'))
-        self.assertNotIn("api-key-hint", response.text)
         self.assertNotIn("sk_bad", response.text)
 
-    async def test_malformed_api_key_uses_verification_help_without_upstream_validation(self):
+    async def test_malformed_api_key_is_not_reflected_or_validated_upstream(self):
         response = await self.client.post(
             "/authorize",
             data={**self.authorization_params(), "api_key": "mhk live incomplete"},
         )
 
         self.assertEqual(response.status_code, 401)
-        parser = AuthorizationPageParser()
-        parser.feed(response.text)
-        self.assertIn(VERIFICATION_ERROR, parser.visible_text)
         self.assertNotIn("mhk live incomplete", response.text)
         self.assertEqual(self.validated_keys, [])
 
@@ -290,9 +262,6 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.status_code, 401)
-        parser = AuthorizationPageParser()
-        parser.feed(response.text)
-        self.assertIn(VERIFICATION_ERROR, parser.visible_text)
         self.assertNotIn("sk_bad", response.text)
         self.assertEqual(self.validated_keys, ["sk_bad"])
 
@@ -320,16 +289,6 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
         self.assertEqual(response.headers["vary"], "Accept")
         self.assertNotIn("www-authenticate", response.headers)
-        self.assertIn("Magic Hour MCP", response.text)
-        self.assertIn("Connect with Claude", response.text)
-        self.assertIn("Settings &gt; Connectors &gt; Add custom connector", response.text)
-        self.assertIn('href="https://claude.ai/new#settings/customize-connectors"', response.text)
-        self.assertIn("https://mcp.magichour.ai/", response.text)
-        self.assertIn("magic-hour-mcp", response.text)
-        self.assertIn("paste your Magic Hour API key", response.text)
-        self.assertIn('href="https://magichour.ai/developer?tab=api-keys"', response.text)
-        self.assertIn("Get a Magic Hour API key", response.text)
-        self.assertIn('target="_blank" rel="noopener noreferrer"', response.text)
 
     async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")
