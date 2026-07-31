@@ -616,7 +616,7 @@ def _authorization_page(
     <label for="api-key">API key</label>
     <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-describedby="{described_by}"{error_attributes}>
     {error_html}
-    <p class="hint" id="api-key-hint"><a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Find your API key in your Magic Hour account.</a></p>
+    <p class="hint" id="api-key-hint"><a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a></p>
     <button type="submit">Connect</button>
   </form>
 </main>

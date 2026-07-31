@@ -144,6 +144,8 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("Magic Hour", visible_text)
         self.assertIn("API key", visible_text)
+        self.assertIn("Create your API key", visible_text)
+        self.assertNotIn("Find your API key in your Magic Hour account.", visible_text)
         self.assertNotIn("client id", normalized_text)
         self.assertNotIn("callback url", normalized_text)
         self.assertIn('<meta name="viewport"', page.text)
