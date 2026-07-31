@@ -481,7 +481,8 @@ def _landing_page() -> HTMLResponse:
     .copy-control:hover { background: var(--muted); }
     .copy-control:focus-visible { position: relative; outline: 2px solid var(--ring); outline-offset: -3px; }
     .copy-value { min-width: 0; }
-    .copy-feedback { flex: 0 0 auto; color: var(--secondary-foreground); font-size: 11px; font-weight: 600; opacity: .8; }
+    .copy-feedback { position: sticky; right: 0; flex: 0 0 auto; padding-left: 12px; color: var(--secondary-foreground); background: var(--card); box-shadow: -8px 0 8px var(--card); font-size: 11px; font-weight: 600; opacity: .8; }
+    .copy-control:hover .copy-feedback { background: var(--muted); box-shadow: -8px 0 8px var(--muted); }
     strong { color: var(--foreground); }
     code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
     a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
