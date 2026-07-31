@@ -36,6 +36,9 @@ class AuthorizationPageParser(HTMLParser):
         self.spans = []
         self.scripts = []
         self.script_bodies = []
+        self.tables = []
+        self.table_headers = []
+        self.table_cells = []
         self._script_body = None
 
     def handle_starttag(self, tag, attrs):
@@ -53,6 +56,12 @@ class AuthorizationPageParser(HTMLParser):
         if tag == "script":
             self.scripts.append(attributes)
             self._script_body = []
+        if tag == "table":
+            self.tables.append(attributes)
+        if tag == "th":
+            self.table_headers.append(attributes)
+        if tag == "td":
+            self.table_cells.append(attributes)
         if attributes.get("role") == "alert":
             self.alerts.append((tag, attributes))
 
@@ -350,6 +359,65 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
         self.assertEqual(response.headers["vary"], "Accept")
         self.assertNotIn("www-authenticate", response.headers)
+
+    async def test_landing_page_copy_controls_are_semantic_and_accessible(self):
+        response = await self.client.get("/", headers={"Accept": "text/html"})
+        parser = AuthorizationPageParser()
+        parser.feed(response.text)
+
+        copy_buttons = [button for button in parser.buttons if button.get("class") == "copy-control"]
+        self.assertEqual(len(parser.tables), 2)
+        self.assertEqual(len(parser.table_headers), 4)
+        self.assertTrue(all(header.get("scope") == "row" for header in parser.table_headers))
+        self.assertEqual(len(parser.table_cells), 4)
+        self.assertTrue(all("onclick" not in cell for cell in parser.table_cells))
+        self.assertEqual(len(copy_buttons), 3)
+        self.assertTrue(all(button.get("type") == "button" for button in copy_buttons))
+        self.assertTrue(all(button.get("data-copy-value") for button in copy_buttons))
+        labels = [button.get("aria-label") for button in copy_buttons]
+        self.assertTrue(all(label and label.startswith("Copy ") for label in labels))
+        self.assertEqual(len(labels), len(set(labels)))
+
+        feedback = [span for span in parser.spans if span.get("class") == "copy-feedback"]
+        self.assertEqual(len(feedback), len(copy_buttons))
+        self.assertTrue(all(span.get("aria-live") == "polite" for span in feedback))
+        self.assertTrue(all(span.get("aria-atomic") == "true" for span in feedback))
+
+        copied_urls = [
+            urlsplit(button["data-copy-value"])
+            for button in copy_buttons
+            if urlsplit(button["data-copy-value"]).scheme
+        ]
+        self.assertEqual(len(copied_urls), 1)
+        self.assertEqual(copied_urls[0].path, "")
+
+        script = "".join(parser.script_bodies)
+        self.assertIn("navigator.clipboard.writeText(button.dataset.copyValue)", script)
+        self.assertIn('button.addEventListener("click"', script)
+        self.assertNotIn('cell.addEventListener("click"', script)
+
+    async def test_landing_page_script_is_nonce_restricted_per_response(self):
+        pages = [
+            await self.client.get("/", headers={"Accept": "text/html"}),
+            await self.client.get("/", headers={"Accept": "text/html"}),
+        ]
+        nonces = []
+        for page in pages:
+            parser = AuthorizationPageParser()
+            parser.feed(page.text)
+            self.assertEqual(len(parser.scripts), 1)
+            nonce = parser.scripts[0].get("nonce")
+            self.assertTrue(nonce)
+            nonces.append(nonce)
+
+            directives = {
+                parts[0]: parts[1:]
+                for directive in page.headers["content-security-policy"].split(";")
+                if (parts := directive.strip().split())
+            }
+            self.assertEqual(directives["script-src"], [f"'nonce-{nonce}'"])
+
+        self.assertNotEqual(nonces[0], nonces[1])
 
     async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")

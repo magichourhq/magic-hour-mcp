@@ -431,6 +431,7 @@ def _accepts_html(scope: Mapping[str, Any]) -> bool:
 
 
 def _landing_page() -> HTMLResponse:
+    script_nonce = secrets.token_urlsafe(18)
     body = """<!doctype html>
 <html lang="en">
 <head>
@@ -475,6 +476,12 @@ def _landing_page() -> HTMLResponse:
     th + th, th + td { border-left: 1px solid var(--border); }
     tbody th { width: 44%; color: var(--foreground); font-weight: 600; }
     tbody tr:last-child > * { border-bottom: 0; }
+    .copy-cell { padding: 0; }
+    .copy-control { width: 100%; min-height: 39px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 0; color: inherit; background: transparent; font: inherit; line-height: inherit; text-align: left; cursor: pointer; }
+    .copy-control:hover { background: var(--muted); }
+    .copy-control:focus-visible { position: relative; outline: 2px solid var(--ring); outline-offset: -3px; }
+    .copy-value { min-width: 0; }
+    .copy-feedback { flex: 0 0 auto; color: var(--secondary-foreground); font-size: 11px; font-weight: 600; opacity: .8; }
     strong { color: var(--foreground); }
     code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
     a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -496,8 +503,8 @@ def _landing_page() -> HTMLResponse:
           <div class="connector-table-wrap" role="region" aria-label="Claude connector basic fields" tabindex="0">
             <table>
               <tbody>
-                <tr><th scope="row">Name</th><td>Magic Hour</td></tr>
-                <tr><th scope="row">Remote MCP server URL</th><td>https://mcp.magichour.ai/</td></tr>
+                <tr><th scope="row">Name</th><td class="copy-cell"><button class="copy-control" type="button" data-copy-value="Magic Hour" aria-label="Copy Name"><span class="copy-value">Magic Hour</span><span class="copy-feedback" aria-live="polite" aria-atomic="true">Copy</span></button></td></tr>
+                <tr><th scope="row">Remote MCP server URL</th><td class="copy-cell"><button class="copy-control" type="button" data-copy-value="https://mcp.magichour.ai" aria-label="Copy Remote MCP server URL"><span class="copy-value">https://mcp.magichour.ai</span><span class="copy-feedback" aria-live="polite" aria-atomic="true">Copy</span></button></td></tr>
               </tbody>
             </table>
           </div>
@@ -506,7 +513,7 @@ def _landing_page() -> HTMLResponse:
           <div class="connector-table-wrap" role="region" aria-label="Claude connector advanced fields" tabindex="0">
             <table>
               <tbody>
-                <tr><th scope="row">OAuth Client ID</th><td>magic-hour-mcp</td></tr>
+                <tr><th scope="row">OAuth Client ID</th><td class="copy-cell"><button class="copy-control" type="button" data-copy-value="magic-hour-mcp" aria-label="Copy OAuth Client ID"><span class="copy-value">magic-hour-mcp</span><span class="copy-feedback" aria-live="polite" aria-atomic="true">Copy</span></button></td></tr>
                 <tr><th scope="row">OAuth Client Secret</th><td>Leave blank</td></tr>
               </tbody>
             </table>
@@ -517,14 +524,33 @@ def _landing_page() -> HTMLResponse:
     </section>
     <a class="docs-link" href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
   </main>
+  <script nonce="__LANDING_SCRIPT_NONCE__">
+    const copyTimers = new WeakMap();
+    for (const button of document.querySelectorAll(".copy-control")) {
+      button.addEventListener("click", async () => {
+        const feedback = button.querySelector(".copy-feedback");
+        try {
+          await navigator.clipboard.writeText(button.dataset.copyValue);
+          feedback.textContent = "Copied";
+        } catch {
+          feedback.textContent = "Copy failed";
+        }
+        clearTimeout(copyTimers.get(button));
+        copyTimers.set(button, setTimeout(() => {
+          feedback.textContent = "Copy";
+        }, 1600));
+      });
+    }
+  </script>
 </body>
 </html>"""
+    body = body.replace("__LANDING_SCRIPT_NONCE__", html.escape(script_nonce, quote=True))
     return HTMLResponse(
         body,
         headers={
             "Cache-Control": "no-store",
             "Content-Security-Policy": (
-                "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; "
+                f"default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-{script_nonce}'; base-uri 'none'; "
                 "form-action 'none'; frame-ancestors 'none'"
             ),
             "Referrer-Policy": "no-referrer",
