@@ -29,6 +29,8 @@ class AuthorizationPageParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.inputs = []
+        self.images = []
+        self.links = []
         self.visible_text = []
         self._hidden_depth = 0
 
@@ -36,6 +38,10 @@ class AuthorizationPageParser(HTMLParser):
         attributes = dict(attrs)
         if tag == "input":
             self.inputs.append(attributes)
+        if tag == "img":
+            self.images.append(attributes)
+        if tag == "a":
+            self.links.append(attributes)
         if tag in {"style", "script"}:
             self._hidden_depth += 1
 
@@ -144,6 +150,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<main", page.text)
         self.assertIn("<h1>Connect Magic Hour</h1>", page.text)
         self.assertIn('<label for="api-key">API key</label>', page.text)
+        self.assertNotIn("Your API key is validated securely and never displayed.", page.text)
         api_key_input = next(field for field in parser.inputs if field.get("name") == "api_key")
         self.assertEqual(api_key_input["type"], "password")
         self.assertIn("required", api_key_input)
@@ -153,7 +160,20 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         for name, value in self.authorization_params().items():
             self.assertEqual(hidden[name], value)
 
-    async def test_authorization_page_security_headers_allow_only_inline_styles(self):
+        self.assertIn(
+            {"class": "brand-logo", "src": "/favicon.ico", "alt": "", "width": "24", "height": "24"},
+            parser.images,
+        )
+        self.assertIn(
+            {
+                "href": "https://magichour.ai/developer?tab=api-keys",
+                "target": "_blank",
+                "rel": "noopener noreferrer",
+            },
+            parser.links,
+        )
+
+    async def test_authorization_page_security_headers_restrict_content(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
 
         self.assertEqual(page.headers["cache-control"], "no-store")
@@ -162,10 +182,11 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(page.headers["x-frame-options"], "DENY")
         self.assertEqual(
             page.headers["content-security-policy"],
-            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+            "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
+            "base-uri 'none'; frame-ancestors 'none'",
         )
         self.assertNotIn("<script", page.text)
-        self.assertNotIn("src=", page.text)
+        self.assertNotIn('src="http', page.text)
 
     async def test_authorization_page_uses_dark_theme_tokens(self):
         page = await self.client.get("/authorize", params=self.authorization_params())

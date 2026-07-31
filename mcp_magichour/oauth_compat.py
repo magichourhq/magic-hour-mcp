@@ -581,14 +581,7 @@ def _authorization_page(
     display: flex; align-items: center; gap: 9px; margin-bottom: 30px;
     color: var(--card-foreground); font-size: 14px; font-weight: 650;
   }}
-  .brand-mark {{
-    position: relative; width: 24px; height: 24px; flex: 0 0 auto;
-    background: var(--primary); border-radius: calc(var(--radius) - .1875rem);
-  }}
-  .brand-mark::before {{
-    content: ""; position: absolute; width: 8px; height: 8px; top: 8px; left: 8px;
-    background: var(--primary-foreground); border-radius: 2px; transform: rotate(45deg);
-  }}
+  .brand-logo {{ width: 24px; height: 24px; flex: 0 0 auto; border-radius: calc(var(--radius) - .1875rem); }}
   h1 {{ margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -.025em; }}
   .intro {{ margin: 12px 0 26px; color: var(--muted-foreground); font-size: 14px; line-height: 1.55; }}
   .error {{
@@ -603,6 +596,9 @@ def _authorization_page(
   input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
   input[aria-invalid="true"] {{ border-color: var(--destructive); }}
   .hint {{ margin: 8px 0 22px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }}
+  .hint a {{ color: inherit; text-underline-offset: 3px; }}
+  .hint a:hover {{ color: var(--foreground); }}
+  .hint a:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }}
   button {{
     width: 100%; min-height: 46px; border: 0; border-radius: var(--radius);
     color: var(--primary-foreground); background: var(--primary);
@@ -610,22 +606,20 @@ def _authorization_page(
   }}
   button:hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
   button:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 3px; }}
-  .privacy {{ margin: 18px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; text-align: center; }}
   @media (max-width: 480px) {{ body {{ padding: 16px; }} .card {{ padding: 28px 24px; }} }}
 </style>
 </head><body>
 <main class="card">
-  <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Magic Hour</div>
+  <div class="brand"><img class="brand-logo" src="/favicon.ico" alt="" width="24" height="24">Magic Hour</div>
   <h1>Connect Magic Hour</h1>
   <p class="intro">Enter your Magic Hour API key to authorize this connection.</p>
   {error_html}
   <form method="post" action="">{fields}
     <label for="api-key">API key</label>
     <input id="api-key" name="api_key" type="password" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-describedby="{described_by}"{error_attributes}>
-    <p class="hint" id="api-key-hint">Find your API key in your Magic Hour account.</p>
+    <p class="hint" id="api-key-hint"><a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Find your API key in your Magic Hour account.</a></p>
     <button type="submit">Connect</button>
   </form>
-  <p class="privacy">Your API key is validated securely and never displayed.</p>
 </main>
 </body></html>"""
     return HTMLResponse(
@@ -634,7 +628,8 @@ def _authorization_page(
         headers={
             "Cache-Control": "no-store",
             "Content-Security-Policy": (
-                "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
+                "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
+                "base-uri 'none'; frame-ancestors 'none'"
             ),
             "Referrer-Policy": "no-referrer",
             "X-Content-Type-Options": "nosniff",
