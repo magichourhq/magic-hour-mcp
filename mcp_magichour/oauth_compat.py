@@ -447,20 +447,118 @@ def _authorization_page(
         for name, value in authorization.items()
         if value is not None
     )
-    error_html = f'<p role="alert">{html.escape(error)}</p>' if error else ""
+    error_html = (
+        f'<div class="error" id="api-key-error" role="alert">'
+        f'<span class="error-icon" aria-hidden="true">!</span>'
+        f"<span>{html.escape(error)}</span></div>"
+        if error
+        else ""
+    )
+    error_attributes = ' aria-invalid="true"' if error else ""
+    described_by = "api-key-hint api-key-error" if error else "api-key-hint"
     body = f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Connect Magic Hour</title></head>
-<body><main><h1>Connect Magic Hour</h1>
-<p>Paste your Magic Hour API key to authorize this connector.</p>{error_html}
-<form method="post" action="">{fields}
-<label>API key <input name="api_key" type="password" required autocomplete="off"></label>
-<button type="submit">Connect</button></form></main></body></html>"""
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Connect Magic Hour</title>
+<style>
+  :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
+    color: #17151c; background:
+      radial-gradient(circle at 12% 16%, rgba(255, 178, 228, .42), transparent 28rem),
+      radial-gradient(circle at 88% 82%, rgba(190, 180, 255, .45), transparent 31rem),
+      #f8f6fb; padding: 32px 20px;
+  }}
+  .shell {{
+    width: min(100%, 940px); min-height: 560px; display: grid; grid-template-columns: .92fr 1.08fr;
+    overflow: hidden; background: rgba(255, 255, 255, .88); border: 1px solid rgba(42, 32, 54, .1);
+    border-radius: 28px; box-shadow: 0 28px 80px rgba(43, 28, 60, .16), 0 2px 8px rgba(43, 28, 60, .06);
+  }}
+  .brand {{
+    position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;
+    padding: 40px; color: #fff; background: linear-gradient(145deg, #1c1724 0%, #31233d 58%, #5b315f 100%);
+  }}
+  .brand::before, .brand::after {{ content: ""; position: absolute; border-radius: 999px; filter: blur(1px); }}
+  .brand::before {{ width: 310px; height: 310px; right: -155px; top: -90px; background: rgba(255, 114, 190, .28); }}
+  .brand::after {{ width: 250px; height: 250px; left: -140px; bottom: -100px; background: rgba(131, 111, 255, .3); }}
+  .wordmark, .brand-copy {{ position: relative; z-index: 1; }}
+  .wordmark {{ display: flex; align-items: center; gap: 12px; font-size: 17px; font-weight: 720; letter-spacing: -.02em; }}
+  .mark {{ position: relative; width: 30px; height: 30px; flex: 0 0 auto; transform: rotate(45deg); }}
+  .mark span {{ position: absolute; width: 13px; height: 13px; border-radius: 4px; background: linear-gradient(135deg, #ff86cf, #bda8ff); }}
+  .mark span:nth-child(1) {{ inset: 0 auto auto 0; }} .mark span:nth-child(2) {{ inset: auto 0 0 auto; }}
+  .brand-copy h2 {{ max-width: 300px; margin: 0 0 14px; font-size: clamp(28px, 3.7vw, 40px); line-height: 1.08; letter-spacing: -.045em; }}
+  .brand-copy p {{ max-width: 290px; margin: 0; color: rgba(255, 255, 255, .68); font-size: 14px; line-height: 1.65; }}
+  .content {{ display: grid; align-content: center; padding: clamp(40px, 7vw, 72px); }}
+  .eyebrow {{ margin: 0 0 14px; color: #7e477e; font-size: 12px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }}
+  h1 {{ margin: 0; font-size: clamp(30px, 4vw, 42px); line-height: 1.1; letter-spacing: -.045em; }}
+  .intro {{ margin: 16px 0 30px; color: #69626f; font-size: 15px; line-height: 1.65; }}
+  .error {{
+    display: flex; align-items: center; gap: 10px; margin: -10px 0 20px; padding: 12px 14px;
+    color: #862543; background: #fff1f5; border: 1px solid #f5cad7; border-radius: 12px; font-size: 13px; font-weight: 600;
+  }}
+  .error-icon {{ display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 auto; color: #fff; background: #bd365e; border-radius: 50%; font-size: 12px; }}
+  label {{ display: block; margin-bottom: 9px; font-size: 13px; font-weight: 700; }}
+  input[type="password"] {{
+    width: 100%; height: 50px; padding: 0 15px; color: #201b25; background: #fff; border: 1px solid #d9d3df;
+    border-radius: 12px; outline: none; font: inherit; box-shadow: 0 1px 2px rgba(28, 18, 35, .04); transition: border-color .16s, box-shadow .16s;
+  }}
+  input[type="password"]:hover {{ border-color: #bcb2c5; }}
+  input[type="password"]:focus-visible {{ border-color: #8d4f91; box-shadow: 0 0 0 4px rgba(141, 79, 145, .14); }}
+  input[aria-invalid="true"] {{ border-color: #bd365e; }}
+  .hint {{ margin: 9px 0 24px; color: #817986; font-size: 12px; line-height: 1.5; }}
+  button {{
+    width: 100%; min-height: 50px; border: 0; border-radius: 12px; color: #fff; background: #201825;
+    font: inherit; font-size: 14px; font-weight: 750; cursor: pointer; box-shadow: 0 8px 20px rgba(32, 24, 37, .18); transition: transform .16s, background .16s, box-shadow .16s;
+  }}
+  button:hover {{ background: #3b2941; box-shadow: 0 10px 24px rgba(32, 24, 37, .23); transform: translateY(-1px); }}
+  button:active {{ transform: translateY(0); }}
+  button:focus-visible {{ outline: 3px solid rgba(141, 79, 145, .35); outline-offset: 3px; }}
+  .privacy {{ display: flex; align-items: flex-start; gap: 8px; margin: 22px 0 0; color: #817986; font-size: 11px; line-height: 1.55; }}
+  .lock {{ width: 14px; height: 11px; flex: 0 0 auto; margin-top: 3px; border: 1.5px solid #8f8794; border-radius: 3px; position: relative; }}
+  .lock::before {{ content: ""; position: absolute; width: 7px; height: 6px; left: 2px; top: -7px; border: 1.5px solid #8f8794; border-bottom: 0; border-radius: 6px 6px 0 0; }}
+  @media (max-width: 720px) {{
+    body {{ padding: 16px; place-items: start center; }}
+    .shell {{ min-height: 0; grid-template-columns: 1fr; border-radius: 22px; }}
+    .brand {{ min-height: 160px; padding: 26px; }}
+    .brand-copy h2 {{ max-width: 420px; margin-top: 32px; font-size: 26px; }}
+    .brand-copy p {{ display: none; }}
+    .content {{ padding: 34px 26px 38px; }}
+  }}
+  @media (max-width: 380px) {{ body {{ padding: 0; }} .shell {{ min-height: 100dvh; border: 0; border-radius: 0; }} }}
+  @media (prefers-reduced-motion: reduce) {{ *, *::before, *::after {{ scroll-behavior: auto !important; transition: none !important; }} }}
+</style>
+</head><body>
+<main class="shell">
+  <section class="brand" aria-label="Magic Hour">
+    <div class="wordmark"><span class="mark" aria-hidden="true"><span></span><span></span></span>Magic Hour</div>
+    <div class="brand-copy"><h2>Bring ideas to life.</h2><p>Create studio-quality video, image, and audio with generative AI.</p></div>
+  </section>
+  <section class="content">
+    <p class="eyebrow">Secure connection</p>
+    <h1>Connect Magic Hour</h1>
+    <p class="intro">Enter your Magic Hour API key to continue. Your key is validated securely and is never shown on this page.</p>
+    {error_html}
+    <form method="post" action="">{fields}
+      <label for="api-key">API key</label>
+      <input id="api-key" name="api_key" type="password" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-describedby="{described_by}"{error_attributes}>
+      <p class="hint" id="api-key-hint">You can find your API key in your Magic Hour account.</p>
+      <button type="submit">Connect securely</button>
+    </form>
+    <p class="privacy"><span class="lock" aria-hidden="true"></span><span>Your API key stays private and is only used to authorize this connection.</span></p>
+  </section>
+</main>
+</body></html>"""
     return HTMLResponse(
         body,
         status_code=status_code,
         headers={
             "Cache-Control": "no-store",
-            "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+            "Content-Security-Policy": (
+                "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
+            ),
             "Referrer-Policy": "no-referrer",
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",

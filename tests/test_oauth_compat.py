@@ -1,4 +1,5 @@
 import unittest
+from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
@@ -22,6 +23,29 @@ REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 RESOURCE = "https://mcp.example/mcp"
 VERIFIER = "v" * 64
 CHALLENGE = _pkce_challenge(VERIFIER)
+
+
+class AuthorizationPageParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.inputs = []
+        self.visible_text = []
+        self._hidden_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "input":
+            self.inputs.append(attributes)
+        if tag in {"style", "script"}:
+            self._hidden_depth += 1
+
+    def handle_endtag(self, tag):
+        if tag in {"style", "script"}:
+            self._hidden_depth -= 1
+
+    def handle_data(self, data):
+        if not self._hidden_depth and data.strip():
+            self.visible_text.append(data.strip())
 
 
 class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
@@ -104,6 +128,54 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         replay = await self.client.post("/token", data=token_request)
         self.assertEqual(replay.status_code, 400)
         self.assertEqual(replay.json()["error"], "invalid_grant")
+
+    async def test_authorization_page_has_branded_accessible_api_key_form(self):
+        page = await self.client.get("/authorize", params=self.authorization_params())
+        parser = AuthorizationPageParser()
+        parser.feed(page.text)
+        visible_text = " ".join(parser.visible_text)
+
+        self.assertIn("Magic Hour", visible_text)
+        self.assertIn("API key", visible_text)
+        self.assertNotIn("client ID", visible_text)
+        self.assertNotIn("callback URL", visible_text)
+        self.assertIn('<meta name="viewport"', page.text)
+        self.assertIn('<main class="shell">', page.text)
+        self.assertIn('<label for="api-key">API key</label>', page.text)
+        api_key_input = next(field for field in parser.inputs if field.get("name") == "api_key")
+        self.assertEqual(api_key_input["type"], "password")
+        self.assertIn("required", api_key_input)
+        self.assertEqual(api_key_input["autocomplete"], "off")
+
+        hidden = {field["name"]: field["value"] for field in parser.inputs if field.get("type") == "hidden"}
+        for name, value in self.authorization_params().items():
+            self.assertEqual(hidden[name], value)
+
+    async def test_authorization_page_security_headers_allow_only_inline_styles(self):
+        page = await self.client.get("/authorize", params=self.authorization_params())
+
+        self.assertEqual(page.headers["cache-control"], "no-store")
+        self.assertEqual(page.headers["referrer-policy"], "no-referrer")
+        self.assertEqual(page.headers["x-content-type-options"], "nosniff")
+        self.assertEqual(page.headers["x-frame-options"], "DENY")
+        self.assertEqual(
+            page.headers["content-security-policy"],
+            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+        )
+        self.assertNotIn("<script", page.text)
+        self.assertNotIn("src=", page.text)
+
+    async def test_authorization_error_is_accessible_and_never_reflects_key(self):
+        response = await self.client.post(
+            "/authorize",
+            data={**self.authorization_params(), "api_key": "sk_bad"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('id="api-key-error" role="alert"', response.text)
+        self.assertIn('aria-invalid="true"', response.text)
+        self.assertIn('aria-describedby="api-key-hint api-key-error"', response.text)
+        self.assertNotIn("sk_bad", response.text)
 
     async def test_claude_client_supports_request_without_resource(self):
         params = self.authorization_params()
