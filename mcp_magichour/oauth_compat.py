@@ -593,22 +593,30 @@ def _authorization_page(
   .field-header a {{ color: var(--muted-foreground); font-size: 12px; text-underline-offset: 3px; }}
   .field-header a:hover {{ color: var(--foreground); }}
   .field-header a:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }}
-  input[type="password"] {{
-    width: 100%; height: 46px; padding: 0 13px; color: var(--foreground); background: var(--input);
+  .api-key-control {{ position: relative; }}
+  #api-key {{
+    width: 100%; height: 46px; padding: 0 68px 0 13px; color: var(--foreground); background: var(--input);
     border: 1px solid var(--border); border-radius: var(--radius); outline: none; font: inherit;
   }}
-  input[type="password"]::placeholder {{ color: var(--muted-foreground); opacity: 1; }}
-  input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
+  #api-key::placeholder {{ color: var(--muted-foreground); opacity: 1; }}
+  #api-key:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
   input[aria-invalid="true"] {{ border-color: var(--destructive); }}
-  button {{
+  .visibility-toggle {{
+    position: absolute; top: 7px; right: 7px; width: auto; min-height: 32px; padding: 0 9px;
+    border: 0; border-radius: calc(var(--radius) - .1875rem); color: var(--muted-foreground);
+    background: transparent; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  }}
+  .visibility-toggle:hover {{ color: var(--foreground); background: var(--muted); }}
+  .visibility-toggle:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 1px; }}
+  .connect-button {{
     width: 100%; min-height: 46px; margin-top: 22px; display: inline-flex; align-items: center;
     justify-content: center; border: 0; border-radius: var(--radius);
     color: var(--primary-foreground); background: var(--primary);
     font-family: inherit; font-size: 14px; font-weight: 650; line-height: 1.25; cursor: pointer;
   }}
-  button:not(:disabled):hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
-  button:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 3px; }}
-  button:disabled {{ cursor: wait; opacity: .72; }}
+  .connect-button:not(:disabled):hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
+  .connect-button:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 3px; }}
+  .connect-button:disabled {{ cursor: wait; opacity: .72; }}
   .button-label, .button-loading {{
     font-family: inherit; font-size: inherit; font-weight: inherit; line-height: inherit;
   }}
@@ -633,9 +641,12 @@ def _authorization_page(
       <label for="api-key">API key</label>
       <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a>
     </div>
-    <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{error_attributes}>
+    <div class="api-key-control">
+      <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{error_attributes}>
+      <button id="api-key-visibility" class="visibility-toggle" type="button" aria-label="Show API key" aria-pressed="false">Show</button>
+    </div>
     {error_html}
-    <button id="connect-button" type="submit">
+    <button id="connect-button" class="connect-button" type="submit">
       <span class="button-label">Connect</span>
       <span class="button-loading" hidden><span class="spinner" aria-hidden="true"></span><span>Connecting…</span></span>
     </button>
@@ -643,12 +654,21 @@ def _authorization_page(
 </main>
 <script nonce="{script_nonce}">
   const form = document.getElementById("authorization-form");
-  const button = document.getElementById("connect-button");
-  const label = button.querySelector(".button-label");
-  const loading = button.querySelector(".button-loading");
+  const apiKeyInput = document.getElementById("api-key");
+  const visibilityButton = document.getElementById("api-key-visibility");
+  const connectButton = document.getElementById("connect-button");
+  const label = connectButton.querySelector(".button-label");
+  const loading = connectButton.querySelector(".button-loading");
+  visibilityButton.addEventListener("click", () => {{
+    const revealing = apiKeyInput.type === "password";
+    apiKeyInput.type = revealing ? "text" : "password";
+    visibilityButton.textContent = revealing ? "Hide" : "Show";
+    visibilityButton.setAttribute("aria-label", revealing ? "Hide API key" : "Show API key");
+    visibilityButton.setAttribute("aria-pressed", String(revealing));
+  }});
   form.addEventListener("submit", () => {{
-    button.disabled = true;
-    button.setAttribute("aria-busy", "true");
+    connectButton.disabled = true;
+    connectButton.setAttribute("aria-busy", "true");
     label.hidden = true;
     loading.hidden = false;
   }});
