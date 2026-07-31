@@ -466,17 +466,17 @@ def _landing_page() -> HTMLResponse:
     h2 { margin: 0 0 16px; color: var(--foreground); font-size: 16px; line-height: 1.3; }
     p { margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
     section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
-    ol { margin: 0; padding-left: 22px; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
+    ol { --step-indent: 22px; margin: 0; padding-left: var(--step-indent); color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
     ol > li + li { margin-top: 10px; }
-    .connector-table-wrap { width: 100%; min-width: 0; margin-top: 12px; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    .connector-table-wrap { width: calc(100% + var(--step-indent)); min-width: 0; margin: 12px 0 0 calc(0px - var(--step-indent)); overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
     .connector-table-wrap:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-    table { width: 100%; min-width: 500px; border-collapse: collapse; text-align: left; line-height: 1.45; }
+    table { width: 100%; min-width: 500px; border-collapse: collapse; text-align: left; font-family: inherit; font-size: 13px; line-height: 1.45; }
     th, td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--border); }
     th + th, th + td { border-left: 1px solid var(--border); }
-    thead th { color: var(--foreground); background: var(--muted); font-size: 12px; font-weight: 650; }
+    thead th { color: var(--foreground); background: var(--muted); font-weight: 650; }
     tbody th { width: 44%; color: var(--foreground); font-weight: 600; }
     tbody tr:last-child > * { border-bottom: 0; }
-    table code { white-space: nowrap; }
+    table code { white-space: nowrap; font-family: inherit; font-size: inherit; }
     strong { color: var(--foreground); }
     code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
     a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
