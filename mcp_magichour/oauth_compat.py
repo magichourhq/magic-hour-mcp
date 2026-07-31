@@ -457,7 +457,7 @@ def _landing_page() -> HTMLResponse:
     <section aria-labelledby="connect-claude">
       <h2 id="connect-claude">Connect with Claude</h2>
       <ol>
-        <li>Open <strong>Settings &gt; Connectors &gt; Add custom connector</strong>.</li>
+        <li>Open <strong><a href="https://claude.ai/new#settings/customize-connectors" target="_blank" rel="noopener noreferrer">Settings &gt; Connectors &gt; Add custom connector</a></strong>.</li>
         <li>Use URL <code>https://mcp.magichour.ai/</code>. Under <strong>Advanced</strong>, set OAuth Client ID to <code>magic-hour-mcp</code>.</li>
         <li>Connect, then paste your Magic Hour API key. <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Get a Magic Hour API key</a>.</li>
       </ol>

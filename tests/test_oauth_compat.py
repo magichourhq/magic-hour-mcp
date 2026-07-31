@@ -200,6 +200,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Magic Hour MCP", response.text)
         self.assertIn("Connect with Claude", response.text)
         self.assertIn("Settings &gt; Connectors &gt; Add custom connector", response.text)
+        self.assertIn('href="https://claude.ai/new#settings/customize-connectors"', response.text)
         self.assertIn("https://mcp.magichour.ai/", response.text)
         self.assertIn("magic-hour-mcp", response.text)
         self.assertIn("paste your Magic Hour API key", response.text)
