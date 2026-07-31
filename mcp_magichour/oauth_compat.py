@@ -445,6 +445,7 @@ def _landing_page() -> HTMLResponse:
       --foreground: white;
       --card: hsl(235.71 25.93% 10.59%);
       --primary: hsl(259.29 100% 50%);
+      --secondary-foreground: hsl(248.16 100% 75.49%);
       --muted: hsl(235.71 21.21% 12.94%);
       --muted-foreground: hsl(235 11.11% 57.65%);
       --border: hsl(232.17 22.77% 19.8%);
@@ -469,7 +470,7 @@ def _landing_page() -> HTMLResponse:
     li + li { margin-top: .6rem; }
     strong { color: var(--foreground); }
     code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
-    a { color: var(--primary); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
     a:hover { color: var(--foreground); }
     a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 2px; }
     .docs-link { display: inline-block; margin-top: 28px; font-size: 14px; font-weight: 650; }
