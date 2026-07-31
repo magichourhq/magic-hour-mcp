@@ -20,6 +20,7 @@ from starlette.middleware.cors import CORSMiddleware
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .oauth_compat import create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
+from .tool_logging import ToolCallLoggingMiddleware
 
 ProjectType = Literal["video", "image", "audio"]
 
@@ -68,6 +69,7 @@ def create_mcp() -> FastMCP:
     )
 
     register_custom_tools(mcp)
+    mcp.add_middleware(ToolCallLoggingMiddleware())
     return mcp
 
 
