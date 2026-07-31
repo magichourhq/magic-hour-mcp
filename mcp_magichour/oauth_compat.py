@@ -467,7 +467,9 @@ def _landing_page() -> HTMLResponse:
     p { margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
     section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
     ol { margin: 0; padding-left: 22px; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
-    li + li { margin-top: .6rem; }
+    ol > li + li { margin-top: 10px; }
+    .connector-fields { margin: 10px 0 0; padding-left: 20px; }
+    .connector-fields li + li { margin-top: 6px; }
     strong { color: var(--foreground); }
     code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
     a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -485,8 +487,15 @@ def _landing_page() -> HTMLResponse:
       <h2 id="connect-claude">Connect with Claude</h2>
       <ol>
         <li>Open <strong><a href="https://claude.ai/new#settings/customize-connectors" target="_blank" rel="noopener noreferrer">Settings &gt; Connectors &gt; Add custom connector</a></strong>.</li>
-        <li>Use URL <code>https://mcp.magichour.ai/</code>. Under <strong>Advanced</strong>, set OAuth Client ID to <code>magic-hour-mcp</code>.</li>
-        <li>Connect, then paste your Magic Hour API key. <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Get a Magic Hour API key</a>.</li>
+        <li>Enter the following details:
+          <ul class="connector-fields">
+            <li><strong>Name:</strong> <code>Magic Hour</code></li>
+            <li><strong>Remote MCP server URL:</strong> <code>https://mcp.magichour.ai/</code></li>
+            <li>Under <strong>Advanced settings</strong>, <strong>OAuth Client ID:</strong> <code>magic-hour-mcp</code></li>
+            <li><strong>OAuth Client Secret:</strong> leave blank</li>
+          </ul>
+        </li>
+        <li>Add and connect the connector, then paste your Magic Hour API key. <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Get a Magic Hour API key</a>.</li>
       </ol>
     </section>
     <a class="docs-link" href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
