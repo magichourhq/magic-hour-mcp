@@ -497,7 +497,7 @@ def _landing_page() -> HTMLResponse:
 <body>
   <main>
     <div class="landing-brand"><img class="landing-logo" src="/favicon.ico" alt="" width="28" height="28"><h1>Magic Hour MCP</h1></div>
-    <p>This endpoint speaks the Model Context Protocol. Connect an MCP client to <code>/</code> to use Magic Hour tools.</p>
+    <p>Add Magic Hour's image, video and audio generation to your AI agent in under a minute.</p>
     <section aria-labelledby="connect-claude">
       <h2 id="connect-claude">Connect with Claude</h2>
       <ol>
