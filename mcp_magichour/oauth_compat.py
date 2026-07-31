@@ -439,9 +439,7 @@ def _landing_page() -> HTMLResponse:
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #09090b; color: #e4e4e7; }
     main { width: min(38rem, calc(100% - 2rem)); padding: 2.5rem; border: 1px solid #27272a; border-radius: 1rem; background: #111113; box-shadow: 0 1.5rem 5rem #0008; }
-    .status { display: inline-flex; align-items: center; gap: .6rem; color: #86efac; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
-    .status::before { content: ""; width: .55rem; height: .55rem; border-radius: 50%; background: #22c55e; box-shadow: 0 0 1rem #22c55e; }
-    h1 { margin: 1.5rem 0 .75rem; font-family: ui-sans-serif, system-ui, sans-serif; font-size: clamp(2rem, 8vw, 3.5rem); letter-spacing: -.06em; }
+    h1 { margin: 0 0 .75rem; font-family: ui-sans-serif, system-ui, sans-serif; font-size: clamp(2rem, 8vw, 3.5rem); letter-spacing: -.06em; }
     p { margin: 0; color: #a1a1aa; line-height: 1.7; }
     code { color: #fafafa; }
     a { display: inline-block; margin-top: 1.75rem; color: #d8b4fe; text-underline-offset: .25rem; }
@@ -449,7 +447,6 @@ def _landing_page() -> HTMLResponse:
 </head>
 <body>
   <main>
-    <div class="status">Service online</div>
     <h1>Magic Hour MCP</h1>
     <p>This endpoint speaks the Model Context Protocol. Connect an MCP client to <code>/</code> to use Magic Hour tools.</p>
     <a href="https://docs.magichour.ai/">Read Magic Hour docs →</a>

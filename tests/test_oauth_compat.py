@@ -198,7 +198,6 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["vary"], "Accept")
         self.assertNotIn("www-authenticate", response.headers)
         self.assertIn("Magic Hour MCP", response.text)
-        self.assertIn("Service online", response.text)
 
     async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")
