@@ -473,7 +473,6 @@ def _landing_page() -> HTMLResponse:
     table { width: 100%; min-width: 500px; border-collapse: collapse; text-align: left; font-family: inherit; font-size: 13px; line-height: 1.45; }
     th, td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--border); }
     th + th, th + td { border-left: 1px solid var(--border); }
-    thead th { color: var(--foreground); background: var(--muted); font-weight: 650; }
     tbody th { width: 44%; color: var(--foreground); font-weight: 600; }
     tbody tr:last-child > * { border-bottom: 0; }
     table code { white-space: nowrap; font-family: inherit; font-size: inherit; }
@@ -494,15 +493,22 @@ def _landing_page() -> HTMLResponse:
       <h2 id="connect-claude">Connect with Claude</h2>
       <ol>
         <li>Open <strong><a href="https://claude.ai/new#settings/customize-connectors" target="_blank" rel="noopener noreferrer">Settings &gt; Connectors &gt; Add custom connector</a></strong>.</li>
-        <li>Enter the following details:
-          <div class="connector-table-wrap" role="region" aria-label="Claude connector fields" tabindex="0">
+        <li>Enter basic details:
+          <div class="connector-table-wrap" role="region" aria-label="Claude connector basic fields" tabindex="0">
             <table>
-              <thead><tr><th scope="col">Field</th><th scope="col">Value</th></tr></thead>
               <tbody>
                 <tr><th scope="row">Name</th><td><code>Magic Hour</code></td></tr>
                 <tr><th scope="row">Remote MCP server URL</th><td><code>https://mcp.magichour.ai/</code></td></tr>
-                <tr><th scope="row">OAuth Client ID (Advanced settings)</th><td><code>magic-hour-mcp</code></td></tr>
-                <tr><th scope="row">OAuth Client Secret (Advanced settings)</th><td>Leave blank</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </li>
+        <li>Open Advanced settings.
+          <div class="connector-table-wrap" role="region" aria-label="Claude connector advanced fields" tabindex="0">
+            <table>
+              <tbody>
+                <tr><th scope="row">OAuth Client ID</th><td><code>magic-hour-mcp</code></td></tr>
+                <tr><th scope="row">OAuth Client Secret</th><td>Leave blank</td></tr>
               </tbody>
             </table>
           </div>
