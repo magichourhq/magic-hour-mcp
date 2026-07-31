@@ -551,7 +551,7 @@ def _authorization_page(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>Connect Magic Hour</title>
+<title>Connect to Magic Hour MCP</title>
 <style>
   :root {{
     color-scheme: dark;
@@ -584,7 +584,7 @@ def _authorization_page(
     color: var(--card-foreground); font-size: 14px; font-weight: 650;
   }}
   .brand-logo {{ width: 24px; height: 24px; flex: 0 0 auto; border-radius: calc(var(--radius) - .1875rem); }}
-  h1 {{ margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -.025em; }}
+  h1 {{ margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -.025em; }}
   .intro {{ margin: 12px 0 26px; color: var(--muted-foreground); font-size: 14px; line-height: 1.55; }}
   .error {{ margin: 8px 0 0; color: var(--destructive); font-size: 12px; line-height: 1.5; }}
   .field-header {{ display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }}
@@ -611,7 +611,7 @@ def _authorization_page(
 </head><body>
 <main class="card">
   <div class="brand"><img class="brand-logo" src="/favicon.ico" alt="" width="24" height="24">Magic Hour</div>
-  <h1>Connect Magic Hour</h1>
+  <h1>Connect to Magic Hour MCP</h1>
   <p class="intro">Enter your Magic Hour API key to use Magic Hour tools in Claude.</p>
   <form method="post" action="">{fields}
     <div class="field-header">
