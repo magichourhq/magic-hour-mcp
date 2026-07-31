@@ -1,7 +1,4 @@
-# OAuth compatibility for Claude
-
-For complete integration, deployment, testing, and troubleshooting instructions,
-see the [OAuth integration guide](oauth-integration-guide.md).
+# OAuth compatibility for claude.ai web
 
 Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 

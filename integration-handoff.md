@@ -6,9 +6,6 @@ If the receiving team wants a more explicit sequence, use `docs/detailed-step-by
 
 If they want to give instructions directly to an AI coding agent, use `docs/ai-agent-go-live-instructions.md`.
 
-For OAuth architecture, production deployment, and connector troubleshooting,
-use the [OAuth integration guide](docs/oauth-integration-guide.md).
-
 ## What to mount
 
 - Import `app` from `mcp_magichour.server`
@@ -105,10 +102,9 @@ Never log the raw `Authorization` header.
 
 What this means:
 
-- Developer clients can continue using a static bearer API key
-- Claude connectors use the included Authorization Code + PKCE compatibility layer
-- OAuth returns the same Magic Hour API key as the access token
-- Read the [OAuth integration guide](docs/oauth-integration-guide.md) before mounting or proxying the OAuth-wrapped app
+- This repo supports developer style clients now
+- Web connector style auth is out of scope here
+- If the product later needs OAuth, add it in the host app or in a future auth layer
 
 ## Auth setup options for the host app
 
@@ -125,18 +121,15 @@ This is the lightest path.
 
 For Codex CLI, launch Codex from the same shell where the bearer token env var is set so the MCP server appears and authenticates correctly.
 
-### Option 2: Use the included Claude OAuth compatibility layer
+### Option 2: Add an auth adapter later
 
-Use this if the goal is:
+Use this later if the goal is:
 
-- claude.ai web Custom Connectors
-- Claude Desktop Connectors UI
-- one-click Claude connector setup
+- web chat
+- connector style flows
+- one click user setup
 
-The fixed-client compatibility layer is already included. Follow the
-[OAuth integration guide](docs/oauth-integration-guide.md); it documents the
-callback allowlist, canonical URLs, discovery routes, deployment constraints,
-and security model.
+The auth adapter should live outside this repo unless the team chooses to add OAuth directly here.
 
 ## Environment
 
