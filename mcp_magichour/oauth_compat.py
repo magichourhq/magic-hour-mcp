@@ -377,6 +377,10 @@ class MCPBearerChallengeMiddleware:
         )
         scheme, _, token = header.partition(" ")
         if scheme.lower() != "bearer" or not token.strip():
+            if scope.get("method") == "GET" and scope.get("path") == "/" and _accepts_html(scope):
+                response = _landing_page()
+                await response(scope, receive, send)
+                return
             request = Request(scope)
             issuer = self.oauth_server.issuer(request)
             response = JSONResponse(
@@ -392,6 +396,74 @@ class MCPBearerChallengeMiddleware:
             return
 
         await self.app(scope, receive, send)
+
+
+def _accepts_html(scope: Mapping[str, Any]) -> bool:
+    accept_values = (
+        value.decode("latin-1")
+        for name, value in scope.get("headers", [])
+        if name.lower() == b"accept"
+    )
+    for item in ",".join(accept_values).split(","):
+        media_type, *parameters = item.split(";")
+        if media_type.strip().lower() != "text/html":
+            continue
+        quality = 1.0
+        for parameter in parameters:
+            name, separator, value = parameter.partition("=")
+            if separator and name.strip().lower() == "q":
+                try:
+                    quality = float(value.strip())
+                except ValueError:
+                    quality = 0.0
+        if quality > 0:
+            return True
+    return False
+
+
+def _landing_page() -> HTMLResponse:
+    body = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Magic Hour MCP</title>
+  <style>
+    :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #09090b; color: #e4e4e7; }
+    main { width: min(38rem, calc(100% - 2rem)); padding: 2.5rem; border: 1px solid #27272a; border-radius: 1rem; background: #111113; box-shadow: 0 1.5rem 5rem #0008; }
+    .status { display: inline-flex; align-items: center; gap: .6rem; color: #86efac; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+    .status::before { content: ""; width: .55rem; height: .55rem; border-radius: 50%; background: #22c55e; box-shadow: 0 0 1rem #22c55e; }
+    h1 { margin: 1.5rem 0 .75rem; font-family: ui-sans-serif, system-ui, sans-serif; font-size: clamp(2rem, 8vw, 3.5rem); letter-spacing: -.06em; }
+    p { margin: 0; color: #a1a1aa; line-height: 1.7; }
+    code { color: #fafafa; }
+    a { display: inline-block; margin-top: 1.75rem; color: #d8b4fe; text-underline-offset: .25rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="status">Service online</div>
+    <h1>Magic Hour MCP</h1>
+    <p>This endpoint speaks the Model Context Protocol. Connect an MCP client to <code>/</code> to use Magic Hour tools.</p>
+    <a href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
+  </main>
+</body>
+</html>"""
+    return HTMLResponse(
+        body,
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": (
+                "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; "
+                "form-action 'none'; frame-ancestors 'none'"
+            ),
+            "Referrer-Policy": "no-referrer",
+            "Vary": "Accept",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+        },
+    )
 
 
 class OAuthRequestError(Exception):

@@ -187,10 +187,39 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "invalid_request")
 
-    async def test_mcp_requires_bearer_but_preserves_existing_api_key_header(self):
+    async def test_browser_get_to_root_returns_landing_page(self):
+        response = await self.client.get(
+            "/",
+            headers={"Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
+        self.assertEqual(response.headers["vary"], "Accept")
+        self.assertNotIn("www-authenticate", response.headers)
+        self.assertIn("Magic Hour MCP", response.text)
+        self.assertIn("Service online", response.text)
+
+    async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")
         self.assertEqual(unauthorized.status_code, 401)
-        self.assertIn("resource_metadata=", unauthorized.headers["www-authenticate"])
+        self.assertEqual(unauthorized.json(), {"error": "unauthorized"})
+        self.assertEqual(
+            unauthorized.headers["www-authenticate"],
+            'Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource"',
+        )
+
+        for method, accept in (
+            ("GET", "text/event-stream"),
+            ("GET", "*/*"),
+            ("GET", "text/html;q=0,*/*"),
+            ("POST", "text/html"),
+        ):
+            response = await self.client.request(method, "/", headers={"Accept": accept})
+            self.assertEqual(response.status_code, 401, (method, accept))
+            self.assertIn("resource_metadata=", response.headers["www-authenticate"])
+
+    async def test_mcp_preserves_existing_api_key_header(self):
 
         authorized = await self.client.get("/", headers={"Authorization": "Bearer sk_existing"})
         self.assertEqual(authorized.status_code, 200)
