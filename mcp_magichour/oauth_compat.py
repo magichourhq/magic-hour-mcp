@@ -459,7 +459,7 @@ def _landing_page() -> HTMLResponse:
       padding: 24px; color: var(--foreground); background: var(--background);
     }
     main {
-      width: min(100%, 680px); padding: 36px; background: var(--card);
+      width: min(100%, 680px); min-width: 0; padding: 36px; background: var(--card);
       border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
     }
     h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.2; letter-spacing: -.025em; }
@@ -468,7 +468,7 @@ def _landing_page() -> HTMLResponse:
     section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
     ol { margin: 0; padding-left: 22px; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
     ol > li + li { margin-top: 10px; }
-    .connector-table-wrap { margin-top: 12px; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    .connector-table-wrap { width: 100%; min-width: 0; margin-top: 12px; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
     .connector-table-wrap:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
     table { width: 100%; min-width: 500px; border-collapse: collapse; text-align: left; line-height: 1.45; }
     th, td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--border); }
