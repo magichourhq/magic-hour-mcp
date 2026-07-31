@@ -438,10 +438,14 @@ def _landing_page() -> HTMLResponse:
     :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #09090b; color: #e4e4e7; }
-    main { width: min(38rem, calc(100% - 2rem)); padding: 2.5rem; border: 1px solid #27272a; border-radius: 1rem; background: #111113; box-shadow: 0 1.5rem 5rem #0008; }
+    main { width: min(42rem, calc(100% - 2rem)); padding: 2.5rem; border: 1px solid #27272a; border-radius: 1rem; background: #111113; box-shadow: 0 1.5rem 5rem #0008; }
     h1 { margin: 0 0 .75rem; font-family: ui-sans-serif, system-ui, sans-serif; font-size: clamp(2rem, 8vw, 3.5rem); letter-spacing: -.06em; }
+    h2 { margin: 0 0 1rem; color: #fafafa; font: 600 1rem ui-sans-serif, system-ui, sans-serif; }
     p { margin: 0; color: #a1a1aa; line-height: 1.7; }
-    code { color: #fafafa; }
+    section { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid #27272a; }
+    ol { margin: 0; padding-left: 1.4rem; color: #a1a1aa; line-height: 1.65; }
+    li + li { margin-top: .6rem; }
+    strong, code { color: #fafafa; }
     a { display: inline-block; margin-top: 1.75rem; color: #d8b4fe; text-underline-offset: .25rem; }
   </style>
 </head>
@@ -449,6 +453,14 @@ def _landing_page() -> HTMLResponse:
   <main>
     <h1>Magic Hour MCP</h1>
     <p>This endpoint speaks the Model Context Protocol. Connect an MCP client to <code>/</code> to use Magic Hour tools.</p>
+    <section aria-labelledby="connect-claude">
+      <h2 id="connect-claude">Connect with Claude</h2>
+      <ol>
+        <li>Open <strong>Settings &gt; Connectors &gt; Add custom connector</strong>.</li>
+        <li>Use URL <code>https://mcp.magichour.ai/</code>. Under <strong>Advanced</strong>, set OAuth Client ID to <code>magic-hour-mcp</code>.</li>
+        <li>Connect, then paste your Magic Hour API key.</li>
+      </ol>
+    </section>
     <a href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
   </main>
 </body>
