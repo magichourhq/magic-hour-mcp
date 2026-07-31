@@ -28,7 +28,9 @@ MAX_FORM_BYTES = 16 * 1024
 MAX_PENDING_CODES = 1_000
 MAX_CODES_PER_API_KEY = 3
 MAX_CONCURRENT_VALIDATIONS = 10
-API_KEY_VERIFICATION_ERROR = "That API key wasn’t accepted. Check it and try again."
+API_KEY_VERIFICATION_ERROR = (
+    "We couldn't verify this API key. Check that you copied the full key and try again."
+)
 CLAUDE_CLIENT_ID = "magic-hour-mcp"
 CLAUDE_REDIRECT_URIS = [
     "https://claude.ai/api/mcp/auth_callback",
