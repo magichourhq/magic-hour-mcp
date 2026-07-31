@@ -36,6 +36,9 @@ class AuthorizationPageParser(HTMLParser):
         self.spans = []
         self.scripts = []
         self.script_bodies = []
+        self.tables = []
+        self.table_headers = []
+        self.table_cells = []
         self._script_body = None
 
     def handle_starttag(self, tag, attrs):
@@ -53,6 +56,12 @@ class AuthorizationPageParser(HTMLParser):
         if tag == "script":
             self.scripts.append(attributes)
             self._script_body = []
+        if tag == "table":
+            self.tables.append(attributes)
+        if tag == "th":
+            self.table_headers.append(attributes)
+        if tag == "td":
+            self.table_cells.append(attributes)
         if attributes.get("role") == "alert":
             self.alerts.append((tag, attributes))
 
@@ -350,6 +359,29 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
         self.assertEqual(response.headers["vary"], "Accept")
         self.assertNotIn("www-authenticate", response.headers)
+
+    async def test_landing_page_script_is_nonce_restricted_per_response(self):
+        pages = [
+            await self.client.get("/", headers={"Accept": "text/html"}),
+            await self.client.get("/", headers={"Accept": "text/html"}),
+        ]
+        nonces = []
+        for page in pages:
+            parser = AuthorizationPageParser()
+            parser.feed(page.text)
+            self.assertEqual(len(parser.scripts), 1)
+            nonce = parser.scripts[0].get("nonce")
+            self.assertTrue(nonce)
+            nonces.append(nonce)
+
+            directives = {
+                parts[0]: parts[1:]
+                for directive in page.headers["content-security-policy"].split(";")
+                if (parts := directive.strip().split())
+            }
+            self.assertEqual(directives["script-src"], [f"'nonce-{nonce}'"])
+
+        self.assertNotEqual(nonces[0], nonces[1])
 
     async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")
