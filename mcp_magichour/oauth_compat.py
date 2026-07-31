@@ -463,7 +463,9 @@ def _landing_page() -> HTMLResponse:
       width: min(100%, 680px); min-width: 0; padding: 36px; background: var(--card);
       border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
     }
-    h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.2; letter-spacing: -.025em; }
+    .landing-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .landing-logo { width: 28px; height: 28px; flex: 0 0 auto; border-radius: calc(var(--radius) - .1875rem); }
+    h1 { margin: 0; font-size: 28px; line-height: 1.2; letter-spacing: -.025em; }
     h2 { margin: 0 0 16px; color: var(--foreground); font-size: 16px; line-height: 1.3; }
     p { margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
     section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
@@ -494,7 +496,7 @@ def _landing_page() -> HTMLResponse:
 </head>
 <body>
   <main>
-    <h1>Magic Hour MCP</h1>
+    <div class="landing-brand"><img class="landing-logo" src="/favicon.ico" alt="" width="28" height="28"><h1>Magic Hour MCP</h1></div>
     <p>This endpoint speaks the Model Context Protocol. Connect an MCP client to <code>/</code> to use Magic Hour tools.</p>
     <section aria-labelledby="connect-claude">
       <h2 id="connect-claude">Connect with Claude</h2>
@@ -551,7 +553,7 @@ def _landing_page() -> HTMLResponse:
         headers={
             "Cache-Control": "no-store",
             "Content-Security-Policy": (
-                f"default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-{script_nonce}'; base-uri 'none'; "
+                f"default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-{script_nonce}'; img-src 'self'; base-uri 'none'; "
                 "form-action 'none'; frame-ancestors 'none'"
             ),
             "Referrer-Policy": "no-referrer",
