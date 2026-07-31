@@ -167,6 +167,28 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<script", page.text)
         self.assertNotIn("src=", page.text)
 
+    async def test_authorization_page_uses_dark_theme_tokens(self):
+        page = await self.client.get("/authorize", params=self.authorization_params())
+
+        self.assertIn('<meta name="color-scheme" content="dark">', page.text)
+        for declaration in (
+            "--background: hsl(234.55 31.43% 6.86%)",
+            "--foreground: white",
+            "--card: hsl(235.71 25.93% 10.59%)",
+            "--card-foreground: white",
+            "--primary: hsl(259.29 100% 50%)",
+            "--primary-foreground: white",
+            "--muted: hsl(235.71 21.21% 12.94%)",
+            "--muted-foreground: hsl(235 11.11% 57.65%)",
+            "--border: hsl(232.17 22.77% 19.8%)",
+            "--input: hsl(236 19% 15%)",
+            "--ring: white",
+            "--destructive: hsl(0 100% 68.24%)",
+            "--radius: .625rem",
+        ):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, page.text)
+
     async def test_authorization_error_is_accessible_and_never_reflects_key(self):
         response = await self.client.post(
             "/authorize",

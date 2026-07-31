@@ -459,52 +459,69 @@ def _authorization_page(
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="dark">
 <title>Connect Magic Hour</title>
 <style>
-  :root {{ color-scheme: light; font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+  :root {{
+    color-scheme: dark;
+    --background: hsl(234.55 31.43% 6.86%);
+    --foreground: white;
+    --card: hsl(235.71 25.93% 10.59%);
+    --card-foreground: white;
+    --primary: hsl(259.29 100% 50%);
+    --primary-foreground: white;
+    --muted: hsl(235.71 21.21% 12.94%);
+    --muted-foreground: hsl(235 11.11% 57.65%);
+    --border: hsl(232.17 22.77% 19.8%);
+    --input: hsl(236 19% 15%);
+    --ring: white;
+    --destructive: hsl(0 100% 68.24%);
+    --radius: .625rem;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }}
   * {{ box-sizing: border-box; }}
   body {{
     margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
-    padding: 24px; color: #211f23; background: #f5f5f7;
+    padding: 24px; color: var(--foreground); background: var(--background);
   }}
   .card {{
-    width: min(100%, 440px); padding: 36px; background: #fff; border: 1px solid #dedce1;
-    border-radius: 16px; box-shadow: 0 8px 28px rgba(31, 27, 34, .08);
+    width: min(100%, 440px); padding: 36px; color: var(--card-foreground); background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
   }}
   .brand {{
     display: flex; align-items: center; gap: 9px; margin-bottom: 30px;
-    color: #3b373e; font-size: 14px; font-weight: 650;
+    color: var(--card-foreground); font-size: 14px; font-weight: 650;
   }}
   .brand-mark {{
     position: relative; width: 24px; height: 24px; flex: 0 0 auto;
-    background: #684570; border-radius: 7px;
+    background: var(--primary); border-radius: calc(var(--radius) - .1875rem);
   }}
   .brand-mark::before {{
     content: ""; position: absolute; width: 8px; height: 8px; top: 8px; left: 8px;
-    background: #fff; border-radius: 2px; transform: rotate(45deg);
+    background: var(--primary-foreground); border-radius: 2px; transform: rotate(45deg);
   }}
   h1 {{ margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -.025em; }}
-  .intro {{ margin: 12px 0 26px; color: #625c66; font-size: 14px; line-height: 1.55; }}
+  .intro {{ margin: 12px 0 26px; color: var(--muted-foreground); font-size: 14px; line-height: 1.55; }}
   .error {{
-    margin: 0 0 20px; padding: 11px 12px; color: #84253f; background: #fff3f6;
-    border: 1px solid #ecc7d1; border-radius: 8px; font-size: 13px; line-height: 1.4;
+    margin: 0 0 20px; padding: 11px 12px; color: var(--destructive); background: var(--muted);
+    border: 1px solid var(--destructive); border-radius: var(--radius); font-size: 13px; line-height: 1.4;
   }}
   label {{ display: block; margin-bottom: 8px; font-size: 13px; font-weight: 650; }}
   input[type="password"] {{
-    width: 100%; height: 46px; padding: 0 13px; color: #211f23; background: #fff;
-    border: 1px solid #bbb7bf; border-radius: 8px; outline: none; font: inherit;
+    width: 100%; height: 46px; padding: 0 13px; color: var(--foreground); background: var(--input);
+    border: 1px solid var(--border); border-radius: var(--radius); outline: none; font: inherit;
   }}
-  input[type="password"]:focus-visible {{ border-color: #684570; box-shadow: 0 0 0 3px rgba(104, 69, 112, .16); }}
-  input[aria-invalid="true"] {{ border-color: #a92f50; }}
-  .hint {{ margin: 8px 0 22px; color: #625c66; font-size: 12px; line-height: 1.5; }}
+  input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
+  input[aria-invalid="true"] {{ border-color: var(--destructive); }}
+  .hint {{ margin: 8px 0 22px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }}
   button {{
-    width: 100%; min-height: 46px; border: 0; border-radius: 8px; color: #fff; background: #684570;
+    width: 100%; min-height: 46px; border: 0; border-radius: var(--radius);
+    color: var(--primary-foreground); background: var(--primary);
     font: inherit; font-size: 14px; font-weight: 650; cursor: pointer;
   }}
-  button:hover {{ background: #583a60; }}
-  button:focus-visible {{ outline: 3px solid rgba(104, 69, 112, .28); outline-offset: 3px; }}
-  .privacy {{ margin: 18px 0 0; color: #625c66; font-size: 11px; line-height: 1.5; text-align: center; }}
+  button:hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
+  button:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 3px; }}
+  .privacy {{ margin: 18px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; text-align: center; }}
   @media (max-width: 480px) {{ body {{ padding: 16px; }} .card {{ padding: 28px 24px; }} }}
 </style>
 </head><body>
