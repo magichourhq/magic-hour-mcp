@@ -153,6 +153,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Your API key is validated securely and never displayed.", page.text)
         api_key_input = next(field for field in parser.inputs if field.get("name") == "api_key")
         self.assertEqual(api_key_input["type"], "password")
+        self.assertEqual(api_key_input["placeholder"], "mhk_live_…")
         self.assertIn("required", api_key_input)
         self.assertEqual(api_key_input["autocomplete"], "off")
 

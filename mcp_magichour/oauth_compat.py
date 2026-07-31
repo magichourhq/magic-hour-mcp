@@ -593,6 +593,7 @@ def _authorization_page(
     width: 100%; height: 46px; padding: 0 13px; color: var(--foreground); background: var(--input);
     border: 1px solid var(--border); border-radius: var(--radius); outline: none; font: inherit;
   }}
+  input[type="password"]::placeholder {{ color: var(--muted-foreground); opacity: 1; }}
   input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
   input[aria-invalid="true"] {{ border-color: var(--destructive); }}
   .hint {{ margin: 8px 0 22px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }}
@@ -616,7 +617,7 @@ def _authorization_page(
   {error_html}
   <form method="post" action="">{fields}
     <label for="api-key">API key</label>
-    <input id="api-key" name="api_key" type="password" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-describedby="{described_by}"{error_attributes}>
+    <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-describedby="{described_by}"{error_attributes}>
     <p class="hint" id="api-key-hint"><a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Find your API key in your Magic Hour account.</a></p>
     <button type="submit">Connect</button>
   </form>
