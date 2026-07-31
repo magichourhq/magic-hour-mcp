@@ -6,13 +6,13 @@ Keep this doc only if the team later wants ChatGPT, Claude Chat, or another web 
 
 - A working HTTP MCP server
 - Bearer passthrough to the Magic Hour API key
+- OAuth Authorization Code + PKCE compatibility for Claude connectors
 - Runtime OpenAPI-generated tools such as `videoAssets_generatePresignedUrl` and `imageToVideo_createVideo`
 - Custom wait helpers that return sanitized `exact_download_urls`
 - Generated create tools that accept Magic Hour `file_path` values, with direct public media URLs as a best-effort fallback
 
 ## What this repo does not give you
 
-- OAuth
 - A browser upload UI
 - A chat popup or modal
 - A server side upload bridge
@@ -34,7 +34,8 @@ Authorization: Bearer <magic_hour_api_key>
 
 That works for developer style clients.
 
-For web chat or connector style clients, add an OAuth layer that maps the user to a Magic Hour API key or another server side credential model.
+For Claude connectors, use the included OAuth compatibility layer. It validates
+the user's Magic Hour API key, then uses that same key as the access token.
 
 See `docs/future-oauth-support.md`.
 
@@ -121,7 +122,6 @@ This should be a backend feature, not only MCP prompting, because arbitrary URL 
 
 ## What the backend team would need to build
 
-- OAuth or another connector compatible auth layer
 - Optional upload bridge endpoint
 - Optional file validation rules
 - Optional file retention and cleanup policy

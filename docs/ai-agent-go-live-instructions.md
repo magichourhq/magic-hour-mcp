@@ -59,8 +59,6 @@ When mounted into the product backend, mount it at:
 
 Do not assume these already exist:
 
-- OAuth
-- ChatGPT or Claude web connector auth
 - a browser upload widget
 - a chat popup
 - a server side upload bridge
@@ -543,11 +541,11 @@ Include:
 - video output is returned as URLs
 - local CLI clients can access local files
 - web chat clients need an upload UI or upload bridge
-- OAuth is not included in the v1 bearer-token path
+- OAuth compatibility reuses the same underlying API key
 
-## Phase 5: Decide whether OAuth is needed later
+## Phase 5: Configure OAuth when needed
 
-Do not build OAuth for the first go-live path unless it is required by the target platform.
+The included compatibility shim is only needed for platforms such as Claude connectors.
 
 Bearer passthrough works for:
 
@@ -556,22 +554,15 @@ Bearer passthrough works for:
 - Claude Code
 - manual clients that support custom headers
 
-OAuth or an auth adapter is likely needed for:
+Use the included OAuth compatibility layer for:
 
 - one click web connector setup
 - marketplace style setup
 - web chat surfaces that do not allow custom bearer headers
 
-If OAuth becomes required later, keep it separate from this v1 integration.
-
-Recommended OAuth approach:
-
-1. use the product's existing login if it already supports OAuth or OIDC
-2. map the logged-in product user to a Magic Hour API key
-3. mint or validate connector tokens at the product backend
-4. keep the MCP tool implementation mostly unchanged
-
-Do not rewrite the MCP tool layer just to add OAuth.
+Set the canonical public issuer and resource URLs, serve over HTTPS, and run one
+worker because the minimal authorization-code store is process-local. The MCP
+tool implementation and downstream bearer passthrough stay unchanged.
 
 ## Phase 6: Final verification checklist
 
