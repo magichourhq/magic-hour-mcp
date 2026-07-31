@@ -203,6 +203,9 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("https://mcp.magichour.ai/", response.text)
         self.assertIn("magic-hour-mcp", response.text)
         self.assertIn("paste your Magic Hour API key", response.text)
+        self.assertIn('href="https://magichour.ai/developer?tab=api-keys"', response.text)
+        self.assertIn("Get a Magic Hour API key", response.text)
+        self.assertIn('target="_blank" rel="noopener noreferrer"', response.text)
 
     async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")

@@ -446,7 +446,8 @@ def _landing_page() -> HTMLResponse:
     ol { margin: 0; padding-left: 1.4rem; color: #a1a1aa; line-height: 1.65; }
     li + li { margin-top: .6rem; }
     strong, code { color: #fafafa; }
-    a { display: inline-block; margin-top: 1.75rem; color: #d8b4fe; text-underline-offset: .25rem; }
+    a { color: #d8b4fe; text-underline-offset: .25rem; }
+    .docs-link { display: inline-block; margin-top: 1.75rem; }
   </style>
 </head>
 <body>
@@ -458,10 +459,10 @@ def _landing_page() -> HTMLResponse:
       <ol>
         <li>Open <strong>Settings &gt; Connectors &gt; Add custom connector</strong>.</li>
         <li>Use URL <code>https://mcp.magichour.ai/</code>. Under <strong>Advanced</strong>, set OAuth Client ID to <code>magic-hour-mcp</code>.</li>
-        <li>Connect, then paste your Magic Hour API key.</li>
+        <li>Connect, then paste your Magic Hour API key. <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Get a Magic Hour API key</a>.</li>
       </ol>
     </section>
-    <a href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
+    <a class="docs-link" href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
   </main>
 </body>
 </html>"""
