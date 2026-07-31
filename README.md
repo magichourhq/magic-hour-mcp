@@ -28,6 +28,7 @@ Core docs:
 
 - `user.md` - hosted endpoint user guide
 - `integration-handoff.md` - FastAPI mount and smoke test guide
+- [OAuth integration guide](docs/oauth-integration-guide.md) - architecture, deployment, and troubleshooting
 - `docs/detailed-step-by-step-integration.md` - step-by-step backend integration guide
 - `docs/ai-agent-go-live-instructions.md` - instructions to give another AI agent for product integration
 
