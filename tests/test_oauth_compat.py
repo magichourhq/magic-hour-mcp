@@ -219,6 +219,20 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status_code, 401, (method, accept))
             self.assertIn("resource_metadata=", response.headers["www-authenticate"])
 
+    async def test_browser_get_with_invalid_authorization_receives_bearer_challenge(self):
+        for authorization in ("Basic dXNlcjpwYXNz", "Bearer"):
+            response = await self.client.get(
+                "/",
+                headers={"Accept": "text/html", "Authorization": authorization},
+            )
+
+            self.assertEqual(response.status_code, 401, authorization)
+            self.assertEqual(response.json(), {"error": "unauthorized"})
+            self.assertEqual(
+                response.headers["www-authenticate"],
+                'Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource"',
+            )
+
     async def test_mcp_preserves_existing_api_key_header(self):
 
         authorized = await self.client.get("/", headers={"Authorization": "Bearer sk_existing"})

@@ -371,13 +371,19 @@ class MCPBearerChallengeMiddleware:
             await self.app(scope, receive, send)
             return
 
-        header = next(
+        authorization = next(
             (value.decode("latin-1") for name, value in scope.get("headers", []) if name.lower() == b"authorization"),
-            "",
+            None,
         )
+        header = authorization or ""
         scheme, _, token = header.partition(" ")
         if scheme.lower() != "bearer" or not token.strip():
-            if scope.get("method") == "GET" and scope.get("path") == "/" and _accepts_html(scope):
+            if (
+                authorization is None
+                and scope.get("method") == "GET"
+                and scope.get("path") == "/"
+                and _accepts_html(scope)
+            ):
                 response = _landing_page()
                 await response(scope, receive, send)
                 return
