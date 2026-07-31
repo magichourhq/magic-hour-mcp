@@ -468,8 +468,15 @@ def _landing_page() -> HTMLResponse:
     section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
     ol { margin: 0; padding-left: 22px; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
     ol > li + li { margin-top: 10px; }
-    .connector-fields { margin: 10px 0 0; padding-left: 20px; }
-    .connector-fields li + li { margin-top: 6px; }
+    .connector-table-wrap { margin-top: 12px; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    .connector-table-wrap:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+    table { width: 100%; min-width: 500px; border-collapse: collapse; text-align: left; line-height: 1.45; }
+    th, td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th + th, th + td { border-left: 1px solid var(--border); }
+    thead th { color: var(--foreground); background: var(--muted); font-size: 12px; font-weight: 650; }
+    tbody th { width: 44%; color: var(--foreground); font-weight: 600; }
+    tbody tr:last-child > * { border-bottom: 0; }
+    table code { white-space: nowrap; }
     strong { color: var(--foreground); }
     code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
     a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -488,12 +495,17 @@ def _landing_page() -> HTMLResponse:
       <ol>
         <li>Open <strong><a href="https://claude.ai/new#settings/customize-connectors" target="_blank" rel="noopener noreferrer">Settings &gt; Connectors &gt; Add custom connector</a></strong>.</li>
         <li>Enter the following details:
-          <ul class="connector-fields">
-            <li><strong>Name:</strong> <code>Magic Hour</code></li>
-            <li><strong>Remote MCP server URL:</strong> <code>https://mcp.magichour.ai/</code></li>
-            <li>Under <strong>Advanced settings</strong>, <strong>OAuth Client ID:</strong> <code>magic-hour-mcp</code></li>
-            <li><strong>OAuth Client Secret:</strong> leave blank</li>
-          </ul>
+          <div class="connector-table-wrap" role="region" aria-label="Claude connector fields" tabindex="0">
+            <table>
+              <thead><tr><th scope="col">Field</th><th scope="col">Value</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Name</th><td><code>Magic Hour</code></td></tr>
+                <tr><th scope="row">Remote MCP server URL</th><td><code>https://mcp.magichour.ai/</code></td></tr>
+                <tr><th scope="row">OAuth Client ID (Advanced settings)</th><td><code>magic-hour-mcp</code></td></tr>
+                <tr><th scope="row">OAuth Client Secret (Advanced settings)</th><td>Leave blank</td></tr>
+              </tbody>
+            </table>
+          </div>
         </li>
         <li>Add and connect the connector, then paste your Magic Hour API key. <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Get a Magic Hour API key</a>.</li>
       </ol>
