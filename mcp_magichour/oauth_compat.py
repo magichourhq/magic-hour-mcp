@@ -508,7 +508,7 @@ def _authorization_page(
   input[type="password"]:hover {{ border-color: #bcb2c5; }}
   input[type="password"]:focus-visible {{ border-color: #8d4f91; box-shadow: 0 0 0 4px rgba(141, 79, 145, .14); }}
   input[aria-invalid="true"] {{ border-color: #bd365e; }}
-  .hint {{ margin: 9px 0 24px; color: #817986; font-size: 12px; line-height: 1.5; }}
+  .hint {{ margin: 9px 0 24px; color: #746c79; font-size: 12px; line-height: 1.5; }}
   button {{
     width: 100%; min-height: 50px; border: 0; border-radius: 12px; color: #fff; background: #201825;
     font: inherit; font-size: 14px; font-weight: 750; cursor: pointer; box-shadow: 0 8px 20px rgba(32, 24, 37, .18); transition: transform .16s, background .16s, box-shadow .16s;
@@ -516,7 +516,7 @@ def _authorization_page(
   button:hover {{ background: #3b2941; box-shadow: 0 10px 24px rgba(32, 24, 37, .23); transform: translateY(-1px); }}
   button:active {{ transform: translateY(0); }}
   button:focus-visible {{ outline: 3px solid rgba(141, 79, 145, .35); outline-offset: 3px; }}
-  .privacy {{ display: flex; align-items: flex-start; gap: 8px; margin: 22px 0 0; color: #817986; font-size: 11px; line-height: 1.55; }}
+  .privacy {{ display: flex; align-items: flex-start; gap: 8px; margin: 22px 0 0; color: #746c79; font-size: 11px; line-height: 1.55; }}
   .lock {{ width: 14px; height: 11px; flex: 0 0 auto; margin-top: 3px; border: 1.5px solid #8f8794; border-radius: 3px; position: relative; }}
   .lock::before {{ content: ""; position: absolute; width: 7px; height: 6px; left: 2px; top: -7px; border: 1.5px solid #8f8794; border-bottom: 0; border-radius: 6px 6px 0 0; }}
   @media (max-width: 720px) {{
