@@ -209,7 +209,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resource.json()["resource"], RESOURCE)
         self.assertEqual(resource.json()["authorization_servers"], ["https://mcp.example"])
 
-    async def test_default_key_validator_only_accepts_authenticated_project_responses(self):
+    async def test_default_key_validator_only_accepts_authenticated_validation_response(self):
         class FakeClient:
             def __init__(self, response):
                 self.response = response
@@ -221,26 +221,28 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             async def __aexit__(self, exc_type, exc, traceback):
                 return None
 
-            async def get(self, path, headers):
+            async def post(self, path, headers, json):
                 self.headers = headers
+                self.json = json
                 return self.response
 
         server = OAuthCompatibilityServer(
             settings=OAuthSettings(resource_url=RESOURCE),
         )
-        for status_code, expected in ((200, True), (404, True), (401, False), (403, False)):
+        for status_code, expected in ((400, True), (401, False), (403, False), (404, False)):
             response = httpx.Response(
                 status_code,
-                request=httpx.Request("GET", "https://api.magichour.ai/validation"),
+                request=httpx.Request("POST", "https://api.magichour.ai/validation"),
             )
             fake_client = FakeClient(response)
             with patch("mcp_magichour.oauth_compat.httpx.AsyncClient", return_value=fake_client):
                 self.assertEqual(await server._validate_api_key("sk_secret"), expected)
             self.assertEqual(fake_client.headers, {"Authorization": "Bearer sk_secret"})
+            self.assertEqual(fake_client.json, {})
 
         bad_response = httpx.Response(
-            400,
-            request=httpx.Request("GET", "https://api.magichour.ai/validation"),
+            500,
+            request=httpx.Request("POST", "https://api.magichour.ai/validation"),
         )
         with patch(
             "mcp_magichour.oauth_compat.httpx.AsyncClient",

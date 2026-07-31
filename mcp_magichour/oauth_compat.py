@@ -120,7 +120,7 @@ class OAuthSettings:
     issuer_url: str | None = None
     resource_url: str | None = None
     api_base_url: str = "https://api.magichour.ai"
-    validation_path: str = "/v1/video-projects/id"
+    validation_path: str = "/v1/ai-image-generator"
 
     @classmethod
     def from_env(cls) -> "OAuthSettings":
@@ -130,7 +130,7 @@ class OAuthSettings:
             api_base_url=os.getenv("MAGIC_HOUR_API_BASE_URL", "https://api.magichour.ai"),
             validation_path=os.getenv(
                 "MAGIC_HOUR_OAUTH_VALIDATION_PATH",
-                "/v1/video-projects/id",
+                "/v1/ai-image-generator",
             ),
         )
 
@@ -340,15 +340,16 @@ class OAuthCompatibilityServer:
 
     async def _validate_api_key(self, api_key: str) -> bool:
         async with httpx.AsyncClient(base_url=self.settings.api_base_url, timeout=10.0) as client:
-            response = await client.get(
+            response = await client.post(
                 self.settings.validation_path,
                 headers={"Authorization": f"Bearer {api_key}"},
+                json={},
             )
-        # Random ID hits the documented, bearer-protected project-details route.
-        # 404 means authentication succeeded before project lookup; 401/403 does not.
-        if response.status_code in {200, 404}:
+        # Empty body cannot create a project or spend credits. The documented
+        # endpoint returns 400 only after bearer authentication succeeds.
+        if response.status_code == 400:
             return True
-        if response.status_code in {401, 403}:
+        if response.status_code in {401, 403, 404}:
             return False
         response.raise_for_status()
         return False
