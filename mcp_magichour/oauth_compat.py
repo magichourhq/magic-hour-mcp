@@ -612,7 +612,7 @@ def _authorization_page(
 <main class="card">
   <div class="brand"><img class="brand-logo" src="/favicon.ico" alt="" width="24" height="24">Magic Hour</div>
   <h1>Connect to Magic Hour MCP</h1>
-  <p class="intro">Enter your Magic Hour API key to use Magic Hour tools in Claude.</p>
+  <p class="intro">Enter your API key to use Magic Hour tools in Claude.</p>
   <form method="post" action="">{fields}
     <div class="field-header">
       <label for="api-key">API key</label>
