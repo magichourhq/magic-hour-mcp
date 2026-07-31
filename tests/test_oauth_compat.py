@@ -32,6 +32,11 @@ class AuthorizationPageParser(HTMLParser):
         self.images = []
         self.links = []
         self.alerts = []
+        self.buttons = []
+        self.spans = []
+        self.scripts = []
+        self.script_bodies = []
+        self._script_body = None
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
@@ -41,8 +46,24 @@ class AuthorizationPageParser(HTMLParser):
             self.images.append(attributes)
         if tag == "a":
             self.links.append(attributes)
+        if tag == "button":
+            self.buttons.append(attributes)
+        if tag == "span":
+            self.spans.append(attributes)
+        if tag == "script":
+            self.scripts.append(attributes)
+            self._script_body = []
         if attributes.get("role") == "alert":
             self.alerts.append((tag, attributes))
+
+    def handle_endtag(self, tag):
+        if tag == "script" and self._script_body is not None:
+            self.script_bodies.append("".join(self._script_body))
+            self._script_body = None
+
+    def handle_data(self, data):
+        if self._script_body is not None:
+            self._script_body.append(data)
 
 
 class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
@@ -154,21 +175,47 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             },
             parser.links,
         )
+        submit_button = next(button for button in parser.buttons if button.get("type") == "submit")
+        self.assertNotIn("disabled", submit_button)
+        self.assertNotIn("aria-busy", submit_button)
+        loading = next(span for span in parser.spans if span.get("class") == "button-loading")
+        spinner = next(span for span in parser.spans if span.get("class") == "spinner")
+        self.assertIn("hidden", loading)
+        self.assertEqual(spinner.get("aria-hidden"), "true")
+
+        script = "".join(parser.script_bodies)
+        self.assertIn('form.addEventListener("submit"', script)
+        self.assertIn("button.disabled = true", script)
+        self.assertIn('button.setAttribute("aria-busy", "true")', script)
+        self.assertIn("label.hidden = true", script)
+        self.assertIn("loading.hidden = false", script)
 
     async def test_authorization_page_security_headers_restrict_content(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
+        parser = AuthorizationPageParser()
+        parser.feed(page.text)
 
         self.assertEqual(page.headers["cache-control"], "no-store")
         self.assertEqual(page.headers["referrer-policy"], "no-referrer")
         self.assertEqual(page.headers["x-content-type-options"], "nosniff")
         self.assertEqual(page.headers["x-frame-options"], "DENY")
-        self.assertEqual(
-            page.headers["content-security-policy"],
-            "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
-            "base-uri 'none'; frame-ancestors 'none'",
-        )
-        self.assertNotIn("<script", page.text)
+        self.assertEqual(len(parser.scripts), 1)
+        nonce = parser.scripts[0].get("nonce")
+        self.assertTrue(nonce)
+        csp = page.headers["content-security-policy"]
+        self.assertIn("default-src 'none'", csp)
+        self.assertIn("style-src 'unsafe-inline'", csp)
+        self.assertIn("img-src 'self'", csp)
+        self.assertIn(f"script-src 'nonce-{nonce}'", csp)
+        script_directive = next(part for part in csp.split("; ") if part.startswith("script-src"))
+        self.assertNotIn("'unsafe-inline'", script_directive)
+        self.assertNotIn("src", parser.scripts[0])
         self.assertNotIn('src="http', page.text)
+
+        second_page = await self.client.get("/authorize", params=self.authorization_params())
+        second_parser = AuthorizationPageParser()
+        second_parser.feed(second_page.text)
+        self.assertNotEqual(nonce, second_parser.scripts[0].get("nonce"))
 
     async def test_authorization_error_is_accessible_and_never_reflects_key(self):
         response = await self.client.post(

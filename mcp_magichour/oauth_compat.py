@@ -534,6 +534,7 @@ def _authorization_page(
     *,
     status_code: int = 200,
 ) -> HTMLResponse:
+    script_nonce = secrets.token_urlsafe(18)
     fields = "".join(
         f'<input type="hidden" name="{html.escape(name)}" value="{html.escape(value or "")}">'
         for name, value in authorization.items()
@@ -606,6 +607,15 @@ def _authorization_page(
   }}
   button:hover {{ box-shadow: inset 0 0 0 1px var(--primary-foreground); }}
   button:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 3px; }}
+  button:disabled {{ cursor: wait; opacity: .9; }}
+  .button-loading {{ display: inline-flex; align-items: center; gap: 8px; }}
+  .button-loading[hidden] {{ display: none; }}
+  .spinner {{
+    width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: spin .7s linear infinite;
+  }}
+  @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+  @media (prefers-reduced-motion: reduce) {{ .spinner {{ animation: none; }} }}
   @media (max-width: 480px) {{ body {{ padding: 16px; }} .card {{ padding: 28px 24px; }} }}
 </style>
 </head><body>
@@ -613,16 +623,31 @@ def _authorization_page(
   <div class="brand"><img class="brand-logo" src="/favicon.ico" alt="" width="24" height="24">Magic Hour</div>
   <h1>Connect to Magic Hour MCP</h1>
   <p class="intro">Enter your API key to use Magic Hour tools in Claude.</p>
-  <form method="post" action="">{fields}
+  <form id="authorization-form" method="post" action="">{fields}
     <div class="field-header">
       <label for="api-key">API key</label>
       <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a>
     </div>
     <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{error_attributes}>
     {error_html}
-    <button type="submit">Connect</button>
+    <button id="connect-button" type="submit">
+      <span class="button-label">Connect</span>
+      <span class="button-loading" hidden><span class="spinner" aria-hidden="true"></span><span>Connecting…</span></span>
+    </button>
   </form>
 </main>
+<script nonce="{script_nonce}">
+  const form = document.getElementById("authorization-form");
+  const button = document.getElementById("connect-button");
+  const label = button.querySelector(".button-label");
+  const loading = button.querySelector(".button-loading");
+  form.addEventListener("submit", () => {{
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    label.hidden = true;
+    loading.hidden = false;
+  }});
+</script>
 </body></html>"""
     return HTMLResponse(
         body,
@@ -631,7 +656,7 @@ def _authorization_page(
             "Cache-Control": "no-store",
             "Content-Security-Policy": (
                 "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
-                "base-uri 'none'; frame-ancestors 'none'"
+                f"script-src 'nonce-{script_nonce}'; base-uri 'none'; frame-ancestors 'none'"
             ),
             "Referrer-Policy": "no-referrer",
             "X-Content-Type-Options": "nosniff",
