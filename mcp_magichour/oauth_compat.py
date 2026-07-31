@@ -614,7 +614,7 @@ def _authorization_page(
   }}
   .button-label {{ display: inline-flex; align-items: center; justify-content: center; }}
   .button-loading {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; }}
-  .button-loading[hidden] {{ display: none; }}
+  .button-label[hidden], .button-loading[hidden] {{ display: none; }}
   .spinner {{
     width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
     border-radius: 50%; animation: spin .7s linear infinite;
