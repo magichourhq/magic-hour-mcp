@@ -3,6 +3,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, patch
 
+import httpx
+
 from mcp_magichour.openapi_server import (
     _project_download_guidance_text,
     _project_status_text,
@@ -10,11 +12,26 @@ from mcp_magichour.openapi_server import (
     _project_to_tool_result,
     _resolve_media_mime_type,
     _upload_file_to_presigned_url,
+    app,
     mcp,
 )
 
 
 class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_favicon_is_public_and_serves_packaged_asset(self):
+        favicon_path = Path(__file__).parent.parent / "mcp_magichour" / "favicon.ico"
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example.test",
+        ) as client:
+            response = await client.get("/favicon.ico")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "image/x-icon")
+        self.assertEqual(response.content, favicon_path.read_bytes())
+        self.assertNotIn("www-authenticate", response.headers)
+
     async def test_custom_media_fetch_tools_are_registered(self):
         tools = await mcp.list_tools()
         names = {tool.name for tool in tools}
