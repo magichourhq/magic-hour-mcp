@@ -715,13 +715,13 @@ def _authorization_page(
   <div class="brand"><img class="brand-logo" src="/favicon.ico" alt="" width="24" height="24">Magic Hour</div>
   <h1>Connect to Magic Hour MCP</h1>
   <p class="intro">Enter your API key to use Magic Hour tools in Claude.</p>
-  <form id="authorization-form" method="post" action="">{fields}
+  <form id="authorization-form" method="post" action="" autocomplete="off">{fields}
     <div class="field-header">
       <label for="api-key">API key</label>
       <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a>
     </div>
     <div class="api-key-control">
-      <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{error_attributes}>
+      <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="new-password" autocapitalize="none" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" autofocus{error_attributes}>
       <button id="api-key-visibility" class="visibility-toggle" type="button" aria-label="Show API key" aria-pressed="false">Show</button>
     </div>
     {error_html}
