@@ -537,8 +537,8 @@ def _authorization_page(
         if value is not None
     )
     error_html = (
-        f'<div class="error" id="api-key-error" role="alert">'
-        f"{html.escape(error)}</div>"
+        f'<p class="error" id="api-key-error" role="alert">'
+        f"{html.escape(error)}</p>"
         if error
         else ""
     )
@@ -584,10 +584,7 @@ def _authorization_page(
   .brand-logo {{ width: 24px; height: 24px; flex: 0 0 auto; border-radius: calc(var(--radius) - .1875rem); }}
   h1 {{ margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -.025em; }}
   .intro {{ margin: 12px 0 26px; color: var(--muted-foreground); font-size: 14px; line-height: 1.55; }}
-  .error {{
-    margin: 0 0 20px; padding: 11px 12px; color: var(--destructive); background: var(--muted);
-    border: 1px solid var(--destructive); border-radius: var(--radius); font-size: 13px; line-height: 1.4;
-  }}
+  .error {{ margin: 8px 0 0; color: var(--destructive); font-size: 12px; line-height: 1.5; }}
   label {{ display: block; margin-bottom: 8px; font-size: 13px; font-weight: 650; }}
   input[type="password"] {{
     width: 100%; height: 46px; padding: 0 13px; color: var(--foreground); background: var(--input);
@@ -597,6 +594,7 @@ def _authorization_page(
   input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
   input[aria-invalid="true"] {{ border-color: var(--destructive); }}
   .hint {{ margin: 8px 0 22px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }}
+  .error + .hint {{ margin-top: 6px; }}
   .hint a {{ color: inherit; text-underline-offset: 3px; }}
   .hint a:hover {{ color: var(--foreground); }}
   .hint a:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }}
@@ -614,10 +612,10 @@ def _authorization_page(
   <div class="brand"><img class="brand-logo" src="/favicon.ico" alt="" width="24" height="24">Magic Hour</div>
   <h1>Connect Magic Hour</h1>
   <p class="intro">Enter your Magic Hour API key to authorize this connection.</p>
-  {error_html}
   <form method="post" action="">{fields}
     <label for="api-key">API key</label>
     <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-describedby="{described_by}"{error_attributes}>
+    {error_html}
     <p class="hint" id="api-key-hint"><a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Find your API key in your Magic Hour account.</a></p>
     <button type="submit">Connect</button>
   </form>

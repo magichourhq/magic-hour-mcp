@@ -218,9 +218,15 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.status_code, 401)
-        self.assertIn('id="api-key-error" role="alert"', response.text)
+        self.assertIn('<p class="error" id="api-key-error" role="alert">Invalid API key.</p>', response.text)
         self.assertIn('aria-invalid="true"', response.text)
         self.assertIn('aria-describedby="api-key-hint api-key-error"', response.text)
+        self.assertLess(response.text.index('id="api-key"'), response.text.index('id="api-key-error"'))
+        self.assertLess(response.text.index('id="api-key-error"'), response.text.index('id="api-key-hint"'))
+        error_rule = response.text.split(".error {", 1)[1].split("}", 1)[0]
+        self.assertNotIn("background", error_rule)
+        self.assertNotIn("border", error_rule)
+        self.assertNotIn("padding", error_rule)
         self.assertNotIn("sk_bad", response.text)
 
     async def test_claude_client_supports_request_without_resource(self):
