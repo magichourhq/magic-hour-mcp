@@ -28,6 +28,9 @@ MAX_FORM_BYTES = 16 * 1024
 MAX_PENDING_CODES = 1_000
 MAX_CODES_PER_API_KEY = 3
 MAX_CONCURRENT_VALIDATIONS = 10
+API_KEY_VERIFICATION_ERROR = (
+    "We couldn't verify this API key. Check that you copied the full key and try again."
+)
 CLAUDE_CLIENT_ID = "magic-hour-mcp"
 CLAUDE_REDIRECT_URIS = [
     "https://claude.ai/api/mcp/auth_callback",
@@ -178,7 +181,7 @@ class OAuthCompatibilityServer:
         if not api_key:
             return _authorization_page(page_params, "API key is required.", status_code=400)
         if len(api_key) > 512 or any(character.isspace() for character in api_key):
-            return _authorization_page(page_params, "Invalid API key.", status_code=401)
+            return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
         if not self.codes.has_capacity(api_key):
             return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
 
@@ -198,7 +201,7 @@ class OAuthCompatibilityServer:
                 status_code=503,
             )
         if not valid:
-            return _authorization_page(page_params, "Invalid API key.", status_code=401)
+            return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
 
         try:
             code = self.codes.issue(
@@ -542,8 +545,7 @@ def _authorization_page(
         if error
         else ""
     )
-    error_attributes = ' aria-invalid="true"' if error else ""
-    described_by = "api-key-hint api-key-error" if error else "api-key-hint"
+    error_attributes = ' aria-invalid="true" aria-describedby="api-key-error"' if error else ""
     body = f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -585,7 +587,11 @@ def _authorization_page(
   h1 {{ margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -.025em; }}
   .intro {{ margin: 12px 0 26px; color: var(--muted-foreground); font-size: 14px; line-height: 1.55; }}
   .error {{ margin: 8px 0 0; color: var(--destructive); font-size: 12px; line-height: 1.5; }}
-  label {{ display: block; margin-bottom: 8px; font-size: 13px; font-weight: 650; }}
+  .field-header {{ display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }}
+  label {{ font-size: 13px; font-weight: 650; }}
+  .field-header a {{ color: var(--muted-foreground); font-size: 12px; text-underline-offset: 3px; }}
+  .field-header a:hover {{ color: var(--foreground); }}
+  .field-header a:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }}
   input[type="password"] {{
     width: 100%; height: 46px; padding: 0 13px; color: var(--foreground); background: var(--input);
     border: 1px solid var(--border); border-radius: var(--radius); outline: none; font: inherit;
@@ -593,13 +599,8 @@ def _authorization_page(
   input[type="password"]::placeholder {{ color: var(--muted-foreground); opacity: 1; }}
   input[type="password"]:focus-visible {{ border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }}
   input[aria-invalid="true"] {{ border-color: var(--destructive); }}
-  .hint {{ margin: 8px 0 22px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }}
-  .error + .hint {{ margin-top: 6px; }}
-  .hint a {{ color: inherit; text-underline-offset: 3px; }}
-  .hint a:hover {{ color: var(--foreground); }}
-  .hint a:focus-visible {{ outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }}
   button {{
-    width: 100%; min-height: 46px; border: 0; border-radius: var(--radius);
+    width: 100%; min-height: 46px; margin-top: 22px; border: 0; border-radius: var(--radius);
     color: var(--primary-foreground); background: var(--primary);
     font: inherit; font-size: 14px; font-weight: 650; cursor: pointer;
   }}
@@ -613,10 +614,12 @@ def _authorization_page(
   <h1>Connect Magic Hour</h1>
   <p class="intro">Enter your Magic Hour API key to authorize this connection.</p>
   <form method="post" action="">{fields}
-    <label for="api-key">API key</label>
-    <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus aria-describedby="{described_by}"{error_attributes}>
+    <div class="field-header">
+      <label for="api-key">API key</label>
+      <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a>
+    </div>
+    <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{error_attributes}>
     {error_html}
-    <p class="hint" id="api-key-hint"><a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a></p>
     <button type="submit">Connect</button>
   </form>
 </main>

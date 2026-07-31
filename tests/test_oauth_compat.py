@@ -23,6 +23,7 @@ REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 RESOURCE = "https://mcp.example/mcp"
 VERIFIER = "v" * 64
 CHALLENGE = _pkce_challenge(VERIFIER)
+VERIFICATION_ERROR = "We couldn't verify this API key. Check that you copied the full key and try again."
 
 
 class AuthorizationPageParser(HTMLParser):
@@ -158,6 +159,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(api_key_input["placeholder"], "mhk_live_…")
         self.assertIn("required", api_key_input)
         self.assertEqual(api_key_input["autocomplete"], "off")
+        self.assertNotIn("aria-describedby", api_key_input)
 
         hidden = {field["name"]: field["value"] for field in parser.inputs if field.get("type") == "hidden"}
         for name, value in self.authorization_params().items():
@@ -175,6 +177,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             },
             parser.links,
         )
+        self.assertLess(page.text.index("Create your API key"), page.text.index('id="api-key"'))
 
     async def test_authorization_page_security_headers_restrict_content(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
@@ -198,16 +201,28 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.status_code, 401)
-        self.assertIn('<p class="error" id="api-key-error" role="alert">Invalid API key.</p>', response.text)
+        parser = AuthorizationPageParser()
+        parser.feed(response.text)
+        self.assertIn('<p class="error" id="api-key-error" role="alert">', response.text)
+        self.assertIn(VERIFICATION_ERROR, parser.visible_text)
         self.assertIn('aria-invalid="true"', response.text)
-        self.assertIn('aria-describedby="api-key-hint api-key-error"', response.text)
+        self.assertIn('aria-describedby="api-key-error"', response.text)
         self.assertLess(response.text.index('id="api-key"'), response.text.index('id="api-key-error"'))
-        self.assertLess(response.text.index('id="api-key-error"'), response.text.index('id="api-key-hint"'))
-        error_rule = response.text.split(".error {", 1)[1].split("}", 1)[0]
-        self.assertNotIn("background", error_rule)
-        self.assertNotIn("border", error_rule)
-        self.assertNotIn("padding", error_rule)
+        self.assertNotIn("api-key-hint", response.text)
         self.assertNotIn("sk_bad", response.text)
+
+    async def test_malformed_api_key_uses_verification_help_without_upstream_validation(self):
+        response = await self.client.post(
+            "/authorize",
+            data={**self.authorization_params(), "api_key": "mhk live incomplete"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        parser = AuthorizationPageParser()
+        parser.feed(response.text)
+        self.assertIn(VERIFICATION_ERROR, parser.visible_text)
+        self.assertNotIn("mhk live incomplete", response.text)
+        self.assertEqual(self.validated_keys, [])
 
     async def test_claude_client_supports_request_without_resource(self):
         params = self.authorization_params()
@@ -273,7 +288,9 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.status_code, 401)
-        self.assertIn("Invalid API key", response.text)
+        parser = AuthorizationPageParser()
+        parser.feed(response.text)
+        self.assertIn(VERIFICATION_ERROR, parser.visible_text)
         self.assertNotIn("sk_bad", response.text)
         self.assertEqual(self.validated_keys, ["sk_bad"])
 
