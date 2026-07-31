@@ -3,7 +3,7 @@
 Use this guide if Magic Hour has a hosted MCP endpoint at:
 
 ```text
-https://magichour.ai/mcp/
+https://mcp.magichour.ai/
 ```
 
 You do not need this repo.
@@ -11,9 +11,16 @@ You do not need this repo.
 ## What You Need
 
 - A Magic Hour API key
-- Claude Code or Codex CLI
+- Claude, Claude Code, or Codex CLI
 
 Keep your API key private. Real generations can spend Magic Hour credits.
+
+## Connect With Claude
+
+Add `https://mcp.magichour.ai/` as a custom connector in Claude. When the
+authorization page opens, paste your Magic Hour API key and select **Connect**.
+The connector uses OAuth compatibility, but the resulting bearer token remains
+your existing API key.
 
 ## What Is MCP?
 
@@ -24,7 +31,7 @@ Use Magic Hour MCP when you want to create content from your AI assistant instea
 ## Connect With Claude Code
 
 ```sh
-claude mcp add --scope user --transport http magic-hour https://magichour.ai/mcp/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
+claude mcp add --scope user --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
 Then start a new Claude Code session and test:
@@ -42,7 +49,7 @@ pong
 If `--scope user` is not supported, use project scope:
 
 ```sh
-claude mcp add --scope project --transport http magic-hour https://magichour.ai/mcp/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
+claude mcp add --scope project --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
 ## Connect With Codex CLI
@@ -64,7 +71,7 @@ $env:MAGIC_HOUR_API_KEY = "YOUR_MAGIC_HOUR_API_KEY"
 Add the MCP server:
 
 ```sh
-codex mcp add magic-hour --url https://magichour.ai/mcp/ --bearer-token-env-var MAGIC_HOUR_API_KEY
+codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var MAGIC_HOUR_API_KEY
 ```
 
 Verify it:

@@ -16,11 +16,11 @@ User facing guide is detailed here: `user.md`
 - Codex CLI with remote HTTP MCP
 - Manual Claude Desktop style configs that allow custom headers
 - Backend mounted HTTP MCP at `/mcp`
+- Claude custom connectors via OAuth Authorization Code + PKCE
 - Runtime OpenAPI tool generation via standalone `fastmcp`
 
 ## Not Included In This Repo
 
-- OAuth or web connector auth
 - Chat native file upload UI
 - A server side upload bridge for web chat clients
 
@@ -63,11 +63,13 @@ Every MCP request must include your Magic Hour API key:
 Authorization: Bearer <magic_hour_api_key>
 ```
 
-Optional environment variables:
+Environment variables (`MCP_OAUTH_*` values are required in production):
 
 ```sh
 MAGIC_HOUR_API_BASE_URL=https://api.magichour.ai
 MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
+MCP_OAUTH_ISSUER_URL=https://mcp.magichour.ai
+MCP_OAUTH_RESOURCE_URL=https://mcp.magichour.ai
 ```
 
 You can still point at a mock or alternate API base by overriding `MAGIC_HOUR_API_BASE_URL`:
@@ -75,6 +77,22 @@ You can still point at a mock or alternate API base by overriding `MAGIC_HOUR_AP
 ```sh
 MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/latest python main.py
 ```
+
+## OAuth compatibility
+
+Claude can discover `/authorize` and `/token` from the OAuth metadata endpoint.
+The authorization page validates a pasted Magic Hour API key against the
+existing API, then returns that same key as the access token. No refresh token
+or second token system is used.
+
+Claude's fixed client is built in as client ID `magic-hour-mcp`. Allowed callback
+URLs live in the `CLAUDE_REDIRECT_URIS` allowlist.
+
+Authorization codes are process-local, single-use, and expire after five
+minutes. Set `MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL` to the public MCP
+URL in production. Run one worker; multi-worker deployment requires a shared
+authorization-code store. Apply normal edge rate limits to `/authorize` before
+exposing it publicly.
 
 ## Test with MCP Inspector
 

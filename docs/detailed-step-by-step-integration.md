@@ -10,10 +10,10 @@ This guide is for the path we support today:
 - generate endpoint tools from `docs/openapi.json` at startup with `FastMCP.from_openapi()`
 - keep only small custom helper tools for polling, upload bridging, and inline image/audio fetches
 
-This guide is not for:
+This guide does not cover:
 
-- OAuth
-- web chat connectors
+- configuring the included OAuth compatibility layer
+- web chat connector setup
 - browser upload UI
 - custom popup or modal upload flows
 
@@ -26,13 +26,13 @@ Use the current path if the goal is:
 - MCP Inspector
 - other developer style MCP clients that can send custom headers
 
-Do not use this path if the goal is:
+Use the OAuth compatibility setup instead if the goal is:
 
 - one click web connector setup
 - ChatGPT style app auth
 - Claude web chat auth
 
-Those require extra auth and upload UX work outside this repo.
+Claude connector auth is included. Chat-native uploads still require extra UX work outside this repo.
 
 ## Step 2: Install this package in the host backend
 
@@ -339,8 +339,6 @@ If the team wants to test from Claude Code:
 
 This repo does not currently include:
 
-- OAuth
-- ChatGPT or Claude web connector auth
 - chat-native file upload UI
 - upload popup or modal
 - a server-side upload bridge for web chat users

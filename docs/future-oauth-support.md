@@ -1,6 +1,6 @@
-# Future: OAuth support for claude.ai web
+# OAuth compatibility for claude.ai web
 
-Not implemented. Keep this doc only if the team later needs claude.ai web or Claude's Connectors UI.
+Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 
 ## Current support
 
@@ -8,10 +8,12 @@ Not implemented. Keep this doc only if the team later needs claude.ai web or Cla
 |---|---|
 | Claude Code CLI | Yes |
 | Hand-edited Claude Desktop config | Yes |
-| Claude Desktop Connectors UI | No |
-| claude.ai web Custom Connector | No. OAuth only |
+| Claude Desktop Connectors UI | Yes, through OAuth |
+| claude.ai web Custom Connector | Yes, through OAuth |
 
-Today this server fits developer workflows such as Claude Code. It does not fit the one-click web connector flow.
+The OAuth shim supports Authorization Code + PKCE for one fixed Claude client.
+Claude client ID `magic-hour-mcp` is built in. Exact callback URLs live in the
+`CLAUDE_REDIRECT_URIS` allowlist.
 
 ## Why
 
@@ -23,36 +25,21 @@ Authorization: Bearer <magic_hour_api_key>
 
 claude.ai web Custom Connectors expect OAuth, not an arbitrary static bearer header.
 
-## If OAuth becomes necessary
+The authorization page asks for a Magic Hour API key. The server validates it
+against the existing API, stores it in a short-lived single-use authorization
+code, then returns that same key from `/token` as the bearer access token. It
+does not mint refresh tokens or introduce another token system.
 
-There are three realistic paths:
+## Deployment
 
-### 1. Self-contained OAuth server
+Set `MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL` to the canonical public
+MCP URL. Serve production endpoints over HTTPS. Authorization codes are
+process-local, so run one worker. Multi-worker deployment requires a shared
+store. Rate-limit `/authorize` at the public edge.
 
-Build an `OAuthAuthorizationServerProvider` in this service. The auth page could ask the user for a Magic Hour API key, then mint an access token mapped to that key.
-
-Best when:
-
-- the startup has no existing OAuth system
-- the goal is a working claude.ai web connector with minimal outside dependencies
-
-### 2. Validate the startup's existing auth
-
-Implement only `TokenVerifier`, validate the startup's own OAuth or OIDC tokens, then map the authenticated user to their Magic Hour key.
-
-Best when:
-
-- the startup already has a real OAuth-capable login system
-- they already store or can resolve a per-user Magic Hour key
-
-### 3. Use a third-party IdP
-
-Proxy auth through Auth0, WorkOS, GitHub, or a similar provider, then solve the same user-to-Magic-Hour-key mapping step.
-
-Best when:
-
-- the startup has no IdP
-- they do not want to build one
+This is intentionally a Claude compatibility layer, not a general-purpose
+authorization server. Access tokens retain the lifetime and privileges of the
+underlying Magic Hour API key.
 
 ## What the backend team would still need after OAuth
 
@@ -66,10 +53,3 @@ If the product later wants web chat or connector style uploads, the team will st
 - resume logic so chat continues after upload completes
 
 See `docs/future-chat-ui-handoff.md`.
-
-## Open question
-
-Does the startup already have an OAuth-capable login system?
-
-- If yes, path 2 is likely best.
-- If no, path 1 is usually the simplest default.
