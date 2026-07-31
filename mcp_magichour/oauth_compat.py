@@ -475,7 +475,6 @@ def _landing_page() -> HTMLResponse:
     th + th, th + td { border-left: 1px solid var(--border); }
     tbody th { width: 44%; color: var(--foreground); font-weight: 600; }
     tbody tr:last-child > * { border-bottom: 0; }
-    table code { white-space: nowrap; font-family: inherit; font-size: inherit; }
     strong { color: var(--foreground); }
     code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
     a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -497,8 +496,8 @@ def _landing_page() -> HTMLResponse:
           <div class="connector-table-wrap" role="region" aria-label="Claude connector basic fields" tabindex="0">
             <table>
               <tbody>
-                <tr><th scope="row">Name</th><td><code>Magic Hour</code></td></tr>
-                <tr><th scope="row">Remote MCP server URL</th><td><code>https://mcp.magichour.ai/</code></td></tr>
+                <tr><th scope="row">Name</th><td>Magic Hour</td></tr>
+                <tr><th scope="row">Remote MCP server URL</th><td>https://mcp.magichour.ai/</td></tr>
               </tbody>
             </table>
           </div>
@@ -507,7 +506,7 @@ def _landing_page() -> HTMLResponse:
           <div class="connector-table-wrap" role="region" aria-label="Claude connector advanced fields" tabindex="0">
             <table>
               <tbody>
-                <tr><th scope="row">OAuth Client ID</th><td><code>magic-hour-mcp</code></td></tr>
+                <tr><th scope="row">OAuth Client ID</th><td>magic-hour-mcp</td></tr>
                 <tr><th scope="row">OAuth Client Secret</th><td>Leave blank</td></tr>
               </tbody>
             </table>
