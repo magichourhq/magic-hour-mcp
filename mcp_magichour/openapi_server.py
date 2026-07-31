@@ -16,6 +16,9 @@ from fastmcp.utilities.types import Audio, Image
 from mcp.types import TextContent
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
+from starlette.responses import FileResponse
+from starlette.routing import Route
 
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .oauth_compat import create_oauth_compatibility_app
@@ -26,6 +29,7 @@ ProjectType = Literal["video", "image", "audio"]
 
 DEFAULT_API_BASE_URL = "https://api.magichour.ai"
 DEFAULT_OPENAPI_PATH = Path(__file__).resolve().parent.parent / "docs" / "openapi.json"
+FAVICON_PATH = Path(__file__).with_name("favicon.ico")
 API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0)
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
@@ -480,5 +484,14 @@ middleware = [
 # Path "/" preserves the existing repo convention: standalone dev runs at root,
 # and a host app can mount this ASGI app at "/mcp" without producing "/mcp/mcp".
 mcp_app = mcp.http_app(path="/", middleware=middleware)
-app = create_oauth_compatibility_app(mcp_app)
+
+
+async def favicon(_: Request) -> FileResponse:
+    return FileResponse(FAVICON_PATH, media_type="image/x-icon")
+
+
+app = create_oauth_compatibility_app(
+    mcp_app,
+    public_routes=[Route("/favicon.ico", favicon, methods=["GET"])],
+)
 lifespan = app.router.lifespan_context

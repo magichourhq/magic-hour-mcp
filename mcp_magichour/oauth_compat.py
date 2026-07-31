@@ -9,7 +9,7 @@ import logging
 import os
 import re
 import secrets
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from threading import Lock
 from time import monotonic
@@ -20,7 +20,7 @@ import httpx
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from starlette.routing import Mount, Route
+from starlette.routing import BaseRoute, Mount, Route
 
 
 CODE_TTL_SECONDS = 300
@@ -371,12 +371,22 @@ class MCPBearerChallengeMiddleware:
             await self.app(scope, receive, send)
             return
 
-        header = next(
+        authorization = next(
             (value.decode("latin-1") for name, value in scope.get("headers", []) if name.lower() == b"authorization"),
-            "",
+            None,
         )
+        header = authorization or ""
         scheme, _, token = header.partition(" ")
         if scheme.lower() != "bearer" or not token.strip():
+            if (
+                authorization is None
+                and scope.get("method") == "GET"
+                and scope.get("path") == "/"
+                and _accepts_html(scope)
+            ):
+                response = _landing_page()
+                await response(scope, receive, send)
+                return
             request = Request(scope)
             issuer = self.oauth_server.issuer(request)
             response = JSONResponse(
@@ -394,6 +404,84 @@ class MCPBearerChallengeMiddleware:
         await self.app(scope, receive, send)
 
 
+def _accepts_html(scope: Mapping[str, Any]) -> bool:
+    accept_values = (
+        value.decode("latin-1")
+        for name, value in scope.get("headers", [])
+        if name.lower() == b"accept"
+    )
+    for item in ",".join(accept_values).split(","):
+        media_type, *parameters = item.split(";")
+        if media_type.strip().lower() != "text/html":
+            continue
+        quality = 1.0
+        for parameter in parameters:
+            name, separator, value = parameter.partition("=")
+            if separator and name.strip().lower() == "q":
+                try:
+                    quality = float(value.strip())
+                except ValueError:
+                    quality = 0.0
+        if quality > 0:
+            return True
+    return False
+
+
+def _landing_page() -> HTMLResponse:
+    body = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Magic Hour MCP</title>
+  <style>
+    :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #09090b; color: #e4e4e7; }
+    main { width: min(42rem, calc(100% - 2rem)); padding: 2.5rem; border: 1px solid #27272a; border-radius: 1rem; background: #111113; box-shadow: 0 1.5rem 5rem #0008; }
+    h1 { margin: 0 0 .75rem; font-family: ui-sans-serif, system-ui, sans-serif; font-size: clamp(2rem, 8vw, 3.5rem); letter-spacing: -.06em; }
+    h2 { margin: 0 0 1rem; color: #fafafa; font: 600 1rem ui-sans-serif, system-ui, sans-serif; }
+    p { margin: 0; color: #a1a1aa; line-height: 1.7; }
+    section { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid #27272a; }
+    ol { margin: 0; padding-left: 1.4rem; color: #a1a1aa; line-height: 1.65; }
+    li + li { margin-top: .6rem; }
+    strong, code { color: #fafafa; }
+    a { color: #d8b4fe; text-underline-offset: .25rem; }
+    .docs-link { display: inline-block; margin-top: 1.75rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Magic Hour MCP</h1>
+    <p>This endpoint speaks the Model Context Protocol. Connect an MCP client to <code>/</code> to use Magic Hour tools.</p>
+    <section aria-labelledby="connect-claude">
+      <h2 id="connect-claude">Connect with Claude</h2>
+      <ol>
+        <li>Open <strong><a href="https://claude.ai/new#settings/customize-connectors" target="_blank" rel="noopener noreferrer">Settings &gt; Connectors &gt; Add custom connector</a></strong>.</li>
+        <li>Use URL <code>https://mcp.magichour.ai/</code>. Under <strong>Advanced</strong>, set OAuth Client ID to <code>magic-hour-mcp</code>.</li>
+        <li>Connect, then paste your Magic Hour API key. <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Get a Magic Hour API key</a>.</li>
+      </ol>
+    </section>
+    <a class="docs-link" href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
+  </main>
+</body>
+</html>"""
+    return HTMLResponse(
+        body,
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": (
+                "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; "
+                "form-action 'none'; frame-ancestors 'none'"
+            ),
+            "Referrer-Policy": "no-referrer",
+            "Vary": "Accept",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+        },
+    )
+
+
 class OAuthRequestError(Exception):
     def __init__(self, error: str, description: str) -> None:
         self.error = error
@@ -406,6 +494,7 @@ def create_oauth_compatibility_app(
     *,
     settings: OAuthSettings | None = None,
     api_key_validator: ApiKeyValidator | None = None,
+    public_routes: Sequence[BaseRoute] = (),
 ) -> Starlette:
     oauth = OAuthCompatibilityServer(
         settings=settings,
@@ -413,7 +502,7 @@ def create_oauth_compatibility_app(
     )
     protected_mcp = MCPBearerChallengeMiddleware(mcp_app, oauth)
     return Starlette(
-        routes=[*oauth.routes(), Mount("/", app=protected_mcp)],
+        routes=[*oauth.routes(), *public_routes, Mount("/", app=protected_mcp)],
         lifespan=mcp_app.lifespan,
     )
 
