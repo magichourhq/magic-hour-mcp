@@ -31,9 +31,10 @@ MAX_CONCURRENT_VALIDATIONS = 10
 API_KEY_VERIFICATION_ERROR = (
     "We couldn't verify this API key. Check that you copied the full key and try again."
 )
-CLAUDE_CLIENT_ID = "magic-hour-mcp"
-CLAUDE_REDIRECT_URIS = [
+OAUTH_CLIENT_ID = "magic-hour-mcp"
+ALLOWED_REDIRECT_URIS = [
     "https://claude.ai/api/mcp/auth_callback",
+    "https://chatgpt.com/connector/oauth/5swpyzyTpmje",
 ]
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
@@ -237,7 +238,7 @@ class OAuthCompatibilityServer:
                 "Authorization code is invalid or expired",
             )
 
-        if not hmac.compare_digest(params.get("client_id", ""), CLAUDE_CLIENT_ID):
+        if not hmac.compare_digest(params.get("client_id", ""), OAUTH_CLIENT_ID):
             return _token_rejection(
                 "client_mismatch",
                 "invalid_grant",
@@ -327,7 +328,7 @@ class OAuthCompatibilityServer:
 
         if params.get("response_type") != "code":
             raise OAuthRequestError("unsupported_response_type", "response_type must be code")
-        if client_id != CLAUDE_CLIENT_ID or redirect_uri not in CLAUDE_REDIRECT_URIS:
+        if client_id != OAUTH_CLIENT_ID or redirect_uri not in ALLOWED_REDIRECT_URIS:
             raise OAuthRequestError("invalid_request", "Unknown client or redirect_uri")
         if params.get("code_challenge_method") != "S256" or not CHALLENGE_RE.fullmatch(challenge):
             raise OAuthRequestError("invalid_request", "PKCE S256 code_challenge is required")

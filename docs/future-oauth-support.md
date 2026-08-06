@@ -1,4 +1,4 @@
-# OAuth compatibility for claude.ai web
+# OAuth compatibility for web connectors
 
 Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 
@@ -10,10 +10,11 @@ Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 | Hand-edited Claude Desktop config | Yes |
 | Claude Desktop Connectors UI | Yes, through OAuth |
 | claude.ai web Custom Connector | Yes, through OAuth |
+| ChatGPT Custom Connector | Yes, through OAuth |
 
-The OAuth shim supports Authorization Code + PKCE for one fixed Claude client.
-Claude client ID `magic-hour-mcp` is built in. Exact callback URLs live in the
-`CLAUDE_REDIRECT_URIS` allowlist.
+The OAuth shim supports Authorization Code + PKCE for one fixed client. Client
+ID `magic-hour-mcp` is built in. Exact callback URLs live in the
+`ALLOWED_REDIRECT_URIS` allowlist.
 
 ## Why
 
@@ -23,7 +24,7 @@ This server uses bearer passthrough:
 Authorization: Bearer <magic_hour_api_key>
 ```
 
-claude.ai web Custom Connectors expect OAuth, not an arbitrary static bearer header.
+Claude and ChatGPT web connectors expect OAuth, not an arbitrary static bearer header.
 
 The authorization page asks for a Magic Hour API key. The server validates it
 against the existing API, stores it in a short-lived single-use authorization
@@ -37,7 +38,7 @@ MCP URL. Serve production endpoints over HTTPS. Authorization codes are
 process-local, so run one worker. Multi-worker deployment requires a shared
 store. Rate-limit `/authorize` at the public edge.
 
-This is intentionally a Claude compatibility layer, not a general-purpose
+This is intentionally a connector compatibility layer, not a general-purpose
 authorization server. Access tokens retain the lifetime and privileges of the
 underlying Magic Hour API key.
 
