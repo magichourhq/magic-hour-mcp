@@ -11,6 +11,7 @@ Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 | Claude Desktop Connectors UI | Yes, through OAuth |
 | claude.ai web Custom Connector | Yes, through OAuth |
 | ChatGPT Custom Connector | Yes, through OAuth |
+| Cursor MCP | Yes, through OAuth |
 
 The OAuth shim supports Authorization Code + PKCE for one fixed client. Client
 ID `magic-hour-mcp` is built in. Exact callback URLs live in the

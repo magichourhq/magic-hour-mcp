@@ -80,13 +80,15 @@ MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/late
 
 ## OAuth compatibility
 
-Claude can discover `/authorize` and `/token` from the OAuth metadata endpoint.
+Supported connectors can discover `/authorize` and `/token` from the OAuth
+metadata endpoint.
 The authorization page validates a pasted Magic Hour API key against the
 existing API, then returns that same key as the access token. No refresh token
 or second token system is used.
 
-The fixed client is built in as client ID `magic-hour-mcp`. Allowed Claude and
-ChatGPT callback URLs live in the `ALLOWED_REDIRECT_URIS` exact allowlist.
+The fixed client is built in as client ID `magic-hour-mcp`. Allowed Claude,
+ChatGPT, and Cursor callback URLs live in the `ALLOWED_REDIRECT_URIS` exact
+allowlist.
 
 Authorization codes are process-local, single-use, and expire after five
 minutes. Set `MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL` to the public MCP
