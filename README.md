@@ -85,8 +85,8 @@ The authorization page validates a pasted Magic Hour API key against the
 existing API, then returns that same key as the access token. No refresh token
 or second token system is used.
 
-Claude's fixed client is built in as client ID `magic-hour-mcp`. Allowed callback
-URLs live in the `CLAUDE_REDIRECT_URIS` allowlist.
+The fixed client is built in as client ID `magic-hour-mcp`. Allowed Claude and
+ChatGPT callback URLs live in the `ALLOWED_REDIRECT_URIS` exact allowlist.
 
 Authorization codes are process-local, single-use, and expire after five
 minutes. Set `MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL` to the public MCP
