@@ -35,6 +35,7 @@ OAUTH_CLIENT_ID = "magic-hour-mcp"
 ALLOWED_REDIRECT_URIS = [
     "https://claude.ai/api/mcp/auth_callback",
     "https://chatgpt.com/connector/oauth/5swpyzyTpmje",
+    "http://localhost:8787/callback",
 ]
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")

@@ -21,6 +21,7 @@ from mcp_magichour.oauth_compat import (
 CLIENT_ID = "magic-hour-mcp"
 REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 CHATGPT_REDIRECT_URI = "https://chatgpt.com/connector/oauth/5swpyzyTpmje"
+CURSOR_REDIRECT_URI = "http://localhost:8787/callback"
 RESOURCE = "https://mcp.example/mcp"
 VERIFIER = "v" * 64
 CHALLENGE = _pkce_challenge(VERIFIER)
@@ -302,6 +303,11 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             "https://chatgpt.com/connector/oauth/",
             "https://chatgpt.com/connector/oauth/replacement-connector-id",
             "https://chatgpt.com.evil.example/connector/oauth/id",
+            "http://localhost:8788/callback",
+            "http://localhost:8787/callback/extra",
+            "http://localhost:8787/callback?next=evil",
+            "http://localhost:8787/callback#fragment",
+            "http://localhost.evil.example:8787/callback",
         ]
 
         for redirect_uri in redirect_uris:
@@ -318,37 +324,42 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.json()["error"], "invalid_request")
         self.assertEqual(self.validated_keys, [])
 
-    async def test_chatgpt_redirect_uri_is_allowed(self):
-        response = await self.client.post(
-            "/authorize",
-            data={
-                **self.authorization_params(redirect_uri=CHATGPT_REDIRECT_URI),
-                "api_key": "sk_valid",
-            },
-        )
+    async def test_connector_redirect_uris_are_allowed(self):
+        for redirect_uri in [CHATGPT_REDIRECT_URI, CURSOR_REDIRECT_URI]:
+            with self.subTest(redirect_uri=redirect_uri):
+                response = await self.client.post(
+                    "/authorize",
+                    data={
+                        **self.authorization_params(redirect_uri=redirect_uri),
+                        "api_key": "sk_valid",
+                    },
+                )
 
-        self.assertEqual(response.status_code, 302)
-        redirect = urlsplit(response.headers["location"])
-        self.assertEqual(
-            f"{redirect.scheme}://{redirect.netloc}{redirect.path}",
-            CHATGPT_REDIRECT_URI,
-        )
-        redirect_query = parse_qs(redirect.query)
-        self.assertEqual(redirect_query["state"], ["client-state"])
+                self.assertEqual(response.status_code, 302)
+                redirect = urlsplit(response.headers["location"])
+                self.assertEqual(
+                    f"{redirect.scheme}://{redirect.netloc}{redirect.path}",
+                    redirect_uri,
+                )
+                redirect_query = parse_qs(redirect.query)
+                self.assertEqual(redirect_query["state"], ["client-state"])
 
-        token = await self.client.post(
-            "/token",
-            data={
-                "grant_type": "authorization_code",
-                "client_id": CLIENT_ID,
-                "redirect_uri": CHATGPT_REDIRECT_URI,
-                "code": redirect_query["code"][0],
-                "code_verifier": VERIFIER,
-                "resource": RESOURCE,
-            },
-        )
-        self.assertEqual(token.status_code, 200)
-        self.assertEqual(token.json(), {"access_token": "sk_valid", "token_type": "Bearer"})
+                token = await self.client.post(
+                    "/token",
+                    data={
+                        "grant_type": "authorization_code",
+                        "client_id": CLIENT_ID,
+                        "redirect_uri": redirect_uri,
+                        "code": redirect_query["code"][0],
+                        "code_verifier": VERIFIER,
+                        "resource": RESOURCE,
+                    },
+                )
+                self.assertEqual(token.status_code, 200)
+                self.assertEqual(
+                    token.json(),
+                    {"access_token": "sk_valid", "token_type": "Bearer"},
+                )
 
     async def test_pkce_failure_does_not_redeem_authorization_code(self):
         code = await self.issue_code()
