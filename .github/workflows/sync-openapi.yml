@@ -1,0 +1,78 @@
+name: Sync OpenAPI
+
+on:
+  schedule:
+    # Run daily at 10:00 AM PST / 11:00 AM PDT (18:00 UTC).
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-openapi
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install project
+        run: python -m pip install -e .
+
+      - name: Fetch OpenAPI spec
+        run: |
+          curl --fail --silent --show-error --location \
+            https://magichour.ai/docs/api/openapi.json \
+            --output /tmp/magic-hour-openapi.json
+          python -m json.tool /tmp/magic-hour-openapi.json >/dev/null
+          mv /tmp/magic-hour-openapi.json docs/openapi.json
+
+      - name: Regenerate API reference
+        run: python docs/build_reference.py
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -p "test_openapi*.py"
+
+      - name: Open pull request
+        env:
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          REVIEWER: davidhu2000
+          SYNC_BRANCH: automation/openapi-sync
+        run: |
+          if git diff --quiet -- docs/openapi.json docs/api-reference.md; then
+            echo "OpenAPI spec already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$SYNC_BRANCH"
+          git add docs/openapi.json docs/api-reference.md
+          git commit -m "chore: sync OpenAPI spec"
+          if git ls-remote --exit-code --heads origin "$SYNC_BRANCH" >/dev/null; then
+            git fetch origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
+          fi
+          git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
+
+          pr_number="$(gh pr list --state open --head "$SYNC_BRANCH" --json number --jq '.[0].number')"
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" --add-reviewer "$REVIEWER"
+            exit 0
+          fi
+
+          gh pr create \
+            --base "$BASE_BRANCH" \
+            --head "$SYNC_BRANCH" \
+            --title "chore: sync OpenAPI spec" \
+            --body "Automated update from https://magichour.ai/docs/api/openapi.json." \
+            --reviewer "$REVIEWER"
