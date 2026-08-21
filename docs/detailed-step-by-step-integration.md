@@ -296,10 +296,10 @@ Before telling another team the integration is done, confirm:
 5. MCP Inspector can call `ping`
 6. MCP Inspector can call `videoAssets_generatePresignedUrl` with image, audio, and video item types
 7. at least one real `create_*` flow was tested if credit-spending validation is required
-8. rollout clients were tested using the [hosted setup guide](https://magichour.ai/mcp)
+8. rollout clients were tested using `user.md`
 
 ## Related docs
 
-- [Hosted setup guide](https://magichour.ai/mcp) - Claude, Claude Code, and Codex
+- `user.md` - Claude, Claude Code, and Codex setup
 - `docs/future-chat-ui-handoff.md`
 - `docs/future-oauth-support.md`

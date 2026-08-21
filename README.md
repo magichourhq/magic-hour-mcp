@@ -9,7 +9,7 @@ and project downloads.
 
 Docs:
 
-- [Hosted setup guide](https://magichour.ai/mcp) - Claude, Claude Code, and Codex
+- `user.md` - hosted endpoint user guide
 - `integration-handoff.md` - FastAPI mount checklist
 - `docs/detailed-step-by-step-integration.md` - full backend integration guide
 - `docs/api-reference.md` - generated API reference
