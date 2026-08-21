@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: sync-openapi
@@ -18,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
       - uses: actions/setup-python@v5
         with:
@@ -40,7 +43,12 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -p "test_openapi*.py"
 
-      - name: Commit updated spec
+      - name: Open pull request
+        env:
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          REVIEWER: davidhu2000
+          SYNC_BRANCH: automation/openapi-sync
         run: |
           if git diff --quiet -- docs/openapi.json docs/api-reference.md; then
             echo "OpenAPI spec already current."
@@ -48,6 +56,23 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$SYNC_BRANCH"
           git add docs/openapi.json docs/api-reference.md
           git commit -m "chore: sync OpenAPI spec"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads origin "$SYNC_BRANCH" >/dev/null; then
+            git fetch origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
+          fi
+          git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
+
+          pr_number="$(gh pr list --state open --head "$SYNC_BRANCH" --json number --jq '.[0].number')"
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" --add-reviewer "$REVIEWER"
+            exit 0
+          fi
+
+          gh pr create \
+            --base "$BASE_BRANCH" \
+            --head "$SYNC_BRANCH" \
+            --title "chore: sync OpenAPI spec" \
+            --body "Automated update from https://magichour.ai/docs/api/openapi.json." \
+            --reviewer "$REVIEWER"
