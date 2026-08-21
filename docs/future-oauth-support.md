@@ -17,7 +17,7 @@ The OAuth shim supports Authorization Code + PKCE for one fixed client. Client
 ID `magic-hour-mcp` is built in. Exact callback URLs live in the
 `ALLOWED_REDIRECT_URIS` allowlist.
 
-## Why
+## Why OAuth exists
 
 This server uses bearer passthrough:
 
@@ -39,19 +39,9 @@ MCP URL. Serve production endpoints over HTTPS. Authorization codes are
 process-local, so run one worker. Multi-worker deployment requires a shared
 store. Rate-limit `/authorize` at the public edge.
 
-This is intentionally a connector compatibility layer, not a general-purpose
-authorization server. Access tokens retain the lifetime and privileges of the
-underlying Magic Hour API key.
+This is a connector compatibility layer, not a general-purpose authorization
+server. Access tokens retain the lifetime and privileges of the Magic Hour API
+key.
 
-## What the backend team would still need after OAuth
-
-OAuth only solves auth.
-
-If the product later wants web chat or connector style uploads, the team will still need:
-
-- a browser upload UI
-- a popup, modal, or embedded upload surface
-- a frontend or backend upload bridge
-- resume logic so chat continues after upload completes
-
-See `docs/future-chat-ui-handoff.md`.
+OAuth does not handle file uploads. See `docs/future-chat-ui-handoff.md` for the
+browser upload flow.

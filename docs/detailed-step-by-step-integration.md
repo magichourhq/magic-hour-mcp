@@ -1,32 +1,19 @@
-# Detailed Step-by-Step Integration
+# Detailed integration guide
 
-Use this guide when another team wants to integrate this MCP server into their product with the current lightweight approach.
-
-This guide is for the path we support today:
-
-- mount the MCP server into an existing FastAPI app
-- pass through the user's Magic Hour API key as a bearer token
-- test with MCP Inspector, Codex CLI, or Claude Code
-- generate endpoint tools from `docs/openapi.json` at startup with `FastMCP.from_openapi()`
-- keep only small custom helper tools for polling, upload bridging, and inline image/audio fetches
-
-This guide does not cover:
-
-- configuring the included OAuth compatibility layer
-- web chat connector setup
-- browser upload UI
-- custom popup or modal upload flows
+Use this guide to mount the server in FastAPI, preserve bearer auth, and verify
+it with MCP Inspector. For client setup, OAuth, or browser uploads, use the
+related docs at the end.
 
 ## Step 1: Decide which integration path you want
 
-Use the current path if the goal is:
+Use bearer passthrough for:
 
 - Codex CLI
 - Claude Code
 - MCP Inspector
 - other developer style MCP clients that can send custom headers
 
-Use the OAuth compatibility setup instead if the goal is:
+Use the OAuth compatibility layer for:
 
 - one click web connector setup
 - ChatGPT style app auth
@@ -53,7 +40,7 @@ from mcp_magichour.server import app as mcp_app
 from mcp_magichour.server import lifespan as mcp_lifespan
 ```
 
-Why both are needed:
+Both imports are required:
 
 - `mcp_app` gives you the HTTP MCP routes
 - `mcp_lifespan` starts the MCP session manager
@@ -78,19 +65,13 @@ app = FastAPI()
 app.mount("/mcp", mcp_app)
 ```
 
-Important:
-
-- the internal FastMCP app is configured for `/`
-- the host app adds `/mcp`
-- the final public MCP endpoint becomes `/mcp/`
+The internal FastMCP app uses `/`. The host adds `/mcp`, making the final
+endpoint `/mcp/`.
 
 ## Step 5: Merge the MCP lifespan into the host app lifespan
 
-Mounted ASGI apps do not run their own startup logic automatically.
-
-That means mounting the app is not enough by itself.
-
-You must also merge in `mcp_lifespan`.
+Mounted ASGI apps do not run their startup logic automatically. Mount the app
+and merge `mcp_lifespan` into the host lifespan.
 
 Use this pattern:
 
@@ -126,20 +107,20 @@ This server expects the caller to send:
 Authorization: Bearer <magic_hour_api_key>
 ```
 
-The current auth model is simple:
+The auth model:
 
 - the bearer token is the user's Magic Hour API key
 - this MCP server passes that key through to the Magic Hour API
 - this MCP server does not look up users in a database
 - this MCP server does not automatically reuse the host app's session auth
 
-What the host app must do:
+The host app must:
 
 1. Accept the incoming `Authorization` header
 2. Forward it unchanged to the mounted MCP route
 3. Avoid logging the raw bearer token
 
-## Step 7: Add any host-level protections you want
+## Step 7: Add host protections
 
 This repo does not force gateway behavior on the host app.
 
@@ -151,9 +132,7 @@ If needed, add these in front of `/mcp`:
 - allowlists
 - API gateway rules
 
-Keep one rule in place:
-
-- never log the raw `Authorization` header
+Never log the raw `Authorization` header.
 
 ## Step 8: Verify reverse proxy or ingress behavior
 
@@ -169,13 +148,13 @@ If any of those are broken, the MCP client may connect but tools will fail.
 
 Run the real FastAPI service that now includes the mounted MCP route.
 
-At this point, the public MCP endpoint should look like:
+The public MCP endpoint should look like:
 
 ```text
 http://<host>/mcp/
 ```
 
-For purely local testing, it is often:
+For local testing:
 
 ```text
 http://127.0.0.1:8000/mcp/
@@ -237,7 +216,7 @@ Expected result in real mode:
 - `expires_at`
 - `file_path`
 
-This is a good auth check because it exercises the real Magic Hour API path without starting a full generation job.
+This checks real authentication without starting a generation job.
 
 ## Step 12: Verify a real generation flow
 
@@ -263,11 +242,9 @@ Expected result:
 3. on `complete`, the response includes `exact_download_urls`
 4. image and audio wait helpers also try to return inline MCP media content
 
-Important:
-
-- real `create_*` calls may spend credits
-- use `exact_download_urls[n]` or the exact `downloads[n].url` value as the link
-- never append `expires_at` or `download_expiration_metadata` to a signed URL
+Real `create_*` calls may spend credits. Use `exact_download_urls[n]` or the
+exact `downloads[n].url` value as the link. Never append `expires_at` or
+`download_expiration_metadata` to a signed URL.
 
 ## Step 13: Verify the bad key path once
 
@@ -285,7 +262,7 @@ Expected result:
 - the error shows the upstream auth failure
 - the host backend stays healthy
 
-## Step 14: Understand the upload flow before building upload-based features
+## Step 14: Understand the upload flow
 
 This MCP server does not accept raw file bytes directly inside tool arguments.
 
@@ -303,49 +280,12 @@ Example:
 2. upload the bytes outside MCP
 3. pass the returned `file_path` into `imageToVideo_createVideo.assets.image_file_path`
 
-Important:
+`videoAssets_generatePresignedUrl` mints upload URLs for image, audio, and video.
+The custom `upload_file_to_presigned_url` helper can upload local files during
+CLI testing when the MCP server can read the path. Browser chat users still
+need an upload UI or bridge.
 
-- this repo mints upload URLs with `videoAssets_generatePresignedUrl`; despite the generated name, it is not video-only
-- the custom `upload_file_to_presigned_url` helper can upload local files for CLI testing when the MCP server can read the path
-- this repo does not upload the bytes for browser chat users
-- CLI style clients can handle this more easily because they can access local files
-
-## Step 15: Test with Codex CLI if needed
-
-If the team wants to test from Codex CLI:
-
-1. start the backend
-2. set `MAGIC_HOUR_API_KEY` in the shell that will launch Codex
-3. register the MCP server with `codex mcp add`
-4. launch Codex from that same shell
-5. ask Codex to call `ping`
-
-Important:
-
-- Codex must inherit the shell environment where `MAGIC_HOUR_API_KEY` is set
-- if Codex is launched from another shell or another surface, the MCP server may not appear or authenticate correctly
-
-## Step 16: Test with Claude Code if needed
-
-If the team wants to test from Claude Code:
-
-1. start the backend
-2. register the MCP server in Claude Code
-3. include `Authorization: Bearer <magic_hour_api_key>`
-4. start a new Claude Code session
-5. ask Claude Code to call `ping`
-
-## Step 17: Know what is intentionally not included
-
-This repo does not currently include:
-
-- chat-native file upload UI
-- upload popup or modal
-- a server-side upload bridge for web chat users
-
-Those are future integration layers around this MCP server, not blockers for the current developer-first path.
-
-## Step 18: Use this checklist before handoff
+## Step 15: Run the handoff checklist
 
 Before telling another team the integration is done, confirm:
 
@@ -356,11 +296,10 @@ Before telling another team the integration is done, confirm:
 5. MCP Inspector can call `ping`
 6. MCP Inspector can call `videoAssets_generatePresignedUrl` with image, audio, and video item types
 7. at least one real `create_*` flow was tested if credit-spending validation is required
-8. Codex CLI or Claude Code testing was verified if those clients are part of the rollout
+8. rollout clients were tested using `user.md`
 
 ## Related docs
 
-- `integration-handoff.md`
-- `docs/ai-agent-go-live-instructions.md`
+- `user.md` - Claude, Claude Code, and Codex setup
 - `docs/future-chat-ui-handoff.md`
 - `docs/future-oauth-support.md`

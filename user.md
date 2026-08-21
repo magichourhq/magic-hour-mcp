@@ -1,4 +1,4 @@
-# Magic Hour MCP User Guide
+# Magic Hour MCP user guide
 
 Use this guide if Magic Hour has a hosted MCP endpoint at:
 
@@ -6,16 +6,17 @@ Use this guide if Magic Hour has a hosted MCP endpoint at:
 https://mcp.magichour.ai/
 ```
 
-You do not need this repo.
+You do not need this repo. After setup, ask for an image, video, or audio result
+in plain English; the assistant handles the tool calls.
 
-## What You Need
+## What you need
 
 - A Magic Hour API key
 - Claude, Claude Code, or Codex CLI
 
 Keep your API key private. Real generations can spend Magic Hour credits.
 
-## Connect With Claude
+## Connect with Claude
 
 1. In Claude, open **Settings > Connectors** and add a custom connector.
 2. Enter `https://mcp.magichour.ai/` as the connector URL.
@@ -28,29 +29,13 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 6. Return to Claude and verify the connector is enabled. Ask Claude to call the
    Magic Hour `ping` tool; the expected result is `pong`.
 
-## What Is MCP?
-
-MCP lets an AI assistant use Magic Hour tools. After setup, you can ask for images, videos, or audio in plain English, and the assistant handles the tool calls behind the scenes.
-
-Use Magic Hour MCP when you want to create content from your AI assistant instead of opening the Magic Hour website manually.
-
-## Connect With Claude Code
+## Connect with Claude Code
 
 ```sh
 claude mcp add --scope user --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
-Then start a new Claude Code session and test:
-
-```text
-Call the magic-hour ping tool.
-```
-
-Expected result:
-
-```text
-pong
-```
+Start a new Claude Code session and ask it to call the Magic Hour `ping` tool.
 
 If `--scope user` is not supported, use project scope:
 
@@ -58,7 +43,7 @@ If `--scope user` is not supported, use project scope:
 claude mcp add --scope project --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
-## Connect With Codex CLI
+## Connect with Codex CLI
 
 Set your API key in the same shell where you will launch Codex.
 
@@ -80,29 +65,9 @@ Add the MCP server:
 codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var MAGIC_HOUR_API_KEY
 ```
 
-Verify it:
+Start Codex from that same shell and ask it to call the Magic Hour `ping` tool.
 
-```sh
-codex mcp get magic-hour --json
-```
-
-Start Codex from that same shell and test:
-
-```text
-Call the magic-hour ping tool.
-```
-
-Expected result:
-
-```text
-pong
-```
-
-## What To Ask
-
-Ask naturally. You do not need to mention MCP tools.
-
-## Mini Cookbook
+## Prompt cookbook
 
 These examples cover the most-used Magic Hour endpoints. For inputs, use uploaded files or existing Magic Hour `file_path` values when possible.
 
@@ -122,45 +87,24 @@ These examples cover the most-used Magic Hour endpoints. For inputs, use uploade
 
 Direct public media URLs can work, but uploaded Magic Hour `file_path` inputs are more reliable.
 
-## Download Links
+## Files and download links
 
 Magic Hour returns signed download URLs. Use the full URL exactly as returned.
 
-Do not:
-
-- Shorten the URL
-- Remove query parameters
-- Append `expires_at`
+Do not shorten the URL, remove query parameters, or append `expires_at`.
 
 If a link shows `SignatureDoesNotMatch`, ask the assistant for the exact download URL again.
 
-## Upload Notes
-
-Some tools need an input file. The most reliable inputs are:
-
-- A file uploaded through the upload flow
-- An existing Magic Hour `file_path`
-
-Direct public media URLs can work when they are stable and fetchable, but treat them as best-effort.
-
-The upload URL tool is named:
-
-```text
-videoAssets_generatePresignedUrl
-```
-
-The name is confusing, but it works for image, audio, and video files.
+For inputs, prefer an uploaded file or existing Magic Hour `file_path`. The
+upload tool is `videoAssets_generatePresignedUrl`; despite its name, it accepts
+image, audio, and video files.
 
 ## Troubleshooting
 
-If tools do not appear, restart Claude Code or Codex after adding the MCP server.
+- If tools do not appear, restart the client after adding the server.
+- If auth fails, verify your API key and the
+  `Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY` header.
 
-If auth fails, check that your API key is correct and that the header is:
-
-```text
-Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY
-```
-
-If Codex cannot see the server, launch Codex from the same shell where `MAGIC_HOUR_API_KEY` is set.
-
-If the assistant returns only a project `id`, ask for the finished Magic Hour result.
+- If Codex cannot see the server, launch it from the shell where
+  `MAGIC_HOUR_API_KEY` is set.
+- If the assistant returns only a project `id`, ask for the finished result.

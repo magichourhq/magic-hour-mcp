@@ -1,4 +1,4 @@
-# Magic Hour API Reference (for MCP tool design)
+# Magic Hour API reference for MCP tool design
 
 Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
 
@@ -7,7 +7,7 @@ Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved 
 - Every request requires `Authorization: Bearer <api_key>`.
 - Get a key at https://magichour.ai/developer?tab=api-keys (Developer Hub → API Keys → Create key). Key is shown once.
 - Base URL: `https://api.magichour.ai` (all paths below are relative to this, e.g. `/v1/ai-image-generator`).
-- No API-level OAuth/session — it's a single static bearer token per account.
+- The API uses one static bearer token per account and has no OAuth session.
 - **Mock server for dev/testing** (Python SDK): `Environment.MOCK_SERVER` (`https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66.0`) returns instant mock data, accepts any token string, and spends no credits. For this MCP server, point `MAGIC_HOUR_API_BASE_URL` at that URL when you want mock API behavior.
 
 ## Async job lifecycle (applies to every `create`/generation endpoint)
@@ -15,7 +15,7 @@ Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved 
 1. `POST /v1/<tool>` → returns immediately with `{id, credits_charged}`. Credits are charged at request time (refunded if the job later errors).
 2. Poll `GET /v1/{image,video,audio}-projects/{id}` until `status` leaves `queued`/`rendering`, or use the matching custom wait helper: `wait_for_image_project`, `wait_for_video_project`, or `wait_for_audio_project`.
 3. Status enum: `draft | queued | rendering | complete | error | canceled`.
-4. On `complete`, `downloads[]` is populated: `{url, expires_at}` — **download URLs expire after 24h**; re-call GET for fresh ones.
+4. On `complete`, `downloads[]` contains `{url, expires_at}`. Download URLs expire after 24 hours; call GET again for fresh URLs.
 5. On `error`, the `error: {message, code}` object is populated and credits are refunded.
 6. `DELETE /v1/{image,video,audio}-projects/{id}` permanently deletes rendered output (irreversible).
 
@@ -26,13 +26,13 @@ The generated project detail and delete tools come from OpenAPI. The custom wait
 Any `*_file_path` field in a request body should preferably use one of:
 1. A Magic Hour library reference (file from a prior generation/upload in the account).
 2. A `file_path` obtained via the presigned-upload flow:
-   - `POST /v1/files/upload-urls` with `{"items":[{"type":"video","extension":"mp4"}]}` -> returns `{upload_url, expires_at, file_path}` per item.
+   - `POST /v1/files/upload-urls` with `{"items":[{"type":"video","extension":"mp4"}]}` returns `{upload_url, expires_at, file_path}` per item.
    - `PUT` the raw file bytes to `upload_url`.
    - Use the returned `file_path` in the actual generation call.
 
 Direct public media URLs can also work when they are stable, fetchable, and return raw file bytes. Treat them as best-effort rather than the default path, because hotlinked URLs can fail or return HTML/auth/redirect responses instead of the file.
 
-**MCP design implication:** an LLM tool call is JSON text, not binary. Raw file bytes must be uploaded out-of-band. In this server, the expected flow is `videoAssets_generatePresignedUrl` -> upload bytes -> pass `file_path` into the generated create tool. `videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` tool despite the generated name, and it accepts `video`, `audio`, and `image` items.
+MCP tool calls carry JSON, not binary data. Upload raw bytes separately. The flow is `videoAssets_generatePresignedUrl`, upload bytes, then pass `file_path` to the generated create tool. Despite its name, `videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` tool for `video`, `audio`, and `image` items.
 
 ## Output delivery
 
@@ -51,11 +51,11 @@ from magic_hour import Client          # or AsyncClient
 client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER for testing
 ```
 
-- `client.v1.<resource>.create(**params)` — 1:1 with each POST endpoint below. Returns immediately (`id`, `credits_charged`). Resource names are the snake_case form of the path, e.g. `client.v1.ai_image_generator.create(...)`, `client.v1.face_swap_photo.create(...)`.
-- `client.v1.<resource>.generate(**params, wait_for_completion=True, download_outputs=True, download_directory=".")` — convenience wrapper: calls `create`, polls `check_result` internally (default poll interval 0.5s, override via `MAGIC_HOUR_POLL_INTERVAL` env var), and **downloads files to local disk**. ⚠️ Not directly reusable server-side as-is: "local disk" means the MCP server's disk, not the end caller's — would need `download_outputs=False` and return the URLs instead if exposed as an MCP tool.
-- `client.v1.image_projects` / `.video_projects` / `.audio_projects` — each has `.get(id=...)`, `.delete(id=...)`, `.check_result(id=..., wait_for_completion, download_outputs, download_directory)`.
+- `client.v1.<resource>.create(**params)` maps to each POST endpoint below and returns `id` and `credits_charged` immediately. Resource names use the snake_case path, for example `client.v1.ai_image_generator.create(...)` and `client.v1.face_swap_photo.create(...)`.
+- `client.v1.<resource>.generate(**params, wait_for_completion=True, download_outputs=True, download_directory=".")` calls `create`, polls `check_result`, and downloads files to local disk. The default poll interval is 0.5 seconds; override it with `MAGIC_HOUR_POLL_INTERVAL`. In server code, set `download_outputs=False` and return URLs so files do not land on the MCP server's disk.
+- `client.v1.image_projects`, `.video_projects`, and `.audio_projects` each have `.get(id=...)`, `.delete(id=...)`, and `.check_result(id=..., wait_for_completion, download_outputs, download_directory)`.
 - `client.v1.files.upload_urls.create(...)`, `client.v1.face_detection.create(...)` / `.get(id=...)`.
-- Both sync (`Client`) and async (`AsyncClient`) variants exist with identical method shapes — `AsyncClient` is the natural fit inside an async MCP server (e.g. FastMCP).
+- Sync `Client` and async `AsyncClient` have the same methods. Use `AsyncClient` inside an async MCP server such as FastMCP.
 
 ## Voice presets
 
@@ -63,13 +63,13 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 - The runtime OpenAPI MCP server does not maintain a custom per-voice list tool.
 - Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `aiVoiceGenerator_createAudio`.
 
-## Note: Magic Hour's own official MCP server is documentation-only
+## Magic Hour's documentation MCP
 
-Magic Hour hosts `https://docs.magichour.ai/mcp` — an MCP server that lets coding assistants (Cursor/VS Code/Claude Code) pull accurate docs/code snippets while *writing integration code*. It does **not** execute API calls or expose action tools. It's unrelated to (and won't conflict with) the action-execution MCP server we're building, which lets an agent actually *call* the Magic Hour API at runtime. Worth knowing so nobody confuses the two.
+Magic Hour hosts `https://docs.magichour.ai/mcp` for documentation and code snippets. It does not execute API calls or expose action tools. This repo provides the separate action MCP server that calls the Magic Hour API.
 
-## Webhooks (likely out of scope for v1)
+## Webhooks
 
-Magic Hour supports webhooks (image/video/audio `completed`/`errored`/`started` events, HMAC-SHA256 signed payloads) for async completion notification. Not needed if the MCP tool design uses agent-driven polling (`get_details`), but flagging since it's an alternative to polling if tool-call latency becomes a problem for long video jobs.
+Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `started`, `completed`, and `errored` events. This server uses agent-driven polling through `get_details`; webhooks are an alternative for hosts that do not want long-running polling calls.
 
 ## Full endpoint index
 
@@ -121,7 +121,7 @@ Magic Hour supports webhooks (image/video/audio `completed`/`errored`/`started` 
 #### POST /v1/face-detection
 `operationId: faceDetection.detectFaces`
 
-Detect faces in an image or video. Use this API to get the list of faces detected in the image or video to use in the [face swap photo](https://docs.magichour.ai/api-reference/image-projects/face-swap-photo) or [face swap video](https://docs.magichour.ai/api-reference/video-projects/face-swap-video) API calls for multi-face swaps.
+Detect faces in an image or video.
 
 
 **Request Body:**
@@ -136,7 +136,7 @@ Detect faces in an image or video. Use this API to get the list of faces detecte
 #### GET /v1/face-detection/{id}
 `operationId: faceDetection.getDetails`
 
-Get the details of a face detection task. 
+Get the details of a face detection task.
 
 **Path Parameters:**
 - `id` (path, required): The id of the task. This value is returned by the [face detection API](https://docs.magichour.ai/api-reference/files/face-detection#response-id).
@@ -169,7 +169,7 @@ Generates a list of pre-signed upload URLs for the assets required. This API is 
     - `expires_at` (string, required): when the upload url expires, and will need to request a new one.
     - `file_path` (string, required): this value is used in APIs that needs assets, such as image_file_path, video_file_path, and audio_file_path
 
-### Video Projects
+### Video projects
 
 
 #### POST /v1/ai-talking-photo
@@ -192,12 +192,12 @@ Create a talking photo from an image and audio or text input.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/ai-video-editor
 `operationId: aiVideoEditor.createVideo`
 
-**What this API does**
+Create Video Editor programmatically.
 
 
 **Request Body:**
@@ -213,7 +213,7 @@ Create a talking photo from an image and audio or text input.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/animation
 `operationId: animation.createVideo`
@@ -242,12 +242,12 @@ Create a Animation video. The estimated frame cost is calculated based on the `f
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/audio-to-video
 `operationId: audioToVideo.createVideo`
 
-**What this API does**
+Create Audio To Video programmatically.
 
 
 **Request Body:**
@@ -263,7 +263,7 @@ Create a Animation video. The estimated frame cost is calculated based on the `f
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/auto-subtitle-generator
 `operationId: autoSubtitleGenerator.createVideo`
@@ -292,12 +292,12 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/character-replace
 `operationId: characterReplace.createVideo`
 
-**What this API does**
+Create Character Replace programmatically.
 
 
 **Request Body:**
@@ -319,12 +319,12 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/face-swap
 `operationId: faceSwap.createVideo`
 
-**What this API does**
+Create Face Swap programmatically.
 
 
 **Request Body:**
@@ -334,7 +334,7 @@ Automatically generate subtitles for your video in multiple languages.
 - `style` (object, optional): Style of the face swap video.
   - `version` (string, optional) enum=['v1', 'v2', 'default']: * `v1` - May preserve skin detail and texture better, but weaker identity preservation. * `v2` - Faster, sharper, better handling of hair and glasses. stronger identity preservation. * `default` - Use the version we...
 - `assets` (object, required): Provide the assets for face swap. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended): swap all detected faces using one source image (`source_file_path` required); **individual-faces**: specify exact mappings using `face_mappings`
   - `image_file_path` (string, optional): The path of the input image with the face to be swapped. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
@@ -346,12 +346,12 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/image-to-video
 `operationId: imageToVideo.createVideo`
 
-**What this API does**
+Create Image To Video programmatically.
 
 
 **Request Body:**
@@ -368,12 +368,12 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/lip-sync
 `operationId: lipSync.createVideo`
 
-**What this API does**
+Create Lip Sync programmatically.
 
 
 **Request Body:**
@@ -391,12 +391,12 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/text-to-video
 `operationId: textToVideo.createVideo`
 
-**What this API does**
+Create Text To Video programmatically.
 
 
 **Request Body:**
@@ -411,12 +411,12 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### GET /v1/video-projects/{id}
 `operationId: videoProjects.getDetails`
 
-Check the progress of a video project. The `downloads` field is populated after a successful render. **Statuses** - `queued` — waiting to start - `rendering` — in progress - `complete` — ready; see `downloads` - `error` — a failure occurred (see `error`) - `canceled` — user canceled - `draft` — not used
+Check the progress of a video project. The `downloads` field is populated after a successful render.
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the video project. This value is returned by all of the POST APIs that create a video.
@@ -432,7 +432,7 @@ Check the progress of a video project. The `downloads` field is populated after 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 - `fps` (number, required): Frame rate of the video. If the status is not 'complete', the frame rate is an estimate and will be adjusted when the video completes.
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
   - `message` (string, required): Details on the reason why a failure happened.
@@ -453,7 +453,7 @@ Permanently delete the rendered video. This action is not reversible, please be 
 #### POST /v1/video-to-video
 `operationId: videoToVideo.createVideo`
 
-**What this API does**
+Create Video To Video programmatically.
 
 
 **Request Body:**
@@ -474,9 +474,9 @@ Permanently delete the rendered video. This action is not reversible, please be 
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
-### Image Projects
+### Image projects
 
 
 #### POST /v1/ai-clothes-changer
@@ -494,7 +494,7 @@ Change outfits in photos in seconds with just a photo reference. Each photo cost
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-face-editor
 `operationId: aiFaceEditor.editImage`
@@ -525,7 +525,7 @@ Edit facial features of an image using AI. Each edit costs 1 frame. The height/w
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-gif-generator
 `operationId: aiGifGenerator.createImage`
@@ -541,7 +541,7 @@ Create an AI GIF. Each GIF costs 50 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-headshot-generator
 `operationId: aiHeadshotGenerator.createImage`
@@ -558,7 +558,7 @@ Create an AI headshot. Each headshot costs 50 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-image-editor
 `operationId: aiImageEditor.createImage`
@@ -580,7 +580,7 @@ Edit images with AI.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-image-generator
 `operationId: aiImageGenerator.createImage`
@@ -600,7 +600,7 @@ Create an AI image with advanced model selection and quality controls.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-image-upscaler
 `operationId: aiImageUpscaler.createImage`
@@ -610,7 +610,7 @@ Upscale your image using AI. Each 2x upscale costs 50 credits for balanced/creat
 
 **Request Body:**
 - `name` (string, optional) default=Image Upscaler - dateTime: Give your image a custom name for easy identification.
-- `scale_factor` (number, required): How much to scale the image. Must be either 2 or 4. Note: 4x upscale is only available on Creator, Pro, or Business tier.
+- `scale_factor` (number, required): How much to scale the image. Must be either 2 or 4.
 - `style` (object, optional) default={}: Style settings for the upscale. Use `mode` (`"preserve"`, `"balanced"`, or `"creative"`). Defaults to `"balanced"`.
   - `mode` (string, optional) enum=['pro', 'preserve', 'balanced', 'creative']: The upscaling mode. `"preserve"` uses the fast pro pipeline (1× credit multiplier). `"balanced"` and `"creative"` use the creative pipeline (2× credit multiplier). `"pro"` is deprecated and maps to `"preserve"`....
   - `prompt` (string, optional): A prompt to guide the final image. Only used when mode is `creative`.
@@ -619,7 +619,7 @@ Upscale your image using AI. Each 2x upscale costs 50 credits for balanced/creat
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-meme-generator
 `operationId: aiMemeGenerator.createImage`
@@ -636,7 +636,7 @@ Create an AI generated meme. Each meme costs 10 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-qr-code-generator
 `operationId: aiQrCodeGenerator.createImage`
@@ -652,7 +652,7 @@ Create an AI QR code. Each QR code costs 0 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/body-swap
 `operationId: bodySwap.createImage`
@@ -669,7 +669,7 @@ Swap a person into a scene image using Nano Banana 2 Lite (640px/1k) or Nano Ban
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/face-swap-photo
 `operationId: faceSwapPhoto.createImage`
@@ -680,7 +680,7 @@ Create a face swap photo. Each photo costs 10 credits. The height/width of the o
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for face swap photo
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended): swap all detected faces using one source image (`source_file_path` required); **individual-faces**: specify exact mappings using `face_mappings`
   - `source_file_path` (string, optional): This is the image from which the face is extracted. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
@@ -690,7 +690,7 @@ Create a face swap photo. Each photo costs 10 credits. The height/width of the o
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/head-swap
 `operationId: headSwap.createImage`
@@ -707,7 +707,7 @@ Swap a head onto a body image. Each image costs 10 credits. Output resolution de
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/image-background-remover
 `operationId: imageBackgroundRemover.createImage`
@@ -723,12 +723,12 @@ Remove background from image. Each image costs 5 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### GET /v1/image-projects/{id}
 `operationId: imageProjects.getDetails`
 
-Check the progress of a image project. The `downloads` field is populated after a successful render. **Statuses** - `queued` — waiting to start - `rendering` — in progress - `complete` — ready; see `downloads` - `error` — a failure occurred (see `error`) - `canceled` — user canceled - `draft` — not used
+Check the progress of an image project. The `downloads` field is populated after a successful render.
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the image project. This value is returned by all of the POST APIs that create an image.
@@ -741,7 +741,7 @@ Check the progress of a image project. The `downloads` field is populated after 
 - `type` (string, required): The type of the image project. Possible values are FACE_EDITOR, AI_IMAGE_EDITOR, AI_SELFIE, AI_HEADSHOT, AI_INFLUENCER, AI_IMAGE, AI_MEME, CLOTHES_CHANGER, BACKGROUND_REMOVER, FACE_SWAP, IMAGE_UPSCALER, IMAGE_ENHANCER,...
 - `created_at` (string, required): 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 - `downloads` (array, required): 
   items:
     - `url` (string, required): 
@@ -771,9 +771,9 @@ Colorize image. Each image costs 10 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
-### Audio Projects
+### Audio projects
 
 
 #### POST /v1/ai-voice-cloner
@@ -791,7 +791,7 @@ Clone a voice from an audio sample and generate speech. * Each character costs 0
 
 **Response 200:**
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
 
 #### POST /v1/ai-voice-generator
 `operationId: aiVoiceGenerator.createAudio`
@@ -807,12 +807,12 @@ Generate speech from text. Each character costs 0.1 credits. The cost is rounded
 
 **Response 200:**
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
 
 #### GET /v1/audio-projects/{id}
 `operationId: audioProjects.getDetails`
 
-Check the progress of a audio project. The `downloads` field is populated after a successful render. **Statuses** - `queued` — waiting to start - `rendering` — in progress - `complete` — ready; see `downloads` - `error` — a failure occurred (see `error`) - `canceled` — user canceled - `draft` — not used
+Check the progress of an audio project. The `downloads` field is populated after a successful render.
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the audio project. This value is returned by all of the POST APIs that create an audio.
@@ -824,7 +824,7 @@ Check the progress of a audio project. The `downloads` field is populated after 
 - `type` (string, required): The type of the audio project. Possible values are VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR
 - `created_at` (string, required): 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made. 
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
 - `downloads` (array, required): 
   items:
     - `url` (string, required): 
