@@ -121,7 +121,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 #### POST /v1/face-detection
 `operationId: faceDetection.detectFaces`
 
-Detect faces in an image or video.
+Face Detection
 
 
 **Request Body:**
@@ -136,7 +136,7 @@ Detect faces in an image or video.
 #### GET /v1/face-detection/{id}
 `operationId: faceDetection.getDetails`
 
-Get the details of a face detection task.
+Get face detection details
 
 **Path Parameters:**
 - `id` (path, required): The id of the task. This value is returned by the [face detection API](https://docs.magichour.ai/api-reference/files/face-detection#response-id).
@@ -153,7 +153,7 @@ Get the details of a face detection task.
 #### POST /v1/files/upload-urls
 `operationId: videoAssets.generatePresignedUrl`
 
-Generates a list of pre-signed upload URLs for the assets required. This API is only necessary if you want to upload to Magic Hour's storage. Refer to the [Input Files Guide](https://docs.magichour.ai/integration/inputs-and-outputs) for more details.
+Generate asset upload urls
 
 
 **Request Body:**
@@ -175,7 +175,7 @@ Generates a list of pre-signed upload URLs for the assets required. This API is 
 #### POST /v1/ai-talking-photo
 `operationId: aiTalkingPhoto.createTalkingPhoto`
 
-Create a talking photo from an image and audio or text input.
+AI Talking Photo
 
 
 **Request Body:**
@@ -197,7 +197,7 @@ Create a talking photo from an image and audio or text input.
 #### POST /v1/ai-video-editor
 `operationId: aiVideoEditor.createVideo`
 
-Create Video Editor programmatically.
+AI Video Editor
 
 
 **Request Body:**
@@ -218,7 +218,7 @@ Create Video Editor programmatically.
 #### POST /v1/animation
 `operationId: animation.createVideo`
 
-Create a Animation video. The estimated frame cost is calculated based on the `fps` and `end_seconds` input.
+Animation
 
 
 **Request Body:**
@@ -247,7 +247,7 @@ Create a Animation video. The estimated frame cost is calculated based on the `f
 #### POST /v1/audio-to-video
 `operationId: audioToVideo.createVideo`
 
-Create Audio To Video programmatically.
+Audio-to-Video
 
 
 **Request Body:**
@@ -268,7 +268,7 @@ Create Audio To Video programmatically.
 #### POST /v1/auto-subtitle-generator
 `operationId: autoSubtitleGenerator.createVideo`
 
-Automatically generate subtitles for your video in multiple languages.
+Auto Subtitle Generator
 
 
 **Request Body:**
@@ -297,7 +297,7 @@ Automatically generate subtitles for your video in multiple languages.
 #### POST /v1/character-replace
 `operationId: characterReplace.createVideo`
 
-Create Character Replace programmatically.
+Character Replace
 
 
 **Request Body:**
@@ -324,7 +324,7 @@ Create Character Replace programmatically.
 #### POST /v1/face-swap
 `operationId: faceSwap.createVideo`
 
-Create Face Swap programmatically.
+Face Swap Video
 
 
 **Request Body:**
@@ -334,7 +334,7 @@ Create Face Swap programmatically.
 - `style` (object, optional): Style of the face swap video.
   - `version` (string, optional) enum=['v1', 'v2', 'default']: * `v1` - May preserve skin detail and texture better, but weaker identity preservation. * `v2` - Faster, sharper, better handling of hair and glasses. stronger identity preservation. * `default` - Use the version we...
 - `assets` (object, required): Provide the assets for face swap. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended): swap all detected faces using one source image (`source_file_path` required); **individual-faces**: specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
   - `image_file_path` (string, optional): The path of the input image with the face to be swapped. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
@@ -351,7 +351,7 @@ Create Face Swap programmatically.
 #### POST /v1/image-to-video
 `operationId: imageToVideo.createVideo`
 
-Create Image To Video programmatically.
+Image-to-Video
 
 
 **Request Body:**
@@ -373,7 +373,7 @@ Create Image To Video programmatically.
 #### POST /v1/lip-sync
 `operationId: lipSync.createVideo`
 
-Create Lip Sync programmatically.
+Lip Sync
 
 
 **Request Body:**
@@ -396,7 +396,7 @@ Create Lip Sync programmatically.
 #### POST /v1/text-to-video
 `operationId: textToVideo.createVideo`
 
-Create Text To Video programmatically.
+Text-to-Video
 
 
 **Request Body:**
@@ -416,7 +416,7 @@ Create Text To Video programmatically.
 #### GET /v1/video-projects/{id}
 `operationId: videoProjects.getDetails`
 
-Check the progress of a video project. The `downloads` field is populated after a successful render.
+Get video details
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the video project. This value is returned by all of the POST APIs that create a video.
@@ -445,7 +445,7 @@ Check the progress of a video project. The `downloads` field is populated after 
 #### DELETE /v1/video-projects/{id}
 `operationId: videoProjects.delete`
 
-Permanently delete the rendered video. This action is not reversible, please be sure before deleting.
+Delete video
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the video project. This value is returned by all of the POST APIs that create a video.
@@ -453,7 +453,7 @@ Permanently delete the rendered video. This action is not reversible, please be 
 #### POST /v1/video-to-video
 `operationId: videoToVideo.createVideo`
 
-Create Video To Video programmatically.
+Video-to-Video
 
 
 **Request Body:**
@@ -482,7 +482,7 @@ Create Video To Video programmatically.
 #### POST /v1/ai-clothes-changer
 `operationId: aiClothesChanger.createImage`
 
-Change outfits in photos in seconds with just a photo reference. Each photo costs 25 credits.
+AI Clothes Changer
 
 
 **Request Body:**
@@ -499,7 +499,7 @@ Change outfits in photos in seconds with just a photo reference. Each photo cost
 #### POST /v1/ai-face-editor
 `operationId: aiFaceEditor.editImage`
 
-Edit facial features of an image using AI. Each edit costs 1 frame. The height/width of the output image depends on your subscription. Please refer to our [pricing](https://magichour.ai/pricing) page for more details
+AI Face Editor
 
 
 **Request Body:**
@@ -530,7 +530,7 @@ Edit facial features of an image using AI. Each edit costs 1 frame. The height/w
 #### POST /v1/ai-gif-generator
 `operationId: aiGifGenerator.createImage`
 
-Create an AI GIF. Each GIF costs 50 credits.
+AI GIF Generator
 
 
 **Request Body:**
@@ -546,7 +546,7 @@ Create an AI GIF. Each GIF costs 50 credits.
 #### POST /v1/ai-headshot-generator
 `operationId: aiHeadshotGenerator.createImage`
 
-Create an AI headshot. Each headshot costs 50 credits.
+AI Headshot Generator
 
 
 **Request Body:**
@@ -563,7 +563,7 @@ Create an AI headshot. Each headshot costs 50 credits.
 #### POST /v1/ai-image-editor
 `operationId: aiImageEditor.createImage`
 
-Edit images with AI.
+AI Image Editor
 
 
 **Request Body:**
@@ -585,7 +585,7 @@ Edit images with AI.
 #### POST /v1/ai-image-generator
 `operationId: aiImageGenerator.createImage`
 
-Create an AI image with advanced model selection and quality controls.
+AI Image Generator
 
 
 **Request Body:**
@@ -605,12 +605,12 @@ Create an AI image with advanced model selection and quality controls.
 #### POST /v1/ai-image-upscaler
 `operationId: aiImageUpscaler.createImage`
 
-Upscale your image using AI. Each 2x upscale costs 50 credits for balanced/creative modes, and 25 credits for preserve. 4x upscale costs 200 and 100 credits respectively.
+AI Image Upscaler
 
 
 **Request Body:**
 - `name` (string, optional) default=Image Upscaler - dateTime: Give your image a custom name for easy identification.
-- `scale_factor` (number, required): How much to scale the image. Must be either 2 or 4.
+- `scale_factor` (number, required): How much to scale the image. Must be either 2 or 4. Note: 4x upscale is only available on Creator, Pro, or Business tier.
 - `style` (object, optional) default={}: Style settings for the upscale. Use `mode` (`"preserve"`, `"balanced"`, or `"creative"`). Defaults to `"balanced"`.
   - `mode` (string, optional) enum=['pro', 'preserve', 'balanced', 'creative']: The upscaling mode. `"preserve"` uses the fast pro pipeline (1× credit multiplier). `"balanced"` and `"creative"` use the creative pipeline (2× credit multiplier). `"pro"` is deprecated and maps to `"preserve"`....
   - `prompt` (string, optional): A prompt to guide the final image. Only used when mode is `creative`.
@@ -624,7 +624,7 @@ Upscale your image using AI. Each 2x upscale costs 50 credits for balanced/creat
 #### POST /v1/ai-meme-generator
 `operationId: aiMemeGenerator.createImage`
 
-Create an AI generated meme. Each meme costs 10 credits.
+AI Meme Generator
 
 
 **Request Body:**
@@ -641,7 +641,7 @@ Create an AI generated meme. Each meme costs 10 credits.
 #### POST /v1/ai-qr-code-generator
 `operationId: aiQrCodeGenerator.createImage`
 
-Create an AI QR code. Each QR code costs 0 credits.
+AI QR Code Generator
 
 
 **Request Body:**
@@ -657,7 +657,7 @@ Create an AI QR code. Each QR code costs 0 credits.
 #### POST /v1/body-swap
 `operationId: bodySwap.createImage`
 
-Swap a person into a scene image using Nano Banana 2 Lite (640px/1k) or Nano Banana 2 (2k/4k). Credits depend on `resolution` (from 50 credits at 640px upward).
+Body Swap
 
 
 **Request Body:**
@@ -674,13 +674,13 @@ Swap a person into a scene image using Nano Banana 2 Lite (640px/1k) or Nano Ban
 #### POST /v1/face-swap-photo
 `operationId: faceSwapPhoto.createImage`
 
-Create a face swap photo. Each photo costs 10 credits. The height/width of the output image depends on your subscription. Please refer to our [pricing](https://magichour.ai/pricing) page for more details
+Face Swap Photo
 
 
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for face swap photo
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended): swap all detected faces using one source image (`source_file_path` required); **individual-faces**: specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
   - `source_file_path` (string, optional): This is the image from which the face is extracted. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
@@ -695,7 +695,7 @@ Create a face swap photo. Each photo costs 10 credits. The height/width of the o
 #### POST /v1/head-swap
 `operationId: headSwap.createImage`
 
-Swap a head onto a body image. Each image costs 10 credits. Output resolution depends on your subscription; you may set `max_resolution` lower than your plan maximum if desired.
+Head Swap
 
 
 **Request Body:**
@@ -712,7 +712,7 @@ Swap a head onto a body image. Each image costs 10 credits. Output resolution de
 #### POST /v1/image-background-remover
 `operationId: imageBackgroundRemover.createImage`
 
-Remove background from image. Each image costs 5 credits.
+Image Background Remover
 
 
 **Request Body:**
@@ -728,7 +728,7 @@ Remove background from image. Each image costs 5 credits.
 #### GET /v1/image-projects/{id}
 `operationId: imageProjects.getDetails`
 
-Check the progress of an image project. The `downloads` field is populated after a successful render.
+Get image details
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the image project. This value is returned by all of the POST APIs that create an image.
@@ -753,7 +753,7 @@ Check the progress of an image project. The `downloads` field is populated after
 #### DELETE /v1/image-projects/{id}
 `operationId: imageProjects.delete`
 
-Permanently delete the rendered image(s). This action is not reversible, please be sure before deleting.
+Delete image
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the image project. This value is returned by all of the POST APIs that create an image.
@@ -761,7 +761,7 @@ Permanently delete the rendered image(s). This action is not reversible, please 
 #### POST /v1/photo-colorizer
 `operationId: photoColorizer.createImage`
 
-Colorize image. Each image costs 10 credits.
+Photo Colorizer
 
 
 **Request Body:**
@@ -779,7 +779,7 @@ Colorize image. Each image costs 10 credits.
 #### POST /v1/ai-voice-cloner
 `operationId: aiVoiceCloner.createAudio`
 
-Clone a voice from an audio sample and generate speech. * Each character costs 0.1 credits. * The cost is rounded up to the nearest whole number
+AI Voice Cloner
 
 
 **Request Body:**
@@ -796,7 +796,7 @@ Clone a voice from an audio sample and generate speech. * Each character costs 0
 #### POST /v1/ai-voice-generator
 `operationId: aiVoiceGenerator.createAudio`
 
-Generate speech from text. Each character costs 0.1 credits. The cost is rounded up to the nearest whole number.
+AI Voice Generator
 
 
 **Request Body:**
@@ -812,7 +812,7 @@ Generate speech from text. Each character costs 0.1 credits. The cost is rounded
 #### GET /v1/audio-projects/{id}
 `operationId: audioProjects.getDetails`
 
-Check the progress of an audio project. The `downloads` field is populated after a successful render.
+Get audio details
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the audio project. This value is returned by all of the POST APIs that create an audio.
@@ -836,7 +836,7 @@ Check the progress of an audio project. The `downloads` field is populated after
 #### DELETE /v1/audio-projects/{id}
 `operationId: audioProjects.delete`
 
-Permanently delete the rendered audio file(s). This action is not reversible, please be sure before deleting.
+Delete audio
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the audio project. This value is returned by all of the POST APIs that create an audio.

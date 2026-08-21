@@ -6,14 +6,8 @@ paths = d['paths']
 def short_desc(s, maxlen=300):
     if not s:
         return ""
-    parts = [part.strip() for part in re.split(r"\n\s*\n", s.strip()) if part.strip()]
-    if parts and re.fullmatch(r"\*\*[^*]+\*\*", parts[0]):
-        parts.pop(0)
-    s = parts[0] if parts else ""
-    s = re.sub(r"\s+", " ", s)
-    s = s.replace(" +- ", "; ").replace(" — ", ": ").replace(" – ", ": ")
-    s = re.sub(r"\b([Aa]) (image|audio)\b", lambda m: f"{'An' if m[1] == 'A' else 'an'} {m[2]}", s)
-    s = re.sub(r"^Create the same (.+?) you can make in the browser, but programmatically, so you can automate it, run it at scale, or connect it to your own app or workflow\.$", r"Create \1 programmatically.", s)
+    s = s.strip().split("\n\n")[0]
+    s = re.sub(r"\s+", " ", s).strip()
     if len(s) > maxlen:
         s = s[:maxlen].rsplit(" ", 1)[0] + "..."
     return s
@@ -153,7 +147,7 @@ for tag in tag_order:
     for verb, p, op in sorted(groups.get(tag, []), key=lambda x: x[1]):
         out.append(f"\n#### {verb} {p}")
         out.append(f"`operationId: {op.get('operationId','')}`\n")
-        out.append(short_desc(op.get('description') or op.get('summary',''), 500) + "\n")
+        out.append(short_desc(op.get('summary') or op.get('description', ''), 500) + "\n")
 
         params = op.get('parameters', [])
         if params:
