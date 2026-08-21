@@ -1,6 +1,6 @@
 # Magic Hour API Reference (for MCP tool design)
 
-Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
+Source: https://magichour.ai/docs/api/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
 
 ## Authentication
 
