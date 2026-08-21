@@ -1,137 +1,42 @@
-# Future: Chat UI and Upload Handoff
+# Web chat upload handoff
 
-Keep this doc only if the team later wants ChatGPT, Claude Chat, or another web chat surface.
+Use this only when adding file-based Magic Hour tools to a web chat client.
+The MCP server already accepts Magic Hour `file_path` values but does not
+provide a browser upload UI or upload bridge.
 
-## What this repo already gives you
+## Required flow
 
-- A working HTTP MCP server
-- Bearer passthrough to the Magic Hour API key
-- OAuth Authorization Code + PKCE compatibility for Claude connectors
-- Runtime OpenAPI-generated tools such as `videoAssets_generatePresignedUrl` and `imageToVideo_createVideo`
-- Custom wait helpers that return sanitized `exact_download_urls`
-- Generated create tools that accept Magic Hour `file_path` values, with direct public media URLs as a best-effort fallback
+1. The user selects a file in the chat UI.
+2. The app gets a presigned URL from `videoAssets_generatePresignedUrl`.
+3. The browser or backend uploads the bytes.
+4. The app passes the returned `file_path` to the create tool.
+5. The chat resumes with the project ID and polls through `wait_for_*_project`.
 
-## What this repo does not give you
+Despite its name, `videoAssets_generatePresignedUrl` accepts image, audio, and
+video files.
 
-- A browser upload UI
-- A chat popup or modal
-- A server side upload bridge
+## Choose upload ownership
 
-## If the team wants web chat later
+Prefer a backend bridge when the product needs consistent validation, audit
+logs, or support across multiple chat clients. Direct browser upload is smaller
+when the client can safely own progress and retries.
 
-There are two separate pieces to add:
-
-1. Auth
-2. Upload UX
-
-### 1. Auth
-
-The current auth model is:
+A backend bridge needs one endpoint:
 
 ```text
-Authorization: Bearer <magic_hour_api_key>
+POST /api/magic-hour/uploads
 ```
 
-That works for developer style clients.
+It should validate the file, upload it, and return the Magic Hour `file_path`.
+Reuse an existing product upload path when possible.
 
-For Claude connectors, use the included OAuth compatibility layer. It validates
-the user's Magic Hour API key, then uses that same key as the access token.
+## Security
 
-See `docs/future-oauth-support.md`.
+- Restrict file size and media types.
+- Never expose the Magic Hour API key to browser code.
+- Treat user-provided URLs as untrusted and block private-network targets.
+- Set fetch timeouts and redirect limits.
+- Reject HTML, auth pages, and unsupported content types.
+- Define retention and cleanup if the product stores files.
 
-### 2. Upload UX
-
-The current upload model is:
-
-1. Call `videoAssets_generatePresignedUrl`
-2. Upload raw bytes to the returned `upload_url`
-3. Pass the returned `file_path` into a generated create tool
-
-That works in local or CLI clients because they can access local files and perform the upload step.
-
-Direct public media URLs can work when they are stable, fetchable, and return raw file bytes. Hotlinked URLs are not reliable enough to use as the default integration path.
-
-For web chat, the team needs a UI layer that handles the file selection and upload step for the user.
-
-## Recommended future architecture
-
-### Option A: Direct browser upload to Magic Hour storage
-
-Flow:
-
-1. User asks for an upload based action such as image to video
-2. Chat UI opens an upload popup or modal
-3. User drops a file into the popup
-4. Frontend calls `videoAssets_generatePresignedUrl`
-5. Frontend uploads the file bytes to the returned `upload_url`
-6. Frontend resumes the MCP flow with the returned `file_path`
-
-Best when:
-
-- the chat platform supports a custom component, modal, or popup
-- the frontend can own upload progress and retry behavior
-
-### Option B: Server side upload bridge
-
-Flow:
-
-1. User asks for an upload based action
-2. Chat UI opens an upload popup or modal
-3. User drops a file into the popup
-4. Frontend uploads the file to the startup's own backend
-5. Backend either:
-   - stores the file and returns a stable hosted raw-file URL, or
-   - calls `videoAssets_generatePresignedUrl` or `/v1/files/upload-urls`, uploads the bytes to Magic Hour storage, and returns the resulting `file_path`
-6. MCP flow resumes with that hosted URL or, preferably, the Magic Hour `file_path`
-
-Best when:
-
-- the team wants tighter control over file handling
-- the chat platform does not support the exact upload flow needed
-- the team wants audit logs, size checks, or file validation on its own backend
-
-## Recommended default
-
-If the team later wants web chat support, Option B is usually the safer default.
-
-Why:
-
-- backend can validate file type and size
-- backend can log uploads
-- backend can hide storage details from the frontend
-- backend can standardize behavior across ChatGPT, Claude Chat, and future clients
-
-## Optional: URL import bridge
-
-If the team wants public media URLs to behave like uploads, add a backend bridge that fetches a user-provided URL, validates it, uploads the bytes through `videoAssets_generatePresignedUrl`, and returns the Magic Hour `file_path`.
-
-This should be a backend feature, not only MCP prompting, because arbitrary URL fetching needs guardrails:
-
-- block private IPs and internal hostnames
-- limit redirects, timeout, and maximum bytes
-- allow only expected image/audio/video content types
-- return clear errors when the URL returns HTML, auth pages, or unsupported content
-
-## What the frontend team would need to build
-
-- An upload popup, modal, or embedded widget
-- Drag and drop file selection
-- Upload progress UI
-- Error handling for expired upload URLs or failed uploads
-- Resume logic so the chat flow continues after upload completes
-
-## What the backend team would need to build
-
-- Optional upload bridge endpoint
-- Optional file validation rules
-- Optional file retention and cleanup policy
-
-## What the MCP repo would not need
-
-The MCP server likely does not need major refactoring for this phase.
-
-The main work is around it:
-
-- auth
-- upload orchestration
-- frontend UX
+The MCP server needs no schema changes for this flow.
