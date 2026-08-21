@@ -2,6 +2,7 @@ name: Sync OpenAPI
 
 on:
   schedule:
+    # Run daily at 08:00 UTC.
     - cron: "0 8 * * *"
   workflow_dispatch:
 
