@@ -2,7 +2,7 @@ name: Sync OpenAPI
 
 on:
   schedule:
-    # Run daily at 08:00 UTC.
+    # Run daily at 12:00 AM PST / 1:00 AM PDT (08:00 UTC).
     - cron: "0 8 * * *"
   workflow_dispatch:
 
