@@ -389,7 +389,7 @@ class MCPBearerChallengeMiddleware:
                 and scope.get("path") == "/"
                 and _accepts_html(scope)
             ):
-                response = _landing_page()
+                response = _setup_page_redirect()
                 await response(scope, receive, send)
                 return
             request = Request(scope)
@@ -432,137 +432,11 @@ def _accepts_html(scope: Mapping[str, Any]) -> bool:
     return False
 
 
-def _landing_page() -> HTMLResponse:
-    script_nonce = secrets.token_urlsafe(18)
-    body = """<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <title>Magic Hour MCP</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --background: hsl(234.55 31.43% 6.86%);
-      --foreground: white;
-      --card: hsl(235.71 25.93% 10.59%);
-      --primary: hsl(259.29 100% 50%);
-      --secondary-foreground: hsl(248.16 100% 75.49%);
-      --muted: hsl(235.71 21.21% 12.94%);
-      --muted-foreground: hsl(235 11.11% 57.65%);
-      --border: hsl(232.17 22.77% 19.8%);
-      --ring: white;
-      --radius: .625rem;
-      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
-      padding: 24px; color: var(--foreground); background: var(--background);
-    }
-    main {
-      width: min(100%, 680px); min-width: 0; padding: 36px; background: var(--card);
-      border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
-    }
-    .landing-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .landing-logo { width: 28px; height: 28px; flex: 0 0 auto; border-radius: calc(var(--radius) - .1875rem); }
-    h1 { margin: 0; font-size: 28px; line-height: 1.2; letter-spacing: -.025em; }
-    h2 { margin: 0 0 16px; color: var(--foreground); font-size: 16px; line-height: 1.3; }
-    p { margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
-    section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
-    ol { --step-indent: 22px; margin: 0; padding-left: var(--step-indent); color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
-    ol > li + li { margin-top: 10px; }
-    .connector-table-wrap { width: calc(100% + var(--step-indent)); min-width: 0; margin: 12px 0 0 calc(0px - var(--step-indent)); overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
-    .connector-table-wrap:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-    table { width: 100%; min-width: 500px; border-collapse: collapse; text-align: left; font-family: inherit; font-size: 13px; line-height: 1.45; }
-    th, td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--border); }
-    th + th, th + td { border-left: 1px solid var(--border); }
-    tbody th { width: 44%; color: var(--foreground); font-weight: 600; }
-    tbody tr:last-child > * { border-bottom: 0; }
-    .copy-cell { padding: 0; }
-    .copy-control { width: 100%; min-height: 39px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 0; color: inherit; background: transparent; font: inherit; line-height: inherit; text-align: left; cursor: pointer; }
-    .copy-control:hover { background: var(--muted); }
-    .copy-control:focus-visible { position: relative; outline: 2px solid var(--ring); outline-offset: -3px; }
-    .copy-value { min-width: 0; }
-    .copy-feedback { position: sticky; right: 0; flex: 0 0 auto; padding-left: 12px; color: var(--secondary-foreground); background: var(--card); box-shadow: -8px 0 8px var(--card); font-size: 11px; font-weight: 600; opacity: .8; }
-    .copy-control:hover .copy-feedback { background: var(--muted); box-shadow: -8px 0 8px var(--muted); }
-    strong { color: var(--foreground); }
-    code { padding: 2px 5px; color: var(--foreground); background: var(--muted); border-radius: calc(var(--radius) - .25rem); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
-    a { color: var(--secondary-foreground); text-decoration-thickness: 1px; text-underline-offset: 3px; }
-    a:hover { color: var(--foreground); }
-    a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 2px; }
-    .docs-link { display: inline-block; margin-top: 28px; font-size: 14px; font-weight: 650; }
-    @media (max-width: 480px) { body { padding: 16px; } main { padding: 28px 24px; } }
-  </style>
-</head>
-<body>
-  <main>
-    <div class="landing-brand"><img class="landing-logo" src="/favicon.ico" alt="" width="28" height="28"><h1>Magic Hour MCP</h1></div>
-    <p>Add Magic Hour's image, video and audio generation to your AI agent in under a minute.</p>
-    <section aria-labelledby="connect-claude">
-      <h2 id="connect-claude">Connect with Claude</h2>
-      <ol>
-        <li>Open <strong><a href="https://claude.ai/new#settings/customize-connectors" target="_blank" rel="noopener noreferrer">Settings &gt; Connectors &gt; Add custom connector</a></strong>.</li>
-        <li>Enter basic details:
-          <div class="connector-table-wrap" role="region" aria-label="Claude connector basic fields" tabindex="0">
-            <table>
-              <tbody>
-                <tr><th scope="row">Name</th><td class="copy-cell"><button class="copy-control" type="button" data-copy-value="Magic Hour" aria-label="Copy Name"><span class="copy-value">Magic Hour</span><span class="copy-feedback" aria-live="polite" aria-atomic="true">Copy</span></button></td></tr>
-                <tr><th scope="row">Remote MCP server URL</th><td class="copy-cell"><button class="copy-control" type="button" data-copy-value="https://mcp.magichour.ai" aria-label="Copy Remote MCP server URL"><span class="copy-value">https://mcp.magichour.ai</span><span class="copy-feedback" aria-live="polite" aria-atomic="true">Copy</span></button></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </li>
-        <li>Open Advanced settings.
-          <div class="connector-table-wrap" role="region" aria-label="Claude connector advanced fields" tabindex="0">
-            <table>
-              <tbody>
-                <tr><th scope="row">OAuth Client ID</th><td class="copy-cell"><button class="copy-control" type="button" data-copy-value="magic-hour-mcp" aria-label="Copy OAuth Client ID"><span class="copy-value">magic-hour-mcp</span><span class="copy-feedback" aria-live="polite" aria-atomic="true">Copy</span></button></td></tr>
-                <tr><th scope="row">OAuth Client Secret</th><td>Leave blank</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </li>
-        <li>Add and connect the connector, then paste your Magic Hour API key. <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Get a Magic Hour API key</a>.</li>
-      </ol>
-    </section>
-    <a class="docs-link" href="https://docs.magichour.ai/">Read Magic Hour docs →</a>
-  </main>
-  <script nonce="__LANDING_SCRIPT_NONCE__">
-    const copyTimers = new WeakMap();
-    for (const button of document.querySelectorAll(".copy-control")) {
-      button.addEventListener("click", async () => {
-        const feedback = button.querySelector(".copy-feedback");
-        try {
-          await navigator.clipboard.writeText(button.dataset.copyValue);
-          feedback.textContent = "Copied";
-        } catch {
-          feedback.textContent = "Copy failed";
-        }
-        clearTimeout(copyTimers.get(button));
-        copyTimers.set(button, setTimeout(() => {
-          feedback.textContent = "Copy";
-        }, 1600));
-      });
-    }
-  </script>
-</body>
-</html>"""
-    body = body.replace("__LANDING_SCRIPT_NONCE__", html.escape(script_nonce, quote=True))
-    return HTMLResponse(
-        body,
-        headers={
-            "Cache-Control": "no-store",
-            "Content-Security-Policy": (
-                f"default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-{script_nonce}'; img-src 'self'; base-uri 'none'; "
-                "form-action 'none'; frame-ancestors 'none'"
-            ),
-            "Referrer-Policy": "no-referrer",
-            "Vary": "Accept",
-            "X-Content-Type-Options": "nosniff",
-            "X-Frame-Options": "DENY",
-        },
+def _setup_page_redirect() -> RedirectResponse:
+    return RedirectResponse(
+        "https://magichour.ai/mcp",
+        status_code=302,
+        headers={"Cache-Control": "no-store", "Vary": "Accept"},
     )
 
 

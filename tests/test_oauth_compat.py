@@ -402,39 +402,17 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "invalid_request")
 
-    async def test_browser_get_to_root_returns_landing_page(self):
+    async def test_browser_get_to_root_redirects_to_setup_page(self):
         response = await self.client.get(
             "/",
             headers={"Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"},
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["content-type"], "text/html; charset=utf-8")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["location"], "https://magichour.ai/mcp")
+        self.assertEqual(response.headers["cache-control"], "no-store")
         self.assertEqual(response.headers["vary"], "Accept")
         self.assertNotIn("www-authenticate", response.headers)
-
-    async def test_landing_page_script_is_nonce_restricted_per_response(self):
-        pages = [
-            await self.client.get("/", headers={"Accept": "text/html"}),
-            await self.client.get("/", headers={"Accept": "text/html"}),
-        ]
-        nonces = []
-        for page in pages:
-            parser = AuthorizationPageParser()
-            parser.feed(page.text)
-            self.assertEqual(len(parser.scripts), 1)
-            nonce = parser.scripts[0].get("nonce")
-            self.assertTrue(nonce)
-            nonces.append(nonce)
-
-            directives = {
-                parts[0]: parts[1:]
-                for directive in page.headers["content-security-policy"].split(";")
-                if (parts := directive.strip().split())
-            }
-            self.assertEqual(directives["script-src"], [f"'nonce-{nonce}'"])
-
-        self.assertNotEqual(nonces[0], nonces[1])
 
     async def test_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")
