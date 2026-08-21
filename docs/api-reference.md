@@ -1,6 +1,6 @@
 # Magic Hour API Reference (for MCP tool design)
 
-Source: https://magichour.ai/docs/api/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
+Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
 
 ## Authentication
 
@@ -187,13 +187,11 @@ Create a talking photo from an image and audio or text input.
   - `audio_file_path` (string, required): The audio file to sync with the image. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
 - `style` (object, optional): Attributes used to dictate the style of the output
   - `generation_mode` (string, optional) enum=['realistic', 'prompted', 'pro', 'standard', 'stable', 'expressive'] default=realistic: Controls overall motion style. * `realistic` - Maintains likeness well, high quality, and reliable. * `prompted` - Slightly lower likeness; allows option to prompt scene.
-  - `intensity` (number, optional) default=1.5 range=[0.1,2]: Note: this value is only applicable when generation_mode is `expressive`. The value can include up to 2 decimal places. * Lower values yield more stability but can suppress mouth movement. * Higher values increase...
   - `prompt` (string, optional): A text prompt to guide the generation. Only applicable when generation_mode is `prompted`. This field is ignored for other modes.
 - `max_resolution` (integer, optional): Constrains the larger dimension (height or width) of the output video. Allows you to set a lower resolution than your plan's maximum if desired. The value is capped by your plan's max resolution.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/ai-video-editor
@@ -215,7 +213,6 @@ Create a talking photo from an image and audio or text input.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/animation
@@ -245,7 +242,6 @@ Create a Animation video. The estimated frame cost is calculated based on the `f
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/audio-to-video
@@ -267,7 +263,6 @@ Create a Animation video. The estimated frame cost is calculated based on the `f
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/auto-subtitle-generator
@@ -297,7 +292,6 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/character-replace
@@ -325,7 +319,6 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/face-swap
@@ -336,8 +329,6 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your video a custom name for easy identification.
-- `height` (integer, optional): `height` is deprecated and no longer influences the output video's resolution.
-- `width` (integer, optional): `width` is deprecated and no longer influences the output video's resolution.
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
 - `style` (object, optional): Style of the face swap video.
@@ -355,7 +346,6 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/image-to-video
@@ -367,22 +357,17 @@ Automatically generate subtitles for your video in multiple languages.
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `height` (integer, optional): `height` is deprecated and no longer influences the output video's resolution.
-- `width` (integer, optional): `width` is deprecated and no longer influences the output video's resolution.
 - `model` (string, optional) enum=[19 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'minimax-h3', 'wan-2.2', 'seedance-1.5'], ...] default=default: The AI model to use for video generation.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
   - `prompt` (string, optional): The prompt used for the video.
-  - `high_quality` (boolean, optional): Deprecated: Please use `resolution` instead. For backward compatibility, * `false` maps to 720p resolution * `true` maps to 1080p resolution
-  - `quality_mode` (string, optional) enum=['quick', 'studio']: DEPRECATED: Please use `resolution` field instead. For backward compatibility: * `quick` maps to 720p resolution * `studio` maps to 1080p resolution
 - `assets` (object, required): Provide the assets for image-to-video. Sora 2 only supports images with an aspect ratio of `9:16` or `16:9`.
   - `image_file_path` (string, required): The path of the image file. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
   - `end_image_file_path` (string, optional): The image to use as the last frame of the video.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/lip-sync
@@ -393,8 +378,6 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Request Body:**
 - `name` (string, optional) default=Lip Sync - dateTime: Give your video a custom name for easy identification.
-- `height` (integer, optional): `height` is deprecated and no longer influences the output video's resolution.
-- `width` (integer, optional): `width` is deprecated and no longer influences the output video's resolution.
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
 - `max_fps_limit` (number, optional) range=[1,None]: Defines the maximum FPS (frames per second) for the output video. If the input video's FPS is lower than this limit, the output video will retain the input FPS. This is useful for reducing unnecessary frame usage in...
@@ -408,7 +391,6 @@ Automatically generate subtitles for your video in multiple languages.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### POST /v1/text-to-video
@@ -421,17 +403,14 @@ Automatically generate subtitles for your video in multiple languages.
 - `name` (string, optional) default=Text To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
 - `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
-- `orientation` (string, optional) enum=['portrait', 'landscape', 'square']: Deprecated. Use `aspect_ratio` instead.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `model` (string, optional) enum=[19 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'minimax-h3', 'wan-2.2', 'seedance-1.5'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required): 
   - `prompt` (string, required): The prompt used for the video.
-  - `quality_mode` (string, optional) enum=['quick', 'studio']: DEPRECATED: Please use `resolution` field instead. For backward compatibility: * `quick` maps to 720p resolution * `studio` maps to 1080p resolution
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 #### GET /v1/video-projects/{id}
@@ -453,7 +432,6 @@ Check the progress of a video project. The `downloads` field is populated after 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
-- `total_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 - `fps` (number, required): Frame rate of the video. If the status is not 'complete', the frame rate is an estimate and will be adjusted when the video completes.
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
@@ -463,9 +441,6 @@ Check the progress of a video project. The `downloads` field is populated after 
   items:
     - `url` (string, required): 
     - `expires_at` (string, required): 
-- `download` (object, required): Deprecated: Please use `.downloads` instead. The download url and expiration date of the video project
-  - `url` (string, required): 
-  - `expires_at` (string, required): 
 
 #### DELETE /v1/video-projects/{id}
 `operationId: videoProjects.delete`
@@ -485,8 +460,6 @@ Permanently delete the rendered video. This action is not reversible, please be 
 - `name` (string, optional) default=Video To Video - dateTime: Give your video a custom name for easy identification.
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
-- `height` (integer, optional): `height` is deprecated and no longer influences the output video's resolution.
-- `width` (integer, optional): `width` is deprecated and no longer influences the output video's resolution.
 - `fps_resolution` (string, optional) enum=['FULL', 'HALF'] default=HALF: Determines whether the resulting video will have the same frame per second as the original video, or half. * `FULL` - the result video will have the same FPS as the input video * `HALF` - the result video will have half...
 - `style` (object, required): 
   - `art_style` (string, required) enum=[75 values, e.g. ['Minecraft', 'Watercolor', 'Pixel', 'Retro Sci-Fi', 'Lego', 'Origami'], ...]: 
@@ -501,7 +474,6 @@ Permanently delete the rendered video. This action is not reversible, please be 
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. 
 
 ### Image Projects
@@ -522,7 +494,6 @@ Change outfits in photos in seconds with just a photo reference. Each photo cost
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-face-editor
@@ -554,7 +525,6 @@ Edit facial features of an image using AI. Each edit costs 1 frame. The height/w
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-gif-generator
@@ -571,7 +541,6 @@ Create an AI GIF. Each GIF costs 50 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-headshot-generator
@@ -589,7 +558,6 @@ Create an AI headshot. Each headshot costs 50 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-image-editor
@@ -606,15 +574,12 @@ Edit images with AI.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): 
   - `prompt` (string, required): The prompt used to edit the image.
-  - `model` (string, optional) enum=['Nano Banana', 'Seedream', 'default']: Deprecated: Please use `model` instead. The AI model to use for image editing. * `Nano Banana` - Precise, realistic edits with consistent results * `Seedream` - Creative, imaginative images with artistic freedom *...
 - `assets` (object, required): Provide the assets for image edit
-  - `image_file_path` (string, optional): Deprecated: Please use `image_file_paths` instead as edits with multiple images are now supported. The image used in the edit. This value is either - a direct URL to the video file - `file_path` field from the response...
   - `image_file_paths` (array, optional): The image(s) used in the edit, maximum of 10 images. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
     items: type=string
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-image-generator
@@ -629,15 +594,12 @@ Create an AI image with advanced model selection and quality controls.
 - `model` (string, optional) enum=[12 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'z-image-turbo', 'flux-2-klein', 'nano-banana-2-lite'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
-- `orientation` (string, optional) enum=['square', 'landscape', 'portrait']: DEPRECATED: Use `aspect_ratio` instead. The orientation of the output image(s). `aspect_ratio` takes precedence when `orientation` if both are provided.
 - `style` (object, required): The art style to use for image generation.
   - `prompt` (string, required): The prompt used for the image(s).
   - `tool` (string, optional) enum=[35 values, e.g. ['ai-anime-generator', 'ai-art-generator', 'ai-background-generator', 'ai-character-generator', 'ai-face-generator', 'ai-fashion-generator'], ...] default=general: The art style to use for image generation. Defaults to 'general' if not provided.
-  - `quality_mode` (string, optional) enum=['standard', 'pro']: DEPRECATED: Use `model` field instead for explicit model selection.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-image-upscaler
@@ -651,14 +613,12 @@ Upscale your image using AI. Each 2x upscale costs 50 credits for balanced/creat
 - `scale_factor` (number, required): How much to scale the image. Must be either 2 or 4. Note: 4x upscale is only available on Creator, Pro, or Business tier.
 - `style` (object, optional) default={}: Style settings for the upscale. Use `mode` (`"preserve"`, `"balanced"`, or `"creative"`). Defaults to `"balanced"`.
   - `mode` (string, optional) enum=['pro', 'preserve', 'balanced', 'creative']: The upscaling mode. `"preserve"` uses the fast pro pipeline (1× credit multiplier). `"balanced"` and `"creative"` use the creative pipeline (2× credit multiplier). `"pro"` is deprecated and maps to `"preserve"`....
-  - `enhancement` (string, optional) enum=['Resemblance', 'Balanced', 'Creative']: Deprecated: use `mode` instead. `"Resemblance"` maps to `"preserve"`. `"Balanced"` and `"Creative"` map to the same-named modes.
   - `prompt` (string, optional): A prompt to guide the final image. Only used when mode is `creative`.
 - `assets` (object, required): Provide the assets for upscaling
   - `image_file_path` (string, required): The image to upscale. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-meme-generator
@@ -676,7 +636,6 @@ Create an AI generated meme. Each meme costs 10 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/ai-qr-code-generator
@@ -693,7 +652,6 @@ Create an AI QR code. Each QR code costs 0 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/body-swap
@@ -711,7 +669,6 @@ Swap a person into a scene image using Nano Banana 2 Lite (640px/1k) or Nano Ban
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/face-swap-photo
@@ -733,7 +690,6 @@ Create a face swap photo. Each photo costs 10 credits. The height/width of the o
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/head-swap
@@ -751,7 +707,6 @@ Swap a head onto a body image. Each image costs 10 credits. Output resolution de
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### POST /v1/image-background-remover
@@ -768,7 +723,6 @@ Remove background from image. Each image costs 5 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 #### GET /v1/image-projects/{id}
@@ -787,7 +741,6 @@ Check the progress of a image project. The `downloads` field is populated after 
 - `type` (string, required): The type of the image project. Possible values are FACE_EDITOR, AI_IMAGE_EDITOR, AI_SELFIE, AI_HEADSHOT, AI_INFLUENCER, AI_IMAGE, AI_MEME, CLOTHES_CHANGER, BACKGROUND_REMOVER, FACE_SWAP, IMAGE_UPSCALER, IMAGE_ENHANCER,...
 - `created_at` (string, required): 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
-- `total_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 - `downloads` (array, required): 
   items:
@@ -818,7 +771,6 @@ Colorize image. Each image costs 10 credits.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
-- `frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for image generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made. 
 
 ### Audio Projects
