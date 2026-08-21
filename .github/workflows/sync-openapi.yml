@@ -32,7 +32,7 @@ jobs:
       - name: Fetch OpenAPI spec
         run: |
           curl --fail --silent --show-error --location \
-            https://magichour.ai/docs/api/openapi.json \
+            https://docs.magichour.ai/api-reference/openapi.json \
             --output /tmp/magic-hour-openapi.json
           python -m json.tool /tmp/magic-hour-openapi.json >/dev/null
           mv /tmp/magic-hour-openapi.json docs/openapi.json
@@ -74,5 +74,5 @@ jobs:
             --base "$BASE_BRANCH" \
             --head "$SYNC_BRANCH" \
             --title "chore: sync OpenAPI spec" \
-            --body "Automated update from https://magichour.ai/docs/api/openapi.json." \
+            --body "Automated update from https://docs.magichour.ai/api-reference/openapi.json." \
             --reviewer "$REVIEWER"
