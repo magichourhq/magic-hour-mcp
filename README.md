@@ -40,7 +40,7 @@ By default, requests go to the production Magic Hour API:
 https://api.magichour.ai
 ```
 
-Every MCP request must include your Magic Hour API key:
+Tool discovery is public. Tool calls must include your Magic Hour API key:
 
 ```text
 Authorization: Bearer <magic_hour_api_key>
