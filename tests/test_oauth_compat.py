@@ -414,7 +414,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["vary"], "Accept")
         self.assertNotIn("www-authenticate", response.headers)
 
-    async def test_machine_requests_still_receive_bearer_challenge(self):
+    async def test_non_post_machine_requests_still_receive_bearer_challenge(self):
         unauthorized = await self.client.get("/")
         self.assertEqual(unauthorized.status_code, 401)
         self.assertEqual(unauthorized.json(), {"error": "unauthorized"})
@@ -427,11 +427,14 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             ("GET", "text/event-stream"),
             ("GET", "*/*"),
             ("GET", "text/html;q=0,*/*"),
-            ("POST", "text/html"),
         ):
             response = await self.client.request(method, "/", headers={"Accept": accept})
             self.assertEqual(response.status_code, 401, (method, accept))
             self.assertIn("resource_metadata=", response.headers["www-authenticate"])
+
+        discovery = await self.client.post("/", headers={"Accept": "text/html"})
+        self.assertNotEqual(discovery.status_code, 401)
+        self.assertNotIn("www-authenticate", discovery.headers)
 
     async def test_browser_get_with_invalid_authorization_receives_bearer_challenge(self):
         for authorization in ("Basic dXNlcjpwYXNz", "Bearer"):

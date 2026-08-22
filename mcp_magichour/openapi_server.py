@@ -21,7 +21,7 @@ from starlette.responses import FileResponse
 from starlette.routing import Route
 
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
-from .oauth_compat import create_oauth_compatibility_app
+from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
 from .tool_logging import ToolCallLoggingMiddleware
 
@@ -74,6 +74,7 @@ def create_mcp() -> FastMCP:
 
     register_custom_tools(mcp)
     mcp.add_middleware(ToolCallLoggingMiddleware())
+    mcp.add_middleware(MCPToolOAuthMiddleware())
     return mcp
 
 
@@ -483,7 +484,7 @@ middleware = [
 
 # Path "/" preserves the existing repo convention: standalone dev runs at root,
 # and a host app can mount this ASGI app at "/mcp" without producing "/mcp/mcp".
-mcp_app = mcp.http_app(path="/", middleware=middleware)
+mcp_app = mcp.http_app(path="/", middleware=middleware, stateless_http=True)
 
 
 async def favicon(_: Request) -> FileResponse:
