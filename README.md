@@ -1,5 +1,7 @@
 # Magic Hour MCP Server
 
+[![smithery badge](https://smithery.ai/badge/magichourhq/magic-hour)](https://smithery.ai/servers/magichourhq/magic-hour)
+
 OpenAPI-backed MCP server for Magic Hour image, video, and audio generation.
 
 At startup, this server reads `docs/openapi.json` and builds MCP tools with
