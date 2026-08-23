@@ -1,31 +1,30 @@
-// @ts-check
+import { useEffect, useState, type MouseEvent } from "react";
 
-import { useEffect, useState } from "react";
+type OpenAIHost = {
+  toolOutput?: unknown;
+  openExternal?: (options: { href: string; redirectUrl?: boolean }) => void;
+};
 
-/** @typedef {{ toolOutput?: unknown, openExternal?: (options: { href: string, redirectUrl?: boolean }) => void }} OpenAIHost */
+type MediaType = "image" | "video" | "audio" | "media";
 
-const hostWindow = /** @type {Window & { openai?: OpenAIHost }} */ (window);
+const hostWindow = window as Window & { openai?: OpenAIHost };
 
-/** @param {unknown} value */
-function record(value) {
+function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null
-    ? /** @type {Record<string, unknown>} */ (value)
+    ? value as Record<string, unknown>
     : {};
 }
 
-/** @param {unknown} value @param {string} [fallback] */
-function text(value, fallback = "—") {
+function text(value: unknown, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
-/** @param {unknown} value */
-function capitalize(value) {
+function capitalize(value: unknown): string {
   const normalized = text(value, "media");
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-/** @param {unknown} value @returns {string | null} */
-function safeMediaUrl(value) {
+function safeMediaUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   try {
     const url = new URL(value);
@@ -35,9 +34,10 @@ function safeMediaUrl(value) {
   }
 }
 
-/** @param {Record<string, unknown>} result @param {string | null} url */
-function projectType(result, url) {
-  if (["image", "video", "audio"].includes(String(result.project_type))) return String(result.project_type);
+function projectType(result: Record<string, unknown>, url: string | null): MediaType {
+  if (["image", "video", "audio"].includes(String(result.project_type))) {
+    return result.project_type as MediaType;
+  }
   const path = url ? new URL(url).pathname.toLowerCase() : "";
   if (/\.(png|jpe?g|webp|gif|avif|heic|tiff?)$/.test(path)) return "image";
   if (/\.(mp3|wav|aac|flac|m4a|ogg|opus|weba?)$/.test(path)) return "audio";
@@ -45,8 +45,13 @@ function projectType(result, url) {
   return "media";
 }
 
-/** @param {{ icon: string, heading: string, message: string }} props */
-function Placeholder({ icon, heading, message }) {
+type PlaceholderProps = {
+  icon: string;
+  heading: string;
+  message: string;
+};
+
+function Placeholder({ icon, heading, message }: PlaceholderProps) {
   return (
     <div className="placeholder">
       <div className="placeholder-icon" aria-hidden="true">{icon}</div>
@@ -56,8 +61,15 @@ function Placeholder({ icon, heading, message }) {
   );
 }
 
-/** @param {{ type: string, url: string | null, name: string, status: string, message: string }} props */
-function Preview({ type, url, name, status, message }) {
+type PreviewProps = {
+  type: MediaType;
+  url: string | null;
+  name: string;
+  status: string;
+  message: string;
+};
+
+function Preview({ type, url, name, status, message }: PreviewProps) {
   if (status !== "complete" || !url) {
     const failed = ["error", "canceled", "cancelled", "timeout"].includes(status);
     return <Placeholder icon={failed ? "!" : "…"} heading={failed ? "Project unavailable" : "Waiting for result"} message={message} />;
@@ -76,19 +88,17 @@ function Preview({ type, url, name, status, message }) {
 }
 
 export default function App() {
-  const [toolOutput, setToolOutput] = useState(hostWindow.openai?.toolOutput);
+  const [toolOutput, setToolOutput] = useState<unknown>(hostWindow.openai?.toolOutput);
 
   useEffect(() => {
-    /** @param {MessageEvent} event */
-    const onMessage = (event) => {
+    const onMessage = (event: MessageEvent) => {
       if (event.source !== window.parent) return;
       const message = record(event.data);
       if (message.jsonrpc !== "2.0" || message.method !== "ui/notifications/tool-result") return;
       setToolOutput(record(message.params).structuredContent);
     };
-    /** @param {Event} event */
-    const onGlobals = (event) => {
-      const detail = record(/** @type {CustomEvent} */ (event).detail);
+    const onGlobals = (event: Event) => {
+      const detail = record((event as CustomEvent).detail);
       const next = record(detail.globals).toolOutput;
       if (next) setToolOutput(next);
     };
@@ -115,8 +125,7 @@ export default function App() {
   const prompt = text(project.prompt || style.prompt, message);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
 
-  /** @param {import("react").MouseEvent<HTMLAnchorElement>} event */
-  const openDownload = (event) => {
+  const openDownload = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!downloadUrl || !hostWindow.openai?.openExternal) return;
     event.preventDefault();
     hostWindow.openai.openExternal({ href: downloadUrl, redirectUrl: false });

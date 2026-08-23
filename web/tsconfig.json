@@ -1,7 +1,5 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
     "jsx": "react-jsx",
     "lib": ["DOM", "ES2022"],
     "module": "ESNext",
@@ -10,5 +8,5 @@
     "strict": true,
     "target": "ES2022"
   },
-  "include": ["src/**/*.js", "src/**/*.jsx"]
+  "include": ["src"]
 }
