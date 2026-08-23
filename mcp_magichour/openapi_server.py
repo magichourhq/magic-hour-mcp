@@ -124,11 +124,11 @@ def register_custom_tools(mcp: FastMCP) -> None:
         return MCP_APP_VIEW_HTML
 
     @mcp.tool(
-        name="check_server_health",
+        name="ping",
         description="Check that the Magic Hour MCP server is reachable.",
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
-    def check_server_health() -> str:
+    def ping() -> str:
         return "pong"
 
     @mcp.tool(

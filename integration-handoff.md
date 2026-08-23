@@ -108,7 +108,7 @@ MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
 
 Use MCP Inspector against `/mcp/` with the bearer header, then verify:
 
-1. `check_server_health` returns `pong`.
+1. `ping` returns `pong`.
 2. `video_assets_generate_presigned_url` returns `upload_url`, `expires_at`, and
    `file_path` for a valid key.
 3. A create tool returns `{id, credits_charged}`.

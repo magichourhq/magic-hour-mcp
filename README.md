@@ -79,7 +79,7 @@ limits.
    - Transport: `Streamable HTTP`
    - URL: `http://127.0.0.1:8000/`
    - Header: `Authorization: Bearer <magic_hour_api_key>`
-4. Call `check_server_health`.
+4. Call `ping`.
 5. Call `video_assets_generate_presigned_url` or another generated tool.
 
 Notes:

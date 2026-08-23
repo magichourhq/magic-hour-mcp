@@ -178,12 +178,12 @@ Use these settings:
 
 Then test in this order:
 
-1. Call `check_server_health`
+1. Call `ping`
 2. Call `video_assets_generate_presigned_url`, the shared upload-URL tool for image/audio/video assets
 3. Call one generated create tool, such as `ai_image_generator_create_image`
 4. Poll with the matching custom `wait_for_*_project` helper
 
-Expected `check_server_health` result:
+Expected `ping` result:
 
 - `"pong"`
 
@@ -293,7 +293,7 @@ Before telling another team the integration is done, confirm:
 2. `mcp_lifespan` is wired into the host app
 3. the `Authorization` header is preserved
 4. bearer tokens are not logged
-5. MCP Inspector can call `check_server_health`
+5. MCP Inspector can call `ping`
 6. MCP Inspector can call `video_assets_generate_presigned_url` with image, audio, and video item types
 7. at least one real `create_*` flow was tested if credit-spending validation is required
 8. rollout clients were tested using `user.md`

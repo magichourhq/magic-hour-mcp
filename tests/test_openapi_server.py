@@ -46,7 +46,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
     async def test_all_tool_names_follow_descriptive_snake_case_convention(self):
         names = {tool.name for tool in await mcp.list_tools()}
 
-        self.assertIn("check_server_health", names)
+        self.assertIn("ping", names)
         self.assertIn("ai_image_generator_create_image", names)
         self.assertIn("face_detection_retrieve_details", names)
         self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in names))

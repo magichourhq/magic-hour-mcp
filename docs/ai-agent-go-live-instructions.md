@@ -23,7 +23,7 @@ dependency management, tests, and existing upload flow. Reuse those patterns.
 ## Required validation
 
 1. Start the host app with `/mcp/` mounted.
-2. Confirm `check_server_health` returns `pong` through MCP Inspector.
+2. Confirm `ping` returns `pong` through MCP Inspector.
 3. Call `video_assets_generate_presigned_url` with a valid key.
 4. Run one real create-and-wait flow only when credit spending is approved.
 5. Confirm a bad key returns `401` without affecting the host app.

@@ -88,8 +88,8 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             all(tool["securitySchemes"] == [{"type": "oauth2", "scopes": []}] for tool in tools)
         )
-        health_check = next(tool for tool in tools if tool["name"] == "check_server_health")
-        self.assertEqual(health_check["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+        ping = next(tool for tool in tools if tool["name"] == "ping")
+        self.assertEqual(ping["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
 
         listed_resources = await client.post(
             "/",
@@ -132,7 +132,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
                 "jsonrpc": "2.0",
                 "id": 5,
                 "method": "tools/call",
-                "params": {"name": "check_server_health", "arguments": {}},
+                "params": {"name": "ping", "arguments": {}},
             },
         )
         result = self.result(called)
@@ -147,7 +147,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
                 "jsonrpc": "2.0",
                 "id": 6,
                 "method": "tools/call",
-                "params": {"name": "check_server_health", "arguments": {}},
+                "params": {"name": "ping", "arguments": {}},
             },
         )
         authorized_result = self.result(authorized)
