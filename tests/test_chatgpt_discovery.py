@@ -82,6 +82,13 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         )
         view_content = self.result(read_view)["contents"][0]
         self.assertEqual(view_content["mimeType"], "text/html;profile=mcp-app")
+        self.assertEqual(
+            view_content["_meta"]["ui"]["csp"],
+            {
+                "connectDomains": ["https://mcp.magichour.ai"],
+                "resourceDomains": ["https://mcp.magichour.ai"],
+            },
+        )
         self.assertTrue(view_content["text"].startswith("<!DOCTYPE html>"))
         self.assertNotIn("<form", view_content["text"].lower())
         self.assertNotIn('type="password"', view_content["text"].lower())

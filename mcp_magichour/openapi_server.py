@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastmcp import FastMCP
-from fastmcp.apps import AppConfig
+from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
@@ -99,6 +99,12 @@ def register_custom_tools(mcp: FastMCP) -> None:
         MCP_APP_VIEW_URI,
         name="Magic Hour overview",
         description="Public overview displayed by MCP Apps hosts.",
+        app=AppConfig(
+            csp=ResourceCSP(
+                connect_domains=["https://mcp.magichour.ai"],
+                resource_domains=["https://mcp.magichour.ai"],
+            ),
+        ),
     )
     def mcp_app_view() -> str:
         return MCP_APP_VIEW_HTML
