@@ -7,14 +7,15 @@ from mcp_magichour.openapi_server import app
 
 
 class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
-    async def call_tool(self, name: str, arguments: dict) -> dict:
+    async def call_tool(self, name: str, arguments: dict, *, authorized: bool = True) -> dict:
+        headers = {"Accept": "application/json, text/event-stream"}
+        if authorized:
+            headers["Authorization"] = "Bearer test-token"
+
         async with app.router.lifespan_context(app), httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="https://mcp.example",
-            headers={
-                "Accept": "application/json, text/event-stream",
-                "Authorization": "Bearer test-token",
-            },
+            headers=headers,
         ) as client:
             response = await client.post(
                 "/",
@@ -38,6 +39,18 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(payload["error"]["code"], -32602)
         self.assertEqual(payload["error"]["message"], "Unknown tool: 'tool_that_does_not_exist'")
+
+    async def test_unauthenticated_invalid_calls_return_structured_json_rpc_errors(self):
+        cases = [
+            ("tool_that_does_not_exist", {}, "Unknown tool"),
+            ("ping", {"unexpected": True}, "Invalid arguments"),
+        ]
+
+        for tool, arguments, expected_message in cases:
+            with self.subTest(tool):
+                payload = await self.call_tool(tool, arguments, authorized=False)
+                self.assertEqual(payload["error"]["code"], -32602)
+                self.assertIn(expected_message, payload["error"]["message"])
 
     async def test_bad_arguments_return_structured_json_rpc_errors(self):
         cases = [
