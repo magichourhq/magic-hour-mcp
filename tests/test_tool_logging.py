@@ -15,7 +15,7 @@ class ToolCallLoggingTests(unittest.IsolatedAsyncioTestCase):
         middleware = ToolCallLoggingMiddleware()
         context = MiddlewareContext(
             message=mt.CallToolRequestParams(
-                name="aiImageGenerator_createImage",
+                name="ai_image_generator_create_image",
                 arguments={
                     "model": "default",
                     "resolution": "640px",

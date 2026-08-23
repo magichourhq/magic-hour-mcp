@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Any
 
@@ -18,6 +19,7 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()}
+GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
 
 
 def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
@@ -28,9 +30,22 @@ def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
         for method, operation in path_item.items():
             if method.lower() not in HTTP_METHODS or not isinstance(operation, dict):
                 continue
+            if operation_id := operation.get("operationId"):
+                operation["operationId"] = normalize_mcp_tool_name(operation_id)
             _apply_operation_policy(path=path, method=method.upper(), operation=operation)
 
     return spec
+
+
+def normalize_mcp_tool_name(operation_id: str) -> str:
+    """Convert an OpenAPI operation ID to a descriptive snake_case MCP tool name."""
+    name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", operation_id)
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+    words = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").lower().split("_")
+    normalized = "_".join(GENERIC_ACTION_REPLACEMENTS.get(word, word) for word in words)
+    if len(normalized) < 4:
+        raise ValueError(f"MCP tool name must contain at least 4 characters: {operation_id!r}")
+    return normalized
 
 
 def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]) -> None:

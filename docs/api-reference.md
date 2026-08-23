@@ -32,7 +32,7 @@ Any `*_file_path` field in a request body should preferably use one of:
 
 Direct public media URLs can also work when they are stable, fetchable, and return raw file bytes. Treat them as best-effort rather than the default path, because hotlinked URLs can fail or return HTML/auth/redirect responses instead of the file.
 
-MCP tool calls carry JSON, not binary data. Upload raw bytes separately. The flow is `videoAssets_generatePresignedUrl`, upload bytes, then pass `file_path` to the generated create tool. Despite its name, `videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` tool for `video`, `audio`, and `image` items.
+MCP tool calls carry JSON, not binary data. Upload raw bytes separately. The flow is `video_assets_generate_presigned_url`, upload bytes, then pass `file_path` to the generated create tool. `video_assets_generate_presigned_url` is the shared `/v1/files/upload-urls` tool for `video`, `audio`, and `image` items.
 
 ## Output delivery
 
@@ -61,7 +61,7 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 
 - The Magic Hour API accepts `voice_name` as a string for AI voice generation.
 - The runtime OpenAPI MCP server does not maintain a custom per-voice list tool.
-- Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `aiVoiceGenerator_createAudio`.
+- Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `ai_voice_generator_create_audio`.
 
 ## Magic Hour's documentation MCP
 
