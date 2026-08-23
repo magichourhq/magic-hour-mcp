@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -41,6 +42,16 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("wait_for_video_project", names)
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)
+
+    async def test_all_tool_names_follow_descriptive_snake_case_convention(self):
+        names = {tool.name for tool in await mcp.list_tools()}
+
+        self.assertIn("check_server_health", names)
+        self.assertIn("ai_image_generator_create_image", names)
+        self.assertIn("face_detection_retrieve_details", names)
+        self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in names))
+        self.assertTrue(all(len(name) >= 4 for name in names))
+        self.assertTrue(all(not {"do", "get", "run"}.intersection(name.split("_")) for name in names))
 
     def test_resolve_media_mime_type_prefers_matching_header(self):
         mime_type = _resolve_media_mime_type(

@@ -27,7 +27,7 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 5. On the Magic Hour authorization page, paste your Magic Hour API key and select
    **Connect**.
 6. Return to Claude and verify the connector is enabled. Ask Claude to call the
-   Magic Hour `ping` tool; the expected result is `pong`.
+   Magic Hour `check_server_health` tool; the expected result is `pong`.
 
 ## Connect with Claude Code
 
@@ -35,7 +35,7 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 claude mcp add --scope user --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
-Start a new Claude Code session and ask it to call the Magic Hour `ping` tool.
+Start a new Claude Code session and ask it to call the Magic Hour `check_server_health` tool.
 
 If `--scope user` is not supported, use project scope:
 
@@ -65,7 +65,7 @@ Add the MCP server:
 codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var MAGIC_HOUR_API_KEY
 ```
 
-Start Codex from that same shell and ask it to call the Magic Hour `ping` tool.
+Start Codex from that same shell and ask it to call the Magic Hour `check_server_health` tool.
 
 ## Prompt cookbook
 
@@ -96,7 +96,7 @@ Do not shorten the URL, remove query parameters, or append `expires_at`.
 If a link shows `SignatureDoesNotMatch`, ask the assistant for the exact download URL again.
 
 For inputs, prefer an uploaded file or existing Magic Hour `file_path`. The
-upload tool is `videoAssets_generatePresignedUrl`; despite its name, it accepts
+upload tool is `video_assets_generate_presigned_url`; it accepts
 image, audio, and video files.
 
 ## Troubleshooting

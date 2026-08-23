@@ -1,6 +1,10 @@
 import unittest
 
-from mcp_magichour.openapi_policies import apply_magic_hour_policies, customize_openapi_component
+from mcp_magichour.openapi_policies import (
+    apply_magic_hour_policies,
+    customize_openapi_component,
+    normalize_mcp_tool_name,
+)
 
 
 class OpenApiPolicyTests(unittest.TestCase):
@@ -18,8 +22,10 @@ class OpenApiPolicyTests(unittest.TestCase):
         }
 
         patched = apply_magic_hour_policies(spec)
+        operation_id = patched["paths"]["/v1/ai-image-generator"]["post"]["operationId"]
         description = patched["paths"]["/v1/ai-image-generator"]["post"]["description"]
 
+        self.assertEqual(operation_id, "ai_image_generator_create_image")
         self.assertIn("MCP guidance", description)
         self.assertIn("wait_for_image_project", description)
         self.assertIn("complete", description)
@@ -85,6 +91,14 @@ class OpenApiPolicyTests(unittest.TestCase):
 
         self.assertIn("wait_for_video_project", description)
         self.assertIn("GET /v1/video-projects/{id}", description)
+
+    def test_tool_names_are_snake_case_and_replace_generic_actions(self):
+        self.assertEqual(normalize_mcp_tool_name("faceDetection.getDetails"), "face_detection_retrieve_details")
+        self.assertEqual(normalize_mcp_tool_name("videoAssets.generatePresignedUrl"), "video_assets_generate_presigned_url")
+
+    def test_tool_names_must_have_at_least_four_characters(self):
+        with self.assertRaisesRegex(ValueError, "at least 4 characters"):
+            normalize_mcp_tool_name("id")
 
 
 if __name__ == "__main__":
