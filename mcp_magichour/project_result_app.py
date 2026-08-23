@@ -1,0 +1,28 @@
+from pathlib import Path
+
+MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
+MCP_APP_VIEW_PATH = "/app/project-result"
+MCP_APP_ASSET_PATH = "/app/project-result-assets"
+MCP_APP_ORIGIN = "https://mcp.magichour.ai"
+MCP_APP_MEDIA_ORIGIN = "https://videos.magichour.ai"
+MCP_APP_VIEW_URL = f"{MCP_APP_ORIGIN}{MCP_APP_VIEW_PATH}"
+MCP_APP_DIST_PATH = Path(__file__).with_name("static") / "project-result"
+MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
+MCP_APP_VIEW_CSP = (
+    "default-src 'none'; "
+    "connect-src 'none'; "
+    "frame-ancestors https://chatgpt.com https://claude.ai; "
+    "form-action 'none'; "
+    f"img-src {MCP_APP_MEDIA_ORIGIN}; "
+    f"media-src {MCP_APP_MEDIA_ORIGIN}; "
+    f"script-src {MCP_APP_ORIGIN}; "
+    f"style-src {MCP_APP_ORIGIN}; "
+    f"base-uri {MCP_APP_ORIGIN}"
+)
+
+
+def read_mcp_app_html() -> str:
+    try:
+        return (MCP_APP_DIST_PATH / "index.html").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise RuntimeError("MCP App frontend is missing; run `npm --prefix web run build`.") from None

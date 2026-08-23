@@ -20,4 +20,7 @@ build-backend = "setuptools.build_meta"
 include = ["mcp_magichour*"]
 
 [tool.setuptools.package-data]
-mcp_magichour = ["favicon.ico"]
+mcp_magichour = ["favicon.ico", "static/project-result/index.html", "static/project-result/assets/*"]
+
+[tool.vercel.scripts]
+build = "npm --prefix web ci && npm --prefix web run build"
