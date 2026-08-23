@@ -46,6 +46,12 @@ Tool discovery is public. Tool calls must include your Magic Hour API key:
 Authorization: Bearer <magic_hour_api_key>
 ```
 
+Agents can discover the hosted server card at:
+
+```text
+https://mcp.magichour.ai/.well-known/mcp/server-card.json
+```
+
 Environment variables:
 
 ```sh

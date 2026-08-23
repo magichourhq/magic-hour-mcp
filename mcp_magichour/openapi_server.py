@@ -18,7 +18,7 @@ from mcp.types import TextContent
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import FileResponse, HTMLResponse
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.routing import Route
 
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
@@ -48,6 +48,19 @@ MCP_APP_VIEW_CSP = (
     "style-src https://mcp.magichour.ai; "
     "base-uri https://mcp.magichour.ai"
 )
+MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
+MCP_SERVER_CARD = {
+    "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
+    "version": "1.0",
+    "protocolVersion": "2025-06-18",
+    "serverInfo": {"name": "magic-hour", "title": "Magic Hour", "version": "0.1.0"},
+    "description": "Create and edit images, video, and audio with Magic Hour.",
+    "transport": {"type": "streamable-http", "endpoint": "/mcp/"},
+    "capabilities": {"tools": {}, "resources": {}},
+    "authentication": {"required": True, "schemes": ["oauth2", "bearer"]},
+    "tools": ["dynamic"],
+    "resources": ["dynamic"],
+}
 MCP_APP_VIEW_HTML = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -546,11 +559,24 @@ async def mcp_app_http_view(_: Request) -> HTMLResponse:
     )
 
 
+async def mcp_server_card(_: Request) -> JSONResponse:
+    return JSONResponse(
+        MCP_SERVER_CARD,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
 app = create_oauth_compatibility_app(
     mcp_app,
     public_routes=[
         Route("/favicon.ico", favicon, methods=["GET"]),
         Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
+        Route(MCP_SERVER_CARD_PATH, mcp_server_card, methods=["GET"]),
     ],
 )
 lifespan = app.router.lifespan_context

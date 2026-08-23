@@ -7,6 +7,7 @@ from mcp_magichour.openapi_server import (
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
     MCP_APP_VIEW_URL,
+    MCP_SERVER_CARD_PATH,
     app,
 )
 
@@ -53,6 +54,19 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
+
+    async def test_server_card_publicly_advertises_mcp_endpoint(self):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example",
+        ) as client:
+            response = await client.get(MCP_SERVER_CARD_PATH)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["transport"], {"type": "streamable-http", "endpoint": "/mcp/"})
+        self.assertEqual(response.headers["access-control-allow-origin"], "*")
+        self.assertEqual(response.headers["access-control-allow-methods"], "GET")
+        self.assertNotIn("www-authenticate", response.headers)
 
     async def assert_discovery_and_auth(self, client: httpx.AsyncClient):
         initialized = await client.post(
