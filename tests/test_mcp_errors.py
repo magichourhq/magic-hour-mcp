@@ -39,11 +39,38 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["error"]["code"], -32602)
         self.assertEqual(payload["error"]["message"], "Unknown tool: 'tool_that_does_not_exist'")
 
-    async def test_bad_arguments_return_structured_json_rpc_error(self):
-        payload = await self.call_tool("ping", {"unexpected": True})
+    async def test_bad_arguments_return_structured_json_rpc_errors(self):
+        cases = [
+            ("missing required parameter", "wait_for_video_project", {}, "'id' is a required property"),
+            ("wrong parameter type", "wait_for_video_project", {"id": 123}, "not of type 'string'"),
+            ("unexpected parameter", "ping", {"unexpected": True}, "was unexpected"),
+            (
+                "wrong nested enum",
+                "video_assets_generate_presigned_url",
+                {"items": [{"type": "document", "extension": "pdf"}]},
+                "is not one of",
+            ),
+            ("empty required array", "video_assets_generate_presigned_url", {"items": []}, "should be non-empty"),
+            (
+                "missing nested parameter",
+                "video_assets_generate_presigned_url",
+                {"items": [{"type": "video"}]},
+                "'extension' is a required property",
+            ),
+            (
+                "invalid extension pattern",
+                "video_assets_generate_presigned_url",
+                {"items": [{"type": "video", "extension": ".mp4"}]},
+                "does not match",
+            ),
+        ]
 
-        self.assertEqual(payload["error"]["code"], -32602)
-        self.assertIn("Invalid arguments for tool 'ping'", payload["error"]["message"])
+        for label, tool, arguments, expected_message in cases:
+            with self.subTest(label):
+                payload = await self.call_tool(tool, arguments)
+                self.assertEqual(payload["error"]["code"], -32602)
+                self.assertIn(f"Invalid arguments for tool {tool!r}", payload["error"]["message"])
+                self.assertIn(expected_message, payload["error"]["message"])
 
 
 if __name__ == "__main__":
