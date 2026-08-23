@@ -1,11 +1,14 @@
+import os
 from pathlib import Path
 
 MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
 MCP_APP_VIEW_PATH = "/app/project-result"
 MCP_APP_ASSET_PATH = "/app/project-result-assets"
-MCP_APP_ORIGIN = "https://mcp.magichour.ai"
+MCP_APP_ORIGIN = os.getenv(
+    "MCP_APP_ORIGIN",
+    f"https://{os.getenv('VERCEL_URL', 'mcp.magichour.ai')}",
+).rstrip("/")
 MCP_APP_MEDIA_ORIGIN = "https://videos.magichour.ai"
-MCP_APP_VIEW_URL = f"{MCP_APP_ORIGIN}{MCP_APP_VIEW_PATH}"
 MCP_APP_DIST_PATH = Path(__file__).with_name("static") / "project-result"
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
 MCP_APP_VIEW_CSP = (
@@ -17,7 +20,7 @@ MCP_APP_VIEW_CSP = (
     f"media-src {MCP_APP_MEDIA_ORIGIN}; "
     f"script-src {MCP_APP_ORIGIN}; "
     f"style-src {MCP_APP_ORIGIN}; "
-    f"base-uri {MCP_APP_ORIGIN}"
+    "base-uri 'none'"
 )
 
 

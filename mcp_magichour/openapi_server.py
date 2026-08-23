@@ -35,7 +35,6 @@ from .project_result_app import (
     MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
-    MCP_APP_VIEW_URL,
     read_mcp_app_html,
 )
 from .tool_logging import ToolCallLoggingMiddleware
@@ -114,7 +113,6 @@ def register_custom_tools(mcp: FastMCP) -> None:
         app=AppConfig(
             csp=ResourceCSP(
                 resource_domains=[MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
-                base_uri_domains=[MCP_APP_ORIGIN],
             ),
             prefers_border=True,
         ),

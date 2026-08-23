@@ -9,10 +9,10 @@ from mcp_magichour.openapi_server import (
     MCP_APP_ASSET_PATH,
     MCP_APP_MEDIA_ORIGIN,
     MCP_APP_MIME_TYPE,
+    MCP_APP_ORIGIN,
     MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
-    MCP_APP_VIEW_URL,
     MCP_SERVER_CARD_PATH,
     MCP_SERVER_DESCRIPTION,
     MCP_SERVER_INSTRUCTIONS,
@@ -59,7 +59,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.headers["content-type"].startswith(MCP_APP_MIME_TYPE))
         self.assertEqual(response.headers["content-security-policy"], MCP_APP_VIEW_CSP)
         self.assertTrue(response.text.startswith("<!DOCTYPE html>"))
-        self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', response.text)
+        self.assertNotIn("<base", response.text.lower())
         self.assertIn('<meta name="color-scheme" content="light dark">', response.text)
         self.assertIn('id="root"', response.text)
         self.assertIn(MCP_APP_ASSET_PATH, response.text)
@@ -170,13 +170,12 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             view_content["_meta"]["ui"]["csp"],
             {
-                "resourceDomains": ["https://mcp.magichour.ai", MCP_APP_MEDIA_ORIGIN],
-                "baseUriDomains": ["https://mcp.magichour.ai"],
+                "resourceDomains": [MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
             },
         )
         self.assertTrue(view_content["_meta"]["ui"]["prefersBorder"])
         self.assertTrue(view_content["text"].startswith("<!DOCTYPE html>"))
-        self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', view_content["text"])
+        self.assertNotIn("<base", view_content["text"].lower())
         self.assertIn('<meta name="color-scheme" content="light dark">', view_content["text"])
         self.assertIn('id="root"', view_content["text"])
         self.assertIn(MCP_APP_ASSET_PATH, view_content["text"])
