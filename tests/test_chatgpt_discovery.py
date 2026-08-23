@@ -3,7 +3,12 @@ import unittest
 
 import httpx
 
-from mcp_magichour.openapi_server import MCP_APP_VIEW_URI, app
+from mcp_magichour.openapi_server import (
+    MCP_APP_VIEW_PATH,
+    MCP_APP_VIEW_URI,
+    MCP_APP_VIEW_URL,
+    app,
+)
 
 
 class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
@@ -23,6 +28,31 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             headers={"Accept": "application/json, text/event-stream"},
         ) as client:
             await self.assert_discovery_and_auth(client)
+
+    async def test_mcp_app_http_view_is_public_with_scoped_csp(self):
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example",
+        ) as client:
+            response = await client.get(MCP_APP_VIEW_PATH)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.headers["content-type"].startswith("text/html"))
+        self.assertEqual(
+            response.headers["content-security-policy"],
+            "default-src 'none'; "
+            "connect-src https://mcp.magichour.ai; "
+            "frame-ancestors https://chatgpt.com https://claude.ai; "
+            "form-action 'none'; "
+            "img-src https://mcp.magichour.ai; "
+            "script-src https://mcp.magichour.ai; "
+            "style-src https://mcp.magichour.ai; "
+            "base-uri https://mcp.magichour.ai",
+        )
+        self.assertTrue(response.text.startswith("<!DOCTYPE html>"))
+        self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', response.text)
+        self.assertNotIn("<form", response.text.lower())
+        self.assertNotIn('type="password"', response.text.lower())
 
     async def assert_discovery_and_auth(self, client: httpx.AsyncClient):
         initialized = await client.post(
@@ -82,7 +112,16 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         )
         view_content = self.result(read_view)["contents"][0]
         self.assertEqual(view_content["mimeType"], "text/html;profile=mcp-app")
+        self.assertEqual(
+            view_content["_meta"]["ui"]["csp"],
+            {
+                "connectDomains": ["https://mcp.magichour.ai"],
+                "resourceDomains": ["https://mcp.magichour.ai"],
+                "baseUriDomains": ["https://mcp.magichour.ai"],
+            },
+        )
         self.assertTrue(view_content["text"].startswith("<!DOCTYPE html>"))
+        self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', view_content["text"])
         self.assertNotIn("<form", view_content["text"].lower())
         self.assertNotIn('type="password"', view_content["text"].lower())
 

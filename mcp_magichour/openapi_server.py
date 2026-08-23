@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastmcp import FastMCP
-from fastmcp.apps import AppConfig
+from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
@@ -18,7 +18,7 @@ from mcp.types import TextContent
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import FileResponse
+from starlette.responses import FileResponse, HTMLResponse
 from starlette.routing import Route
 
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
@@ -36,10 +36,23 @@ API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
 MCP_APP_VIEW_URI = "ui://magic-hour/overview.html"
-MCP_APP_VIEW_HTML = """<!DOCTYPE html>
+MCP_APP_VIEW_PATH = "/app/overview"
+MCP_APP_VIEW_URL = f"https://mcp.magichour.ai{MCP_APP_VIEW_PATH}"
+MCP_APP_VIEW_CSP = (
+    "default-src 'none'; "
+    "connect-src https://mcp.magichour.ai; "
+    "frame-ancestors https://chatgpt.com https://claude.ai; "
+    "form-action 'none'; "
+    "img-src https://mcp.magichour.ai; "
+    "script-src https://mcp.magichour.ai; "
+    "style-src https://mcp.magichour.ai; "
+    "base-uri https://mcp.magichour.ai"
+)
+MCP_APP_VIEW_HTML = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <base href="{MCP_APP_VIEW_URL}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Magic Hour</title>
 </head>
@@ -99,6 +112,13 @@ def register_custom_tools(mcp: FastMCP) -> None:
         MCP_APP_VIEW_URI,
         name="Magic Hour overview",
         description="Public overview displayed by MCP Apps hosts.",
+        app=AppConfig(
+            csp=ResourceCSP(
+                connect_domains=["https://mcp.magichour.ai"],
+                resource_domains=["https://mcp.magichour.ai"],
+                base_uri_domains=["https://mcp.magichour.ai"],
+            ),
+        ),
     )
     def mcp_app_view() -> str:
         return MCP_APP_VIEW_HTML
@@ -519,8 +539,18 @@ async def favicon(_: Request) -> FileResponse:
     return FileResponse(FAVICON_PATH, media_type="image/x-icon")
 
 
+async def mcp_app_http_view(_: Request) -> HTMLResponse:
+    return HTMLResponse(
+        MCP_APP_VIEW_HTML,
+        headers={"Content-Security-Policy": MCP_APP_VIEW_CSP},
+    )
+
+
 app = create_oauth_compatibility_app(
     mcp_app,
-    public_routes=[Route("/favicon.ico", favicon, methods=["GET"])],
+    public_routes=[
+        Route("/favicon.ico", favicon, methods=["GET"]),
+        Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
+    ],
 )
 lifespan = app.router.lifespan_context
