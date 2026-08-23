@@ -22,6 +22,7 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.routing import Route
 
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
+from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
 from .tool_logging import ToolCallLoggingMiddleware
@@ -117,6 +118,7 @@ def create_mcp() -> FastMCP:
     register_custom_tools(mcp)
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(MCPToolOAuthMiddleware())
+    install_structured_tool_errors(mcp)
     return mcp
 
 
