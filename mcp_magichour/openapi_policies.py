@@ -4,6 +4,8 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from mcp.types import ToolAnnotations
+
 
 PROJECT_TAG_TO_ASSET = {
     "Video Projects": "video",
@@ -32,6 +34,7 @@ def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
                 continue
             if operation_id := operation.get("operationId"):
                 operation["operationId"] = normalize_mcp_tool_name(operation_id)
+            _describe_style_inputs(operation)
             _apply_operation_policy(path=path, method=method.upper(), operation=operation)
 
     return spec
@@ -62,8 +65,7 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if method == "POST" and path == "/v1/face-detection":
         additions.append(
-            "This starts an async face-detection task and returns an `id`. Use the face-detection details "
-            "endpoint with that id to retrieve detected faces before doing individual face swaps."
+            "This starts an async face-detection task and returns an `id`. Use the face-detection details endpoint with that id to retrieve detected faces before doing individual face swaps."
         )
 
     if method == "POST" and asset_type:
@@ -78,12 +80,10 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if method == "GET" and path in PROJECT_DETAIL_PATHS:
         additions.append(
-            "Use this after a create tool to poll job status. When status is `complete`, surface the `downloads` "
-            "URLs to the user; if status is `error`, surface the error message."
+            "Use this after a create tool to poll job status. When status is `complete`, surface the `downloads` URLs to the user; if status is `error`, surface the error message."
         )
         additions.append(
-            "Each `downloads[n].url` is already the full signed download URL. Use it exactly as returned. "
-            "Do not shorten it, strip query parameters, or append `expires_at` onto the URL string."
+            "Each `downloads[n].url` is already the full signed download URL. Use it exactly as returned. Do not shorten it, strip query parameters, or append `expires_at` onto the URL string."
         )
 
     if _operation_mentions_file_path(operation):
@@ -112,6 +112,18 @@ def _append_mcp_guidance(description: str, additions: list[str]) -> str:
     return f"{existing}\n\n{guidance}"
 
 
+def _describe_style_inputs(value: Any) -> None:
+    if isinstance(value, dict):
+        properties = value.get("properties")
+        if isinstance(properties, dict) and isinstance(properties.get("style"), dict):
+            properties["style"].setdefault("description", "Style settings for the generated output.")
+        for child in value.values():
+            _describe_style_inputs(child)
+    elif isinstance(value, list):
+        for child in value:
+            _describe_style_inputs(child)
+
+
 def customize_openapi_component(route: Any, component: Any) -> None:
     """Small runtime component policy for tags; text policy is applied to the spec."""
     tags = getattr(component, "tags", None)
@@ -123,6 +135,13 @@ def customize_openapi_component(route: Any, component: Any) -> None:
     method = str(getattr(route, "method", "")).upper()
     path = str(getattr(route, "path", ""))
     route_tags = set(getattr(route, "tags", []) or [])
+    component.annotations = ToolAnnotations(
+        title=getattr(route, "summary", None) or str(getattr(component, "name", "Magic Hour Tool")).replace("_", " ").title(),
+        readOnlyHint=method == "GET",
+        destructiveHint=method == "DELETE",
+        idempotentHint=method in {"GET", "PUT", "DELETE"},
+        openWorldHint=True,
+    )
 
     if method == "POST":
         tags.add("write-operation")
