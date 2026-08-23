@@ -1,12 +1,18 @@
 import json
+import re
 import unittest
+from urllib.parse import urlparse
 
 import httpx
 
 from mcp_magichour.openapi_server import (
+    MCP_APP_ASSET_PATH,
+    MCP_APP_MEDIA_ORIGIN,
+    MCP_APP_MIME_TYPE,
+    MCP_APP_ORIGIN,
+    MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
-    MCP_APP_VIEW_URL,
     MCP_SERVER_CARD_PATH,
     MCP_SERVER_DESCRIPTION,
     MCP_SERVER_INSTRUCTIONS,
@@ -41,23 +47,30 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             base_url="https://mcp.example",
         ) as client:
             response = await client.get(MCP_APP_VIEW_PATH)
+            script_url = re.search(r'<script[^>]+src="([^"]+)"', response.text)
+            style_url = re.search(r'<link[^>]+href="([^"]+)"', response.text)
+            self.assertIsNotNone(script_url)
+            self.assertIsNotNone(style_url)
+            asset_headers = {"Origin": "https://chatgpt.com"}
+            script_response = await client.get(urlparse(script_url.group(1)).path, headers=asset_headers)
+            style_response = await client.get(urlparse(style_url.group(1)).path, headers=asset_headers)
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.headers["content-type"].startswith("text/html"))
-        self.assertEqual(
-            response.headers["content-security-policy"],
-            "default-src 'none'; "
-            "connect-src https://mcp.magichour.ai; "
-            "frame-ancestors https://chatgpt.com https://claude.ai; "
-            "form-action 'none'; "
-            "img-src https://mcp.magichour.ai; "
-            "script-src https://mcp.magichour.ai; "
-            "style-src https://mcp.magichour.ai; "
-            "base-uri https://mcp.magichour.ai",
-        )
+        self.assertTrue(response.headers["content-type"].startswith(MCP_APP_MIME_TYPE))
+        self.assertEqual(response.headers["content-security-policy"], MCP_APP_VIEW_CSP)
         self.assertTrue(response.text.startswith("<!DOCTYPE html>"))
-        self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', response.text)
+        self.assertNotIn("<base", response.text.lower())
         self.assertIn('<meta name="color-scheme" content="light dark">', response.text)
+        self.assertIn('id="root"', response.text)
+        self.assertIn(MCP_APP_ASSET_PATH, response.text)
+        self.assertEqual(script_response.status_code, 200)
+        self.assertEqual(style_response.status_code, 200)
+        self.assertEqual(script_response.headers["access-control-allow-origin"], "*")
+        self.assertEqual(style_response.headers["access-control-allow-origin"], "*")
+        self.assertIn("ui/notifications/tool-result", script_response.text)
+        self.assertIn("openExternal", script_response.text)
+        self.assertIn("toolOutput", script_response.text)
+        self.assertIn("prefers-color-scheme:dark", style_response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
 
@@ -75,7 +88,13 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(card["version"], MCP_SERVER_VERSION)
         self.assertEqual(card["serverUrl"], MCP_SERVER_URL)
         self.assertGreater(len(card["tools"]), 0)
-        self.assertTrue(all({"name", "description", "inputSchema"} <= tool.keys() for tool in card["tools"]))
+        self.assertTrue(
+            all(
+                {"name", "description"} <= tool.keys()
+                and ("inputSchema" in tool or "parameters" in tool)
+                for tool in card["tools"]
+            )
+        )
         self.assertIn("ping", {tool["name"] for tool in card["tools"]})
         self.assertEqual(response.headers["access-control-allow-origin"], "*")
         self.assertEqual(response.headers["access-control-allow-methods"], "GET")
@@ -122,7 +141,10 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             all(tool["securitySchemes"] == [{"type": "oauth2", "scopes": []}] for tool in tools)
         )
         ping = next(tool for tool in tools if tool["name"] == "ping")
-        self.assertEqual(ping["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+        self.assertNotIn("ui", ping.get("_meta", {}))
+        for name in ("wait_for_video_project", "wait_for_image_project", "wait_for_audio_project"):
+            tool = next(tool for tool in tools if tool["name"] == name)
+            self.assertEqual(tool["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
 
         listed_resources = await client.post(
             "/",
@@ -148,14 +170,15 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             view_content["_meta"]["ui"]["csp"],
             {
-                "connectDomains": ["https://mcp.magichour.ai"],
-                "resourceDomains": ["https://mcp.magichour.ai"],
-                "baseUriDomains": ["https://mcp.magichour.ai"],
+                "resourceDomains": [MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
             },
         )
+        self.assertTrue(view_content["_meta"]["ui"]["prefersBorder"])
         self.assertTrue(view_content["text"].startswith("<!DOCTYPE html>"))
-        self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', view_content["text"])
+        self.assertNotIn("<base", view_content["text"].lower())
         self.assertIn('<meta name="color-scheme" content="light dark">', view_content["text"])
+        self.assertIn('id="root"', view_content["text"])
+        self.assertIn(MCP_APP_ASSET_PATH, view_content["text"])
         self.assertNotIn("<form", view_content["text"].lower())
         self.assertNotIn('type="password"', view_content["text"].lower())
 
