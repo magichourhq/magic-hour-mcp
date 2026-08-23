@@ -43,6 +43,13 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)
 
+    async def test_video_wait_accepts_shared_inline_options(self):
+        tool = next(tool for tool in await mcp.list_tools() if tool.name == "wait_for_video_project")
+        properties = tool.parameters["properties"]
+
+        self.assertEqual(properties["include_inline_downloads"]["default"], False)
+        self.assertEqual(properties["max_inline_downloads"]["default"], 0)
+
     async def test_all_tool_names_follow_descriptive_snake_case_convention(self):
         names = {tool.name for tool in await mcp.list_tools()}
 

@@ -135,8 +135,21 @@ def register_custom_tools(mcp: FastMCP) -> None:
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
-    async def wait_for_video_project(id: str, poll_interval_seconds: float = 2.0, timeout_seconds: float = 300.0) -> ToolResult:
-        return await _wait_for_project_result("video", id, poll_interval_seconds, timeout_seconds)
+    async def wait_for_video_project(
+        id: str,
+        poll_interval_seconds: float = 2.0,
+        timeout_seconds: float = 300.0,
+        include_inline_downloads: bool = False,
+        max_inline_downloads: int = 0,
+    ) -> ToolResult:
+        return await _wait_for_project_result(
+            "video",
+            id,
+            poll_interval_seconds,
+            timeout_seconds,
+            include_inline_downloads=include_inline_downloads,
+            max_inline_downloads=max_inline_downloads,
+        )
 
     @mcp.tool(
         name="wait_for_image_project",
