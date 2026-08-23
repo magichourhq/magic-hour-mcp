@@ -3,7 +3,7 @@ import unittest
 
 import httpx
 
-from mcp_magichour.openapi_server import app
+from mcp_magichour.openapi_server import MCP_APP_VIEW_URI, app
 
 
 class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
@@ -58,13 +58,40 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             all(tool["securitySchemes"] == [{"type": "oauth2", "scopes": []}] for tool in tools)
         )
+        ping = next(tool for tool in tools if tool["name"] == "ping")
+        self.assertEqual(ping["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+
+        listed_resources = await client.post(
+            "/",
+            headers=headers,
+            json={"jsonrpc": "2.0", "id": 3, "method": "resources/list", "params": {}},
+        )
+        resources = self.result(listed_resources)["resources"]
+        view = next(resource for resource in resources if resource["uri"] == MCP_APP_VIEW_URI)
+        self.assertEqual(view["mimeType"], "text/html;profile=mcp-app")
+
+        read_view = await client.post(
+            "/",
+            headers=headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "resources/read",
+                "params": {"uri": MCP_APP_VIEW_URI},
+            },
+        )
+        view_content = self.result(read_view)["contents"][0]
+        self.assertEqual(view_content["mimeType"], "text/html;profile=mcp-app")
+        self.assertTrue(view_content["text"].startswith("<!DOCTYPE html>"))
+        self.assertNotIn("<form", view_content["text"].lower())
+        self.assertNotIn('type="password"', view_content["text"].lower())
 
         called = await client.post(
             "/",
             headers=headers,
             json={
                 "jsonrpc": "2.0",
-                "id": 3,
+                "id": 5,
                 "method": "tools/call",
                 "params": {"name": "ping", "arguments": {}},
             },
@@ -79,7 +106,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             headers={**headers, "Authorization": "Bearer sk_test"},
             json={
                 "jsonrpc": "2.0",
-                "id": 4,
+                "id": 6,
                 "method": "tools/call",
                 "params": {"name": "ping", "arguments": {}},
             },

@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.apps import AppConfig
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
@@ -34,6 +35,21 @@ API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
+MCP_APP_VIEW_URI = "ui://magic-hour/overview.html"
+MCP_APP_VIEW_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Magic Hour</title>
+</head>
+<body>
+  <main>
+    <h1>Magic Hour</h1>
+    <p>Create and edit images, video, and audio with your AI assistant.</p>
+  </main>
+</body>
+</html>"""
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
@@ -79,7 +95,19 @@ def create_mcp() -> FastMCP:
 
 
 def register_custom_tools(mcp: FastMCP) -> None:
-    @mcp.tool(name="ping", description="Check that the Magic Hour MCP server is reachable.")
+    @mcp.resource(
+        MCP_APP_VIEW_URI,
+        name="Magic Hour overview",
+        description="Public overview displayed by MCP Apps hosts.",
+    )
+    def mcp_app_view() -> str:
+        return MCP_APP_VIEW_HTML
+
+    @mcp.tool(
+        name="ping",
+        description="Check that the Magic Hour MCP server is reachable.",
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
+    )
     def ping() -> str:
         return "pong"
 
