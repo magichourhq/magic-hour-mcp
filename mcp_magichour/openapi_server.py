@@ -397,7 +397,9 @@ async def _project_to_tool_result(
             )
         )
 
-    return ToolResult(content=content, structured_content=_project_structured_content_for_agent(project))
+    structured_content = _project_structured_content_for_agent(project)
+    structured_content["project_type"] = project_type
+    return ToolResult(content=content, structured_content=structured_content)
 
 
 def _can_inline_media(project_type: ProjectType, include_inline_downloads: bool, max_inline_downloads: int) -> bool:
