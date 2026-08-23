@@ -55,6 +55,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(response.text.startswith("<!DOCTYPE html>"))
         self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', response.text)
+        self.assertIn('<meta name="color-scheme" content="light dark">', response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
 
@@ -145,6 +146,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(view_content["text"].startswith("<!DOCTYPE html>"))
         self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', view_content["text"])
+        self.assertIn('<meta name="color-scheme" content="light dark">', view_content["text"])
         self.assertNotIn("<form", view_content["text"].lower())
         self.assertNotIn('type="password"', view_content["text"].lower())
 
