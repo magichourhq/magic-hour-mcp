@@ -60,7 +60,8 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('<meta name="color-scheme" content="light dark">', response.text)
         self.assertIn('id="preview"', response.text)
         self.assertIn("ui/notifications/tool-result", response.text)
-        self.assertIn("window.openai", response.text)
+        self.assertIn("openExternal", response.text)
+        self.assertIn("toolOutput", response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
 
@@ -165,7 +166,8 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('<meta name="color-scheme" content="light dark">', view_content["text"])
         self.assertIn('id="preview"', view_content["text"])
         self.assertIn("ui/notifications/tool-result", view_content["text"])
-        self.assertIn("window.openai", view_content["text"])
+        self.assertIn("openExternal", view_content["text"])
+        self.assertIn("toolOutput", view_content["text"])
         self.assertNotIn("<form", view_content["text"].lower())
         self.assertNotIn('type="password"', view_content["text"].lower())
 

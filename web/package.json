@@ -1,0 +1,13 @@
+{
+  "name": "magic-hour-mcp-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run typecheck && node build.mjs",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}

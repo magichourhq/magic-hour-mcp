@@ -20,4 +20,4 @@ build-backend = "setuptools.build_meta"
 include = ["mcp_magichour*"]
 
 [tool.setuptools.package-data]
-mcp_magichour = ["favicon.ico"]
+mcp_magichour = ["favicon.ico", "static/*.html"]
