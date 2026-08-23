@@ -25,6 +25,14 @@ from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, cu
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
+from .project_result_app import (
+    MCP_APP_MEDIA_ORIGIN,
+    MCP_APP_VIEW_CSP,
+    MCP_APP_VIEW_HTML,
+    MCP_APP_VIEW_PATH,
+    MCP_APP_VIEW_URI,
+    MCP_APP_VIEW_URL,
+)
 from .tool_logging import ToolCallLoggingMiddleware
 
 ProjectType = Literal["video", "image", "audio"]
@@ -36,9 +44,6 @@ API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
-MCP_APP_VIEW_URI = "ui://magic-hour/overview.html"
-MCP_APP_VIEW_PATH = "/app/overview"
-MCP_APP_VIEW_URL = f"https://mcp.magichour.ai{MCP_APP_VIEW_PATH}"
 MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_VERSION = "0.1.0"
 MCP_SERVER_INSTRUCTIONS = (
@@ -46,35 +51,9 @@ MCP_SERVER_INSTRUCTIONS = (
     "Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project. "
     "Upload local media before passing its file_path, and preserve signed download URLs exactly as returned."
 )
-MCP_APP_VIEW_CSP = (
-    "default-src 'none'; "
-    "connect-src https://mcp.magichour.ai; "
-    "frame-ancestors https://chatgpt.com https://claude.ai; "
-    "form-action 'none'; "
-    "img-src https://mcp.magichour.ai; "
-    "script-src https://mcp.magichour.ai; "
-    "style-src https://mcp.magichour.ai; "
-    "base-uri https://mcp.magichour.ai"
-)
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
 MCP_SERVER_URL = "https://mcp.magichour.ai/mcp/"
-MCP_APP_VIEW_HTML = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <base href="{MCP_APP_VIEW_URL}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <title>Magic Hour</title>
-</head>
-<body>
-  <main>
-    <h1>Magic Hour</h1>
-    <p>Create and edit images, video, and audio with your AI assistant.</p>
-  </main>
-</body>
-</html>"""
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
@@ -125,14 +104,15 @@ def create_mcp() -> FastMCP:
 def register_custom_tools(mcp: FastMCP) -> None:
     @mcp.resource(
         MCP_APP_VIEW_URI,
-        name="Magic Hour overview",
-        description="Public overview displayed by MCP Apps hosts.",
+        name="Magic Hour project result",
+        description="Render completed or terminal Magic Hour project results in MCP Apps hosts.",
         app=AppConfig(
             csp=ResourceCSP(
                 connect_domains=["https://mcp.magichour.ai"],
-                resource_domains=["https://mcp.magichour.ai"],
+                resource_domains=["https://mcp.magichour.ai", MCP_APP_MEDIA_ORIGIN],
                 base_uri_domains=["https://mcp.magichour.ai"],
             ),
+            prefers_border=True,
         ),
     )
     def mcp_app_view() -> str:
@@ -141,7 +121,6 @@ def register_custom_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="ping",
         description="Check that the Magic Hour MCP server is reachable.",
-        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
     def ping() -> str:
         return "pong"
@@ -152,6 +131,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "Poll a video project until it completes, errors, is canceled, or times out. "
             f"{SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
     async def wait_for_video_project(id: str, poll_interval_seconds: float = 2.0, timeout_seconds: float = 300.0) -> ToolResult:
         return await _wait_for_project_result("video", id, poll_interval_seconds, timeout_seconds)
@@ -163,6 +143,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
     async def wait_for_image_project(
         id: str,
@@ -189,6 +170,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
     async def wait_for_audio_project(
         id: str,
@@ -397,7 +379,9 @@ async def _project_to_tool_result(
             )
         )
 
-    return ToolResult(content=content, structured_content=_project_structured_content_for_agent(project))
+    structured_content = _project_structured_content_for_agent(project)
+    structured_content["project_type"] = project_type
+    return ToolResult(content=content, structured_content=structured_content)
 
 
 def _can_inline_media(project_type: ProjectType, include_inline_downloads: bool, max_inline_downloads: int) -> bool:

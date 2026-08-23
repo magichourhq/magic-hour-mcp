@@ -147,6 +147,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.structured_content["exact_download_urls"], ["https://videos.magichour.ai/id/output.png?sig=123"])
         self.assertEqual(result.structured_content["downloads"], [{"url": "https://videos.magichour.ai/id/output.png?sig=123"}])
+        self.assertEqual(result.structured_content["project_type"], "image")
         self.assertNotIn("expires_at", result.structured_content["downloads"][0])
         self.assertEqual(result.content[0].text, "Image project img-123 completed with 1 download(s).")
         self.assertIn("EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.png?sig=123", result.content[1].text)
@@ -174,6 +175,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.structured_content["exact_download_urls"], ["https://videos.magichour.ai/id/output.mp4?sig=123"])
         self.assertEqual(result.structured_content["downloads"], [{"url": "https://videos.magichour.ai/id/output.mp4?sig=123"}])
+        self.assertEqual(result.structured_content["project_type"], "video")
         self.assertEqual(result.structured_content["download_expiration_metadata"][0]["expires_at"], "2026-07-04T15:23:44.751Z")
         self.assertNotIn("expires_at", result.structured_content["downloads"][0])
         self.assertEqual(result.content[0].text, "Video project vid-123 completed with 1 download(s).")
