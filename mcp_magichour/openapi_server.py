@@ -57,18 +57,8 @@ MCP_APP_VIEW_CSP = (
     "base-uri https://mcp.magichour.ai"
 )
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
-MCP_SERVER_CARD = {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
-    "version": "1.0",
-    "protocolVersion": "2025-06-18",
-    "serverInfo": {"name": MCP_SERVER_NAME, "title": "Magic Hour", "version": MCP_SERVER_VERSION},
-    "description": "Create and edit images, video, and audio with Magic Hour.",
-    "transport": {"type": "streamable-http", "endpoint": "/mcp/"},
-    "capabilities": {"tools": {}, "resources": {}},
-    "authentication": {"required": True, "schemes": ["oauth2", "bearer"]},
-    "tools": ["dynamic"],
-    "resources": ["dynamic"],
-}
+MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
+MCP_SERVER_URL = "https://mcp.magichour.ai/mcp/"
 MCP_APP_VIEW_HTML = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -573,7 +563,16 @@ async def mcp_app_http_view(_: Request) -> HTMLResponse:
 
 async def mcp_server_card(_: Request) -> JSONResponse:
     return JSONResponse(
-        MCP_SERVER_CARD,
+        {
+            "name": MCP_SERVER_NAME,
+            "description": MCP_SERVER_DESCRIPTION,
+            "version": MCP_SERVER_VERSION,
+            "serverUrl": MCP_SERVER_URL,
+            "tools": [
+                tool.model_dump(mode="json", by_alias=True, exclude_none=True)
+                for tool in await mcp.list_tools()
+            ],
+        },
         headers={
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET",

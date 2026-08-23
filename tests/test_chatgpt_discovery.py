@@ -8,8 +8,10 @@ from mcp_magichour.openapi_server import (
     MCP_APP_VIEW_URI,
     MCP_APP_VIEW_URL,
     MCP_SERVER_CARD_PATH,
+    MCP_SERVER_DESCRIPTION,
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
+    MCP_SERVER_URL,
     MCP_SERVER_VERSION,
     app,
 )
@@ -67,7 +69,14 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             response = await client.get(MCP_SERVER_CARD_PATH)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["transport"], {"type": "streamable-http", "endpoint": "/mcp/"})
+        card = response.json()
+        self.assertEqual(card["name"], MCP_SERVER_NAME)
+        self.assertEqual(card["description"], MCP_SERVER_DESCRIPTION)
+        self.assertEqual(card["version"], MCP_SERVER_VERSION)
+        self.assertEqual(card["serverUrl"], MCP_SERVER_URL)
+        self.assertGreater(len(card["tools"]), 0)
+        self.assertTrue(all({"name", "description", "inputSchema"} <= tool.keys() for tool in card["tools"]))
+        self.assertIn("ping", {tool["name"] for tool in card["tools"]})
         self.assertEqual(response.headers["access-control-allow-origin"], "*")
         self.assertEqual(response.headers["access-control-allow-methods"], "GET")
         self.assertNotIn("www-authenticate", response.headers)
