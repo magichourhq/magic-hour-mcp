@@ -1,13 +1,7 @@
+import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useEffect, useState, type MouseEvent } from "react";
 
-type OpenAIHost = {
-  toolOutput?: unknown;
-  openExternal?: (options: { href: string; redirectUrl?: boolean }) => void;
-};
-
 type MediaType = "image" | "video" | "audio" | "media";
-
-const hostWindow = window as Window & { openai?: OpenAIHost };
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -88,27 +82,23 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
 }
 
 export default function App() {
-  const [toolOutput, setToolOutput] = useState<unknown>(hostWindow.openai?.toolOutput);
+  const [toolOutput, setToolOutput] = useState<unknown>();
+  const [canFullscreen, setCanFullscreen] = useState(false);
+  const { app } = useApp({
+    appInfo: { name: "Magic Hour project result", version: "1.0.0" },
+    capabilities: {},
+    onAppCreated: (createdApp) => {
+      createdApp.ontoolresult = (result) => setToolOutput(result.structuredContent);
+      createdApp.onhostcontextchanged = (context) => {
+        if (context.availableDisplayModes) setCanFullscreen(context.availableDisplayModes.includes("fullscreen"));
+      };
+    },
+  });
 
   useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== window.parent) return;
-      const message = record(event.data);
-      if (message.jsonrpc !== "2.0" || message.method !== "ui/notifications/tool-result") return;
-      setToolOutput(record(message.params).structuredContent);
-    };
-    const onGlobals = (event: Event) => {
-      const detail = record((event as CustomEvent).detail);
-      const next = record(detail.globals).toolOutput;
-      if (next) setToolOutput(next);
-    };
-    window.addEventListener("message", onMessage);
-    window.addEventListener("openai:set_globals", onGlobals);
-    return () => {
-      window.removeEventListener("message", onMessage);
-      window.removeEventListener("openai:set_globals", onGlobals);
-    };
-  }, []);
+    const availableModes = app?.getHostContext()?.availableDisplayModes;
+    if (availableModes) setCanFullscreen(availableModes.includes("fullscreen"));
+  }, [app]);
 
   const project = record(toolOutput);
   const style = record(project.style);
@@ -126,10 +116,18 @@ export default function App() {
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
 
   const openDownload = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!downloadUrl || !hostWindow.openai?.openExternal) return;
-    event.preventDefault();
-    hostWindow.openai.openExternal({ href: downloadUrl, redirectUrl: false });
+    if (!app || !downloadUrl) return;
+    const capabilities = app.getHostCapabilities();
+    if (capabilities?.downloadFile) {
+      event.preventDefault();
+      void app.downloadFile({ contents: [{ type: "resource_link", uri: downloadUrl, name }] });
+    } else if (capabilities?.openLinks) {
+      event.preventDefault();
+      void app.openLink({ url: downloadUrl });
+    }
   };
+
+  const requestFullscreen = () => void app?.requestDisplayMode({ mode: "fullscreen" });
 
   return (
     <main className="card" aria-live="polite">
@@ -150,6 +148,7 @@ export default function App() {
         </dl>
         <div className="actions">
           {downloadUrl && <a className="action" href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={openDownload}>Download</a>}
+          {canFullscreen && <button className="action action-secondary" type="button" onClick={requestFullscreen}>Fullscreen</button>}
         </div>
       </section>
     </main>
