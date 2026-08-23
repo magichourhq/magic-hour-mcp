@@ -1,9 +1,12 @@
 import json
+import re
 import unittest
+from urllib.parse import urlparse
 
 import httpx
 
 from mcp_magichour.openapi_server import (
+    MCP_APP_ASSET_PATH,
     MCP_APP_MEDIA_ORIGIN,
     MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_PATH,
@@ -43,6 +46,12 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             base_url="https://mcp.example",
         ) as client:
             response = await client.get(MCP_APP_VIEW_PATH)
+            script_url = re.search(r'<script[^>]+src="([^"]+)"', response.text)
+            style_url = re.search(r'<link[^>]+href="([^"]+)"', response.text)
+            self.assertIsNotNone(script_url)
+            self.assertIsNotNone(style_url)
+            script_response = await client.get(urlparse(script_url.group(1)).path)
+            style_response = await client.get(urlparse(style_url.group(1)).path)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.headers["content-type"].startswith("text/html"))
@@ -52,16 +61,20 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn(f"img-src {MCP_APP_MEDIA_ORIGIN}", MCP_APP_VIEW_CSP)
         self.assertIn(f"media-src {MCP_APP_MEDIA_ORIGIN}", MCP_APP_VIEW_CSP)
-        self.assertIn("script-src 'sha256-", MCP_APP_VIEW_CSP)
-        self.assertIn("style-src 'sha256-", MCP_APP_VIEW_CSP)
+        self.assertIn("script-src https://mcp.magichour.ai", MCP_APP_VIEW_CSP)
+        self.assertIn("style-src https://mcp.magichour.ai", MCP_APP_VIEW_CSP)
         self.assertNotIn("'unsafe-inline'", MCP_APP_VIEW_CSP)
         self.assertTrue(response.text.startswith("<!DOCTYPE html>"))
         self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', response.text)
         self.assertIn('<meta name="color-scheme" content="light dark">', response.text)
         self.assertIn('id="preview"', response.text)
-        self.assertIn("ui/notifications/tool-result", response.text)
-        self.assertIn("openExternal", response.text)
-        self.assertIn("toolOutput", response.text)
+        self.assertIn(MCP_APP_ASSET_PATH, response.text)
+        self.assertEqual(script_response.status_code, 200)
+        self.assertEqual(style_response.status_code, 200)
+        self.assertIn("ui/notifications/tool-result", script_response.text)
+        self.assertIn("openExternal", script_response.text)
+        self.assertIn("toolOutput", script_response.text)
+        self.assertIn("prefers-color-scheme:dark", style_response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
 
@@ -165,9 +178,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(f'<base href="{MCP_APP_VIEW_URL}">', view_content["text"])
         self.assertIn('<meta name="color-scheme" content="light dark">', view_content["text"])
         self.assertIn('id="preview"', view_content["text"])
-        self.assertIn("ui/notifications/tool-result", view_content["text"])
-        self.assertIn("openExternal", view_content["text"])
-        self.assertIn("toolOutput", view_content["text"])
+        self.assertIn(MCP_APP_ASSET_PATH, view_content["text"])
         self.assertNotIn("<form", view_content["text"].lower())
         self.assertNotIn('type="password"', view_content["text"].lower())
 

@@ -19,13 +19,16 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
 from .project_result_app import (
+    MCP_APP_ASSET_PATH,
+    MCP_APP_DIST_PATH,
     MCP_APP_MEDIA_ORIGIN,
     MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_HTML,
@@ -571,6 +574,7 @@ app = create_oauth_compatibility_app(
     public_routes=[
         Route("/favicon.ico", favicon, methods=["GET"]),
         Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
+        Mount(MCP_APP_ASSET_PATH, app=StaticFiles(directory=MCP_APP_DIST_PATH)),
         Route(MCP_SERVER_CARD_PATH, mcp_server_card, methods=["GET"]),
     ],
 )
