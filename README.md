@@ -100,6 +100,8 @@ Notes:
   returned; never append expiration metadata.
 - Image and audio wait tools also return inline media when supported.
 
+Rebuild and type-check the MCP App UI with `cd web && npm ci && npm run build`.
+
 ## File uploads
 
 Magic Hour does not accept raw file bytes inside tool arguments. The flow is:

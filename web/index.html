@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <base href="https://mcp.magichour.ai/app/project-result">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Magic Hour project result</title>
+  <link rel="stylesheet" href="/src/project-result.css">
+</head>
+<body>
+  <main class="card" aria-live="polite">
+    <section id="preview" class="preview" aria-label="Generated media preview"></section>
+    <section class="content">
+      <span id="status" class="badge" data-tone="warning">Waiting</span>
+      <div>
+        <h1 id="title">Magic Hour project</h1>
+        <p id="summary" class="summary">Waiting for project result.</p>
+      </div>
+      <dl class="details">
+        <div class="detail"><dt>Project</dt><dd id="project-id">—</dd></div>
+        <div class="detail"><dt>Media</dt><dd id="media-type">—</dd></div>
+        <div class="detail"><dt>Credits</dt><dd id="credits">—</dd></div>
+        <div class="detail"><dt>Outputs</dt><dd id="outputs">0</dd></div>
+      </dl>
+      <div class="actions">
+        <a id="download" class="action" href="#" target="_blank" rel="noopener noreferrer" hidden>Download</a>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/src/project-result.js"></script>
+</body>
+</html>
