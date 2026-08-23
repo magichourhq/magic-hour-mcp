@@ -8,6 +8,9 @@ from mcp_magichour.openapi_server import (
     MCP_APP_VIEW_URI,
     MCP_APP_VIEW_URL,
     MCP_SERVER_CARD_PATH,
+    MCP_SERVER_INSTRUCTIONS,
+    MCP_SERVER_NAME,
+    MCP_SERVER_VERSION,
     app,
 )
 
@@ -83,6 +86,12 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertEqual(initialized.status_code, 200)
+        initialize_result = self.result(initialized)
+        self.assertEqual(
+            initialize_result["serverInfo"],
+            {"name": MCP_SERVER_NAME, "version": MCP_SERVER_VERSION},
+        )
+        self.assertEqual(initialize_result["instructions"], MCP_SERVER_INSTRUCTIONS)
 
         headers = {}
         if session_id := initialized.headers.get("mcp-session-id"):
