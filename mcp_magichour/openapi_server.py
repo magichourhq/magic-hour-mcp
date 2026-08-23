@@ -39,6 +39,13 @@ DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
 MCP_APP_VIEW_URI = "ui://magic-hour/overview.html"
 MCP_APP_VIEW_PATH = "/app/overview"
 MCP_APP_VIEW_URL = f"https://mcp.magichour.ai{MCP_APP_VIEW_PATH}"
+MCP_SERVER_NAME = "magic-hour"
+MCP_SERVER_VERSION = "0.1.0"
+MCP_SERVER_INSTRUCTIONS = (
+    "Create and edit images, video, and audio with Magic Hour. Tool calls require authentication. "
+    "Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project. "
+    "Upload local media before passing its file_path, and preserve signed download URLs exactly as returned."
+)
 MCP_APP_VIEW_CSP = (
     "default-src 'none'; "
     "connect-src https://mcp.magichour.ai; "
@@ -54,7 +61,7 @@ MCP_SERVER_CARD = {
     "$schema": "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
     "version": "1.0",
     "protocolVersion": "2025-06-18",
-    "serverInfo": {"name": "magic-hour", "title": "Magic Hour", "version": "0.1.0"},
+    "serverInfo": {"name": MCP_SERVER_NAME, "title": "Magic Hour", "version": MCP_SERVER_VERSION},
     "description": "Create and edit images, video, and audio with Magic Hour.",
     "transport": {"type": "streamable-http", "endpoint": "/mcp/"},
     "capabilities": {"tools": {}, "resources": {}},
@@ -107,7 +114,9 @@ def create_mcp() -> FastMCP:
     mcp = FastMCP.from_openapi(
         openapi_spec=spec,
         client=build_api_client(),
-        name="magic-hour",
+        name=MCP_SERVER_NAME,
+        version=MCP_SERVER_VERSION,
+        instructions=MCP_SERVER_INSTRUCTIONS,
         route_maps=[
             RouteMap(methods=["POST"], pattern=r".*", mcp_type=MCPType.TOOL, mcp_tags={"write-operation"}),
             RouteMap(pattern=r".*", mcp_type=MCPType.TOOL),
