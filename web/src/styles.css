@@ -116,7 +116,6 @@ h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
   font-weight: 700;
   text-decoration: none;
 }
-.action[hidden] { display: none; }
 .action:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
 
 @media (max-width: 560px) {
