@@ -1,4 +1,5 @@
 import os
+from html import escape
 from pathlib import Path
 
 MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
@@ -12,6 +13,7 @@ MCP_APP_ORIGIN = os.getenv(
 MCP_APP_MEDIA_ORIGIN = "https://videos.magichour.ai"
 MCP_APP_DIST_PATH = Path(__file__).with_name("static") / "project-result"
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
+_MCP_APP_CSP_PLACEHOLDER = "__MCP_APP_CSP__"
 MCP_APP_VIEW_CSP = (
     "default-src 'none'; "
     f"connect-src {MCP_APP_SERVER_ORIGIN} {MCP_APP_ORIGIN}; "
@@ -27,6 +29,7 @@ MCP_APP_VIEW_CSP = (
 
 def read_mcp_app_html() -> str:
     try:
-        return (MCP_APP_DIST_PATH / "index.html").read_text(encoding="utf-8")
+        app_html = (MCP_APP_DIST_PATH / "index.html").read_text(encoding="utf-8")
     except FileNotFoundError:
         raise RuntimeError("MCP App frontend is missing; run `npm --prefix web run build`.") from None
+    return app_html.replace(_MCP_APP_CSP_PLACEHOLDER, escape(MCP_APP_VIEW_CSP, quote=True))
