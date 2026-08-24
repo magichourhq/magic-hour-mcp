@@ -34,7 +34,7 @@ body { padding: 1px; }
 button, a { font: inherit; }
 .card {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(245px, .85fr);
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -44,7 +44,9 @@ button, a { font: inherit; }
 .preview {
   position: relative;
   display: grid;
+  aspect-ratio: 16 / 9;
   min-height: 330px;
+  max-height: 720px;
   overflow: hidden;
   place-items: center;
   background: var(--panel-muted);
@@ -97,10 +99,10 @@ button, a { font: inherit; }
 .badge[data-tone="danger"] { color: var(--danger); }
 h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
 .summary { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-.details { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-muted); }
-.detail { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.details { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-muted); }
+.detail { display: grid; gap: 4px; font-size: 12px; }
 .detail dt { color: var(--muted); }
-.detail dd { min-width: 0; margin: 0; overflow: hidden; font-weight: 650; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.detail dd { min-width: 0; margin: 0; overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; gap: 8px; margin-top: auto; }
 .action {
   display: inline-flex;
@@ -120,7 +122,7 @@ h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
 .action-secondary { background: transparent; color: var(--accent); cursor: pointer; }
 
 @media (max-width: 560px) {
-  .card { grid-template-columns: 1fr; }
   .preview, .preview img, .preview video { min-height: 240px; }
   .preview { max-height: 420px; }
+  .details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
