@@ -72,6 +72,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ui/download-file", script_response.text)
         self.assertIn("ui/request-display-mode", script_response.text)
         self.assertIn("/app/observability", script_response.text)
+        self.assertNotIn("Generated media is ready.", script_response.text)
         self.assertIn("prefers-color-scheme:dark", style_response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
