@@ -13,7 +13,7 @@ MCP_APP_DIST_PATH = Path(__file__).with_name("static") / "project-result"
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
 MCP_APP_VIEW_CSP = (
     "default-src 'none'; "
-    "connect-src 'none'; "
+    f"connect-src {MCP_APP_ORIGIN}; "
     "frame-ancestors https://chatgpt.com https://claude.ai; "
     "form-action 'none'; "
     f"img-src {MCP_APP_MEDIA_ORIGIN}; "
