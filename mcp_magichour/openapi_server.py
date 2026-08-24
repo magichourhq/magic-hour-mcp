@@ -33,6 +33,7 @@ from .project_result_app import (
     MCP_APP_MEDIA_ORIGIN,
     MCP_APP_MIME_TYPE,
     MCP_APP_ORIGIN,
+    MCP_APP_SERVER_ORIGIN,
     MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
@@ -113,7 +114,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         description="Render completed or terminal Magic Hour project results in MCP Apps hosts.",
         app=AppConfig(
             csp=ResourceCSP(
-                connect_domains=[MCP_APP_ORIGIN],
+                connect_domains=[MCP_APP_SERVER_ORIGIN, MCP_APP_ORIGIN],
                 resource_domains=[MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
             ),
             prefers_border=True,

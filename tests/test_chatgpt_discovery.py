@@ -11,6 +11,7 @@ from mcp_magichour.openapi_server import (
     MCP_APP_MEDIA_ORIGIN,
     MCP_APP_MIME_TYPE,
     MCP_APP_ORIGIN,
+    MCP_APP_SERVER_ORIGIN,
     MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
@@ -59,6 +60,11 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.headers["content-type"].startswith(MCP_APP_MIME_TYPE))
         self.assertEqual(response.headers["content-security-policy"], MCP_APP_VIEW_CSP)
+        self.assertIn(f"connect-src {MCP_APP_SERVER_ORIGIN} {MCP_APP_ORIGIN}", MCP_APP_VIEW_CSP)
+        self.assertIn("frame-ancestors https://chatgpt.com https://claude.ai", MCP_APP_VIEW_CSP)
+        self.assertIn("form-action 'none'", MCP_APP_VIEW_CSP)
+        for directive in ("img-src", "script-src", "style-src"):
+            self.assertNotIn(f"{directive} *", MCP_APP_VIEW_CSP)
         self.assertTrue(response.text.startswith("<!DOCTYPE html>"))
         self.assertNotIn("<base", response.text.lower())
         self.assertIn('<meta name="color-scheme" content="light dark">', response.text)
@@ -198,7 +204,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             view_content["_meta"]["ui"]["csp"],
             {
-                "connectDomains": [MCP_APP_ORIGIN],
+                "connectDomains": [MCP_APP_SERVER_ORIGIN, MCP_APP_ORIGIN],
                 "resourceDomains": [MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
             },
         )
