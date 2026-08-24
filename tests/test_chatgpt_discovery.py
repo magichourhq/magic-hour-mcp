@@ -70,6 +70,8 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ui/notifications/tool-result", script_response.text)
         self.assertIn("ui/download-file", script_response.text)
         self.assertIn("ui/request-display-mode", script_response.text)
+        self.assertIn("/_vercel/insights/script.js", script_response.text)
+        self.assertIn("/_vercel/speed-insights/script.js", script_response.text)
         self.assertIn("prefers-color-scheme:dark", style_response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
@@ -171,6 +173,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             view_content["_meta"]["ui"]["csp"],
             {
+                "connectDomains": [MCP_APP_ORIGIN],
                 "resourceDomains": [MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
             },
         )
