@@ -84,7 +84,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             [
                 {
                     "source": "/app/observability/:path*",
-                    "destination": "/_vercel/:path*",
+                    "destination": "https://mcp.magichour.ai/_vercel/:path*",
                 }
             ],
         )
