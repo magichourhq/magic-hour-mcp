@@ -13,6 +13,10 @@ function text(value: unknown, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function optionalText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function capitalize(value: unknown): string {
   const normalized = text(value, "media");
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
@@ -111,9 +115,9 @@ export default function App() {
   const downloadUrl = urls[0] ?? null;
   const type = projectType(project, downloadUrl);
   const name = text(project.name, `${capitalize(type)} project`);
-  const message = text(project.message || project.error, status === "complete" ? "Generated media is ready." : "Magic Hour is preparing the result.");
-  const prompt = text(project.prompt || style.prompt, message);
-  const model = text(project.model || style.model);
+  const message = text(project.message || project.error, "Magic Hour is preparing the result.");
+  const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
+  const model = optionalText(project.model) ?? optionalText(style.model);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
 
   const openDownload = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -137,15 +141,12 @@ export default function App() {
       </section>
       <section className="content">
         <span className="badge" data-tone={tone}>{capitalize(status)}</span>
-        <div>
-          <h1>{name}</h1>
-          <p className="summary">{message}</p>
-        </div>
+        <h1>{name}</h1>
         <details className="details">
           <summary>Generation details</summary>
           <dl className="detail-list">
-            <div className="detail"><dt>Model</dt><dd>{model}</dd></div>
-            <div className="detail"><dt>Prompt</dt><dd className="detail-copy">{prompt}</dd></div>
+            {model && <div className="detail"><dt>Model</dt><dd>{model}</dd></div>}
+            {prompt && <div className="detail"><dt>Prompt</dt><dd className="detail-copy">{prompt}</dd></div>}
             <div className="detail"><dt>Project ID</dt><dd>{text(project.id)}</dd></div>
             <div className="detail"><dt>Media</dt><dd>{capitalize(type)}</dd></div>
             <div className="detail"><dt>Credits</dt><dd>{project.credits_charged == null ? "—" : String(project.credits_charged)}</dd></div>
