@@ -58,7 +58,7 @@ MCP_SERVER_INSTRUCTIONS = (
 )
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
-MCP_SERVER_URL = "https://mcp.magichour.ai/mcp/"
+MCP_SERVER_URL = "https://mcp.magichour.ai/"
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (

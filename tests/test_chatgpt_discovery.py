@@ -86,6 +86,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(card["name"], MCP_SERVER_NAME)
         self.assertEqual(card["description"], MCP_SERVER_DESCRIPTION)
         self.assertEqual(card["version"], MCP_SERVER_VERSION)
+        self.assertEqual(MCP_SERVER_URL, "https://mcp.magichour.ai/")
         self.assertEqual(card["serverUrl"], MCP_SERVER_URL)
         self.assertGreater(len(card["tools"]), 0)
         self.assertTrue(
