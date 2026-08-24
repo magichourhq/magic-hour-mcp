@@ -36,6 +36,7 @@ The repo adds these custom helpers:
 - `wait_for_audio_project`
 - `fetch_image_download`
 - `fetch_audio_download`
+- `fetch_video_download`
 - `upload_file_to_presigned_url`
 
 OpenAPI policies add agent guidance by endpoint group rather than by individual endpoint.

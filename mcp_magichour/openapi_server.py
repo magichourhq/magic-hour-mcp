@@ -4,6 +4,7 @@ import asyncio
 import json
 import mimetypes
 import os
+from base64 import b64encode
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -14,7 +15,7 @@ from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import TextContent
+from mcp.types import BlobResourceContents, EmbeddedResource, TextContent
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -218,6 +219,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     _register_media_fetch_tool(mcp, "image")
     _register_media_fetch_tool(mcp, "audio")
+    _register_media_fetch_tool(mcp, "video")
 
 
 async def _upload_file_to_presigned_url(upload_url: str, local_file_path: str, content_type: str | None = None) -> dict[str, Any]:
@@ -242,20 +244,19 @@ class _LocalFileByteStream(httpx.AsyncByteStream):
                 yield chunk
 
 
-def _register_media_fetch_tool(mcp: FastMCP, media_type: Literal["image", "audio"]) -> None:
+def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
     tool_name = f"fetch_{media_type}_download"
+    content_kind = f"inline MCP {media_type} content" if media_type != "video" else "an embedded MCP binary resource"
     description = (
-        f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as inline MCP "
-        f"{media_type} content for Inspector or compatible clients. Pass the exact full signed URL from "
+        f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as "
+        f"{content_kind} for compatible clients. Pass the exact full signed URL from "
         "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
     )
 
     @mcp.tool(name=tool_name, description=description)
     async def fetch_download(download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES):
         data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
-        if media_type == "image":
-            return _media_content("image", data, mime_type)
-        return _media_content("audio", data, mime_type)
+        return _media_content(media_type, data, mime_type, source_uri=download_url)
 
 
 async def _wait_for_project(
@@ -310,6 +311,9 @@ async def _wait_for_project_result(
 async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:
     if max_bytes <= 0:
         raise ValueError("max_bytes must be greater than 0.")
+    parsed_url = urlparse(download_url)
+    if parsed_url.scheme != "https" or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname:
+        raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
 
     async with httpx.AsyncClient(timeout=API_TIMEOUT, follow_redirects=True) as client:
         async with client.stream("GET", download_url) as response:
@@ -403,10 +407,21 @@ def _can_inline_media(project_type: ProjectType, include_inline_downloads: bool,
     return include_inline_downloads and max_inline_downloads > 0 and project_type in {"image", "audio"}
 
 
-def _media_content(media_type: Literal["image", "audio"], data: bytes, mime_type: str) -> Any:
+def _media_content(media_type: ProjectType, data: bytes, mime_type: str, source_uri: str | None = None) -> Any:
     if media_type == "image":
         return Image(data=data).to_image_content(mime_type=mime_type)
-    return Audio(data=data).to_audio_content(mime_type=mime_type)
+    if media_type == "audio":
+        return Audio(data=data).to_audio_content(mime_type=mime_type)
+    if source_uri is None:
+        raise ValueError("source_uri is required for video content.")
+    return EmbeddedResource(
+        type="resource",
+        resource=BlobResourceContents(
+            uri=source_uri,
+            mimeType=mime_type,
+            blob=b64encode(data).decode("ascii"),
+        ),
+    )
 
 
 def _project_download_urls(project: dict[str, Any]) -> list[str]:
@@ -527,6 +542,8 @@ def _resolve_media_mime_type(download_url: str, header_value: str | None, expect
         return "image/png"
     if expected_prefix == "audio/":
         return "audio/wav"
+    if expected_prefix == "video/":
+        return "video/mp4"
 
     return "application/octet-stream"
 
