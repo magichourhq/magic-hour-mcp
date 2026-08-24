@@ -62,7 +62,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.headers["content-type"].startswith(MCP_APP_MIME_TYPE))
         self.assertEqual(response.headers["content-security-policy"], MCP_APP_VIEW_CSP)
         self.assertIn(
-            f'<meta http-equiv="Content-Security-Policy" content="{escape(MCP_APP_VIEW_CSP, quote=True)}">',
+            f'<meta http-equiv="Content-Security-Policy" content="{escape(MCP_APP_VIEW_CSP, quote=False)}">',
             response.text,
         )
         self.assertIn(f"connect-src {MCP_APP_SERVER_ORIGIN} {MCP_APP_ORIGIN}", MCP_APP_VIEW_CSP)
@@ -216,7 +216,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(view_content["_meta"]["ui"]["prefersBorder"])
         self.assertTrue(view_content["text"].startswith("<!DOCTYPE html>"))
         self.assertIn(
-            f'<meta http-equiv="Content-Security-Policy" content="{escape(MCP_APP_VIEW_CSP, quote=True)}">',
+            f'<meta http-equiv="Content-Security-Policy" content="{escape(MCP_APP_VIEW_CSP, quote=False)}">',
             view_content["text"],
         )
         self.assertNotIn("<base", view_content["text"].lower())

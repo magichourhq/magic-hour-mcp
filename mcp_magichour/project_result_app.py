@@ -32,4 +32,7 @@ def read_mcp_app_html() -> str:
         app_html = (MCP_APP_DIST_PATH / "index.html").read_text(encoding="utf-8")
     except FileNotFoundError:
         raise RuntimeError("MCP App frontend is missing; run `npm --prefix web run build`.") from None
-    return app_html.replace(_MCP_APP_CSP_PLACEHOLDER, escape(MCP_APP_VIEW_CSP, quote=True))
+    return app_html.replace(
+        _MCP_APP_CSP_PLACEHOLDER,
+        escape(MCP_APP_VIEW_CSP, quote=False).replace('"', "&quot;"),
+    )
