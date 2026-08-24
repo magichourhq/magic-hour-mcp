@@ -113,6 +113,7 @@ export default function App() {
   const name = text(project.name, `${capitalize(type)} project`);
   const message = text(project.message || project.error, status === "complete" ? "Generated media is ready." : "Magic Hour is preparing the result.");
   const prompt = text(project.prompt || style.prompt, message);
+  const model = text(project.model || style.model);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
 
   const openDownload = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -138,14 +139,19 @@ export default function App() {
         <span className="badge" data-tone={tone}>{capitalize(status)}</span>
         <div>
           <h1>{name}</h1>
-          <p className="summary">{prompt}</p>
+          <p className="summary">{message}</p>
         </div>
-        <dl className="details">
-          <div className="detail"><dt>Project</dt><dd>{text(project.id)}</dd></div>
-          <div className="detail"><dt>Media</dt><dd>{capitalize(type)}</dd></div>
-          <div className="detail"><dt>Credits</dt><dd>{project.credits_charged == null ? "—" : String(project.credits_charged)}</dd></div>
-          <div className="detail"><dt>Outputs</dt><dd>{urls.length}</dd></div>
-        </dl>
+        <details className="details">
+          <summary>Generation details</summary>
+          <dl className="detail-list">
+            <div className="detail"><dt>Model</dt><dd>{model}</dd></div>
+            <div className="detail"><dt>Prompt</dt><dd className="detail-copy">{prompt}</dd></div>
+            <div className="detail"><dt>Project ID</dt><dd>{text(project.id)}</dd></div>
+            <div className="detail"><dt>Media</dt><dd>{capitalize(type)}</dd></div>
+            <div className="detail"><dt>Credits</dt><dd>{project.credits_charged == null ? "—" : String(project.credits_charged)}</dd></div>
+            <div className="detail"><dt>Outputs</dt><dd>{urls.length}</dd></div>
+          </dl>
+        </details>
         <div className="actions">
           {downloadUrl && <a className="action" href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={openDownload}>Download</a>}
           {canFullscreen && <button className="action action-secondary" type="button" onClick={requestFullscreen}>Fullscreen</button>}
