@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 
-const observabilityBasePath = `${new URL(import.meta.env.BASE_URL).origin}/_vercel`;
+const observabilityBasePath = `${new URL(import.meta.env.BASE_URL).origin}/app/observability`;
 injectAnalytics({ basePath: observabilityBasePath });
 injectSpeedInsights({ basePath: observabilityBasePath });
 
