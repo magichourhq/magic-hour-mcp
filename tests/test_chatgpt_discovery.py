@@ -1,6 +1,7 @@
 import json
 import re
 import unittest
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -70,11 +71,34 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ui/notifications/tool-result", script_response.text)
         self.assertIn("ui/download-file", script_response.text)
         self.assertIn("ui/request-display-mode", script_response.text)
-        self.assertIn("/_vercel/insights/script.js", script_response.text)
-        self.assertIn("/_vercel/speed-insights/script.js", script_response.text)
+        self.assertIn("/app/observability", script_response.text)
         self.assertIn("prefers-color-scheme:dark", style_response.text)
         self.assertNotIn("<form", response.text.lower())
         self.assertNotIn('type="password"', response.text.lower())
+
+    def test_vercel_observability_relay_allows_mcp_iframes(self):
+        config = json.loads((Path(__file__).parents[1] / "vercel.json").read_text())
+
+        self.assertEqual(
+            config["rewrites"],
+            [
+                {
+                    "source": "/app/observability/:path*",
+                    "destination": "https://mcp.magichour.ai/_vercel/:path*",
+                }
+            ],
+        )
+        self.assertEqual(
+            config["headers"][0],
+            {
+                "source": "/app/observability/:path*",
+                "headers": [
+                    {"key": "Access-Control-Allow-Origin", "value": "*"},
+                    {"key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS"},
+                    {"key": "Access-Control-Allow-Headers", "value": "Content-Type"},
+                ],
+            },
+        )
 
     async def test_server_card_publicly_advertises_mcp_endpoint(self):
         async with httpx.AsyncClient(
