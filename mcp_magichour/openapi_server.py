@@ -4,25 +4,41 @@ import asyncio
 import json
 import mimetypes
 import os
+from base64 import b64encode
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import TextContent
+from mcp.types import BlobResourceContents, EmbeddedResource, TextContent
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import FileResponse
-from starlette.routing import Route
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
-from .oauth_compat import create_oauth_compatibility_app
+from .mcp_errors import install_structured_tool_errors
+from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
+from .project_result_app import (
+    MCP_APP_ASSET_PATH,
+    MCP_APP_DIST_PATH,
+    MCP_APP_MEDIA_ORIGIN,
+    MCP_APP_MIME_TYPE,
+    MCP_APP_ORIGIN,
+    MCP_APP_SERVER_ORIGIN,
+    MCP_APP_VIEW_CSP,
+    MCP_APP_VIEW_PATH,
+    MCP_APP_VIEW_URI,
+    read_mcp_app_html,
+)
 from .tool_logging import ToolCallLoggingMiddleware
 
 ProjectType = Literal["video", "image", "audio"]
@@ -34,6 +50,17 @@ API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
+MCP_SERVER_NAME = "magic-hour"
+MCP_SERVER_VERSION = "0.1.0"
+MCP_SERVER_INSTRUCTIONS = (
+    "Create and edit images, video, and audio with Magic Hour. Tool calls require authentication. "
+    "Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project. "
+    "Upload local media before passing its file_path, and preserve signed download URLs exactly as returned."
+)
+MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
+GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
+MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
+MCP_SERVER_URL = "https://mcp.magichour.ai/"
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
@@ -64,7 +91,9 @@ def create_mcp() -> FastMCP:
     mcp = FastMCP.from_openapi(
         openapi_spec=spec,
         client=build_api_client(),
-        name="magic-hour",
+        name=MCP_SERVER_NAME,
+        version=MCP_SERVER_VERSION,
+        instructions=MCP_SERVER_INSTRUCTIONS,
         route_maps=[
             RouteMap(methods=["POST"], pattern=r".*", mcp_type=MCPType.TOOL, mcp_tags={"write-operation"}),
             RouteMap(pattern=r".*", mcp_type=MCPType.TOOL),
@@ -74,11 +103,31 @@ def create_mcp() -> FastMCP:
 
     register_custom_tools(mcp)
     mcp.add_middleware(ToolCallLoggingMiddleware())
+    mcp.add_middleware(MCPToolOAuthMiddleware())
+    install_structured_tool_errors(mcp)
     return mcp
 
 
 def register_custom_tools(mcp: FastMCP) -> None:
-    @mcp.tool(name="ping", description="Check that the Magic Hour MCP server is reachable.")
+    @mcp.resource(
+        MCP_APP_VIEW_URI,
+        name="Magic Hour project result",
+        description="Render completed or terminal Magic Hour project results in MCP Apps hosts.",
+        app=AppConfig(
+            csp=ResourceCSP(
+                connect_domains=[MCP_APP_SERVER_ORIGIN, MCP_APP_ORIGIN],
+                resource_domains=[MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
+            ),
+            prefers_border=True,
+        ),
+    )
+    def mcp_app_view() -> str:
+        return read_mcp_app_html()
+
+    @mcp.tool(
+        name="ping",
+        description="Check that the Magic Hour MCP server is reachable.",
+    )
     def ping() -> str:
         return "pong"
 
@@ -88,9 +137,23 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "Poll a video project until it completes, errors, is canceled, or times out. "
             f"{SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
-    async def wait_for_video_project(id: str, poll_interval_seconds: float = 2.0, timeout_seconds: float = 300.0) -> ToolResult:
-        return await _wait_for_project_result("video", id, poll_interval_seconds, timeout_seconds)
+    async def wait_for_video_project(
+        id: str,
+        poll_interval_seconds: float = 2.0,
+        timeout_seconds: float = 300.0,
+        include_inline_downloads: bool = False,
+        max_inline_downloads: int = 0,
+    ) -> ToolResult:
+        return await _wait_for_project_result(
+            "video",
+            id,
+            poll_interval_seconds,
+            timeout_seconds,
+            include_inline_downloads=include_inline_downloads,
+            max_inline_downloads=max_inline_downloads,
+        )
 
     @mcp.tool(
         name="wait_for_image_project",
@@ -99,6 +162,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
     async def wait_for_image_project(
         id: str,
@@ -125,6 +189,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
     async def wait_for_audio_project(
         id: str,
@@ -157,6 +222,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     _register_media_fetch_tool(mcp, "image")
     _register_media_fetch_tool(mcp, "audio")
+    _register_media_fetch_tool(mcp, "video")
 
 
 async def _upload_file_to_presigned_url(upload_url: str, local_file_path: str, content_type: str | None = None) -> dict[str, Any]:
@@ -181,20 +247,19 @@ class _LocalFileByteStream(httpx.AsyncByteStream):
                 yield chunk
 
 
-def _register_media_fetch_tool(mcp: FastMCP, media_type: Literal["image", "audio"]) -> None:
+def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
     tool_name = f"fetch_{media_type}_download"
+    content_kind = f"inline MCP {media_type} content" if media_type != "video" else "an embedded MCP binary resource"
     description = (
-        f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as inline MCP "
-        f"{media_type} content for Inspector or compatible clients. Pass the exact full signed URL from "
+        f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as "
+        f"{content_kind} for compatible clients. Pass the exact full signed URL from "
         "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
     )
 
     @mcp.tool(name=tool_name, description=description)
     async def fetch_download(download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES):
         data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
-        if media_type == "image":
-            return _media_content("image", data, mime_type)
-        return _media_content("audio", data, mime_type)
+        return _media_content(media_type, data, mime_type, source_uri=download_url)
 
 
 async def _wait_for_project(
@@ -249,6 +314,9 @@ async def _wait_for_project_result(
 async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:
     if max_bytes <= 0:
         raise ValueError("max_bytes must be greater than 0.")
+    parsed_url = urlparse(download_url)
+    if parsed_url.scheme != "https" or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname:
+        raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
 
     async with httpx.AsyncClient(timeout=API_TIMEOUT, follow_redirects=True) as client:
         async with client.stream("GET", download_url) as response:
@@ -333,17 +401,30 @@ async def _project_to_tool_result(
             )
         )
 
-    return ToolResult(content=content, structured_content=_project_structured_content_for_agent(project))
+    structured_content = _project_structured_content_for_agent(project)
+    structured_content["project_type"] = project_type
+    return ToolResult(content=content, structured_content=structured_content)
 
 
 def _can_inline_media(project_type: ProjectType, include_inline_downloads: bool, max_inline_downloads: int) -> bool:
     return include_inline_downloads and max_inline_downloads > 0 and project_type in {"image", "audio"}
 
 
-def _media_content(media_type: Literal["image", "audio"], data: bytes, mime_type: str) -> Any:
+def _media_content(media_type: ProjectType, data: bytes, mime_type: str, source_uri: str | None = None) -> Any:
     if media_type == "image":
         return Image(data=data).to_image_content(mime_type=mime_type)
-    return Audio(data=data).to_audio_content(mime_type=mime_type)
+    if media_type == "audio":
+        return Audio(data=data).to_audio_content(mime_type=mime_type)
+    if source_uri is None:
+        raise ValueError("source_uri is required for video content.")
+    return EmbeddedResource(
+        type="resource",
+        resource=BlobResourceContents(
+            uri=source_uri,
+            mimeType=mime_type,
+            blob=b64encode(data).decode("ascii"),
+        ),
+    )
 
 
 def _project_download_urls(project: dict[str, Any]) -> list[str]:
@@ -464,6 +545,8 @@ def _resolve_media_mime_type(download_url: str, header_value: str | None, expect
         return "image/png"
     if expected_prefix == "audio/":
         return "audio/wav"
+    if expected_prefix == "video/":
+        return "video/mp4"
 
     return "application/octet-stream"
 
@@ -483,15 +566,65 @@ middleware = [
 
 # Path "/" preserves the existing repo convention: standalone dev runs at root,
 # and a host app can mount this ASGI app at "/mcp" without producing "/mcp/mcp".
-mcp_app = mcp.http_app(path="/", middleware=middleware)
+mcp_app = mcp.http_app(path="/", middleware=middleware, stateless_http=True)
 
 
 async def favicon(_: Request) -> FileResponse:
     return FileResponse(FAVICON_PATH, media_type="image/x-icon")
 
 
+async def mcp_app_http_view(_: Request) -> HTMLResponse:
+    return HTMLResponse(
+        read_mcp_app_html(),
+        media_type=MCP_APP_MIME_TYPE,
+        headers={"Content-Security-Policy": MCP_APP_VIEW_CSP},
+    )
+
+
+async def mcp_server_card(_: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "name": MCP_SERVER_NAME,
+            "description": MCP_SERVER_DESCRIPTION,
+            "version": MCP_SERVER_VERSION,
+            "serverUrl": MCP_SERVER_URL,
+            "tools": [
+                tool.model_dump(mode="json", by_alias=True, exclude_none=True)
+                for tool in await mcp.list_tools()
+            ],
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
+async def glama_verification(_: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "$schema": "https://glama.ai/mcp/schemas/connector.json",
+            "maintainers": [{"email": "support@magichour.ai"}],
+        }
+    )
+
+
+mcp_app_assets = CORSMiddleware(
+    StaticFiles(directory=MCP_APP_DIST_PATH, check_dir=False),
+    allow_origins=["*"],
+    allow_methods=["GET"],
+)
+
 app = create_oauth_compatibility_app(
     mcp_app,
-    public_routes=[Route("/favicon.ico", favicon, methods=["GET"])],
+    public_routes=[
+        Route("/favicon.ico", favicon, methods=["GET"]),
+        Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
+        Mount(MCP_APP_ASSET_PATH, app=mcp_app_assets),
+        Route(MCP_SERVER_CARD_PATH, mcp_server_card, methods=["GET"]),
+        Route(GLAMA_VERIFICATION_PATH, glama_verification, methods=["GET"]),
+    ],
 )
 lifespan = app.router.lifespan_context

@@ -17,10 +17,16 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 import httpx
+from fastmcp.server.dependencies import get_http_request
+from fastmcp.server.middleware import Middleware, MiddlewareContext
+from fastmcp.tools.base import Tool, ToolResult
+from mcp.types import TextContent
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import BaseRoute, Mount, Route
+
+from .openapi_auth import AuthError, current_authorization_header
 
 
 CODE_TTL_SECONDS = 300
@@ -41,6 +47,7 @@ PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 ApiKeyValidator = Callable[[str], Awaitable[bool]]
 logger = logging.getLogger("uvicorn.error.mcp_oauth")
+OAUTH_SECURITY_SCHEMES = [{"type": "oauth2", "scopes": []}]
 
 
 class OAuthCapacityError(Exception):
@@ -423,7 +430,7 @@ class OAuthCompatibilityServer:
 
 
 class MCPBearerChallengeMiddleware:
-    """Require bearer syntax before MCP; key validity remains downstream's job."""
+    """Preserve HTTP auth challenges while allowing public MCP discovery."""
 
     def __init__(self, app: Any, oauth_server: OAuthCompatibilityServer) -> None:
         self.app = app
@@ -434,7 +441,7 @@ class MCPBearerChallengeMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if scope.get("method") == "OPTIONS":
+        if scope.get("method") in {"OPTIONS", "POST"}:
             await self.app(scope, receive, send)
             return
 
@@ -469,6 +476,42 @@ class MCPBearerChallengeMiddleware:
             return
 
         await self.app(scope, receive, send)
+
+
+class _OAuthListedTool(Tool):
+    def to_mcp_tool(self, **overrides: Any):
+        tool = super().to_mcp_tool(**overrides)
+        tool.securitySchemes = OAUTH_SECURITY_SCHEMES
+        return tool
+
+
+class MCPToolOAuthMiddleware(Middleware):
+    """Advertise OAuth during discovery and challenge unauthenticated tool calls."""
+
+    async def on_list_tools(self, context: MiddlewareContext, call_next: Any):
+        tools = await call_next(context)
+        return [
+            _OAuthListedTool(**{name: getattr(tool, name) for name in Tool.model_fields})
+            for tool in tools
+        ]
+
+    async def on_call_tool(self, context: MiddlewareContext, call_next: Any) -> ToolResult:
+        try:
+            current_authorization_header()
+        except AuthError:
+            issuer = (
+                OAuthSettings.from_env().issuer_url or str(get_http_request().base_url)
+            ).rstrip("/")
+            challenge = (
+                f'Bearer resource_metadata="{issuer}/.well-known/oauth-protected-resource", '
+                'error="invalid_token", error_description="Authentication required"'
+            )
+            return ToolResult(
+                content=[TextContent(type="text", text="Authentication required.")],
+                meta={"mcp/www_authenticate": [challenge]},
+                is_error=True,
+            )
+        return await call_next(context)
 
 
 def _accepts_html(scope: Mapping[str, Any]) -> bool:

@@ -96,7 +96,7 @@ Do not shorten the URL, remove query parameters, or append `expires_at`.
 If a link shows `SignatureDoesNotMatch`, ask the assistant for the exact download URL again.
 
 For inputs, prefer an uploaded file or existing Magic Hour `file_path`. The
-upload tool is `videoAssets_generatePresignedUrl`; despite its name, it accepts
+upload tool is `video_assets_generate_presigned_url`; it accepts
 image, audio, and video files.
 
 ## Troubleshooting

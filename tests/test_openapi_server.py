@@ -1,4 +1,6 @@
+import re
 import unittest
+from base64 import b64encode
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, patch
@@ -7,6 +9,7 @@ import httpx
 
 from mcp_magichour.openapi_server import (
     _project_download_guidance_text,
+    _fetch_media_bytes,
     _project_status_text,
     _project_structured_content_for_agent,
     _project_to_tool_result,
@@ -38,9 +41,47 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("fetch_image_download", names)
         self.assertIn("fetch_audio_download", names)
+        self.assertIn("fetch_video_download", names)
         self.assertIn("wait_for_video_project", names)
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)
+
+    async def test_video_download_is_returned_as_embedded_binary_resource(self):
+        url = "https://videos.magichour.ai/id/output.mp4?sig=123"
+
+        tool = await mcp.get_tool("fetch_video_download")
+        with patch(
+            "mcp_magichour.openapi_server._fetch_media_bytes",
+            new=AsyncMock(return_value=(b"video-bytes", "video/mp4")),
+        ):
+            result = await tool.run({"download_url": url})
+
+        content = result.content[0]
+        self.assertEqual(content.type, "resource")
+        self.assertEqual(str(content.resource.uri), url)
+        self.assertEqual(content.resource.mimeType, "video/mp4")
+        self.assertEqual(content.resource.blob, b64encode(b"video-bytes").decode("ascii"))
+
+    async def test_media_fetch_rejects_non_magic_hour_url(self):
+        with self.assertRaisesRegex(ValueError, "download_url must use https://videos.magichour.ai"):
+            await _fetch_media_bytes("https://example.test/output.mp4", "video/", 1024)
+
+    async def test_video_wait_accepts_shared_inline_options(self):
+        tool = next(tool for tool in await mcp.list_tools() if tool.name == "wait_for_video_project")
+        properties = tool.parameters["properties"]
+
+        self.assertEqual(properties["include_inline_downloads"]["default"], False)
+        self.assertEqual(properties["max_inline_downloads"]["default"], 0)
+
+    async def test_all_tool_names_follow_descriptive_snake_case_convention(self):
+        names = {tool.name for tool in await mcp.list_tools()}
+
+        self.assertIn("ping", names)
+        self.assertIn("ai_image_generator_create_image", names)
+        self.assertIn("face_detection_retrieve_details", names)
+        self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in names))
+        self.assertTrue(all(len(name) >= 4 for name in names))
+        self.assertTrue(all(not {"do", "get", "run"}.intersection(name.split("_")) for name in names))
 
     def test_resolve_media_mime_type_prefers_matching_header(self):
         mime_type = _resolve_media_mime_type(
@@ -59,6 +100,15 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(mime_type, "audio/mpeg")
+
+    def test_resolve_video_mime_type_has_safe_fallback(self):
+        mime_type = _resolve_media_mime_type(
+            "https://videos.magichour.ai/id/output",
+            "application/octet-stream",
+            "video/",
+        )
+
+        self.assertEqual(mime_type, "video/mp4")
 
     async def test_upload_file_to_presigned_url_sends_bytes_with_async_client(self):
         class FakeResponse:
@@ -136,6 +186,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.structured_content["exact_download_urls"], ["https://videos.magichour.ai/id/output.png?sig=123"])
         self.assertEqual(result.structured_content["downloads"], [{"url": "https://videos.magichour.ai/id/output.png?sig=123"}])
+        self.assertEqual(result.structured_content["project_type"], "image")
         self.assertNotIn("expires_at", result.structured_content["downloads"][0])
         self.assertEqual(result.content[0].text, "Image project img-123 completed with 1 download(s).")
         self.assertIn("EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.png?sig=123", result.content[1].text)
@@ -163,6 +214,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.structured_content["exact_download_urls"], ["https://videos.magichour.ai/id/output.mp4?sig=123"])
         self.assertEqual(result.structured_content["downloads"], [{"url": "https://videos.magichour.ai/id/output.mp4?sig=123"}])
+        self.assertEqual(result.structured_content["project_type"], "video")
         self.assertEqual(result.structured_content["download_expiration_metadata"][0]["expires_at"], "2026-07-04T15:23:44.751Z")
         self.assertNotIn("expires_at", result.structured_content["downloads"][0])
         self.assertEqual(result.content[0].text, "Video project vid-123 completed with 1 download(s).")

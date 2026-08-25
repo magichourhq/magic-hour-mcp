@@ -17,14 +17,14 @@ The internal FastMCP app is intentionally configured for `/`, not `/mcp`.
 
 At startup, the server reads `docs/openapi.json` and builds tools with `FastMCP.from_openapi()`.
 
-The generated tool names come from OpenAPI `operationId` values. Examples:
+OpenAPI `operationId` values are normalized to descriptive snake_case tool names. Examples:
 
-- `videoAssets_generatePresignedUrl`
-- `aiImageGenerator_createImage`
-- `imageProjects_getDetails`
-- `videoProjects_getDetails`
+- `video_assets_generate_presigned_url`
+- `ai_image_generator_create_image`
+- `image_projects_retrieve_details`
+- `video_projects_retrieve_details`
 
-`videoAssets_generatePresignedUrl` is the shared `/v1/files/upload-urls` endpoint even though the generated name says `videoAssets`. It accepts `video`, `audio`, and `image` asset items.
+`video_assets_generate_presigned_url` is the shared `/v1/files/upload-urls` endpoint. It accepts `video`, `audio`, and `image` asset items.
 
 Do not hand-register Magic Hour endpoints in the host backend. Update
 `docs/openapi.json` and restart the MCP server to pick up new endpoints.
@@ -36,6 +36,7 @@ The repo adds these custom helpers:
 - `wait_for_audio_project`
 - `fetch_image_download`
 - `fetch_audio_download`
+- `fetch_video_download`
 - `upload_file_to_presigned_url`
 
 OpenAPI policies add agent guidance by endpoint group rather than by individual endpoint.
@@ -109,7 +110,7 @@ MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
 Use MCP Inspector against `/mcp/` with the bearer header, then verify:
 
 1. `ping` returns `pong`.
-2. `videoAssets_generatePresignedUrl` returns `upload_url`, `expires_at`, and
+2. `video_assets_generate_presigned_url` returns `upload_url`, `expires_at`, and
    `file_path` for a valid key.
 3. A create tool returns `{id, credits_charged}`.
 4. Its `wait_for_*_project` helper reaches a terminal state.

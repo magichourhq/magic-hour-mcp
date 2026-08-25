@@ -24,7 +24,7 @@ dependency management, tests, and existing upload flow. Reuse those patterns.
 
 1. Start the host app with `/mcp/` mounted.
 2. Confirm `ping` returns `pong` through MCP Inspector.
-3. Call `videoAssets_generatePresignedUrl` with a valid key.
+3. Call `video_assets_generate_presigned_url` with a valid key.
 4. Run one real create-and-wait flow only when credit spending is approved.
 5. Confirm a bad key returns `401` without affecting the host app.
 
@@ -34,7 +34,7 @@ Use `exact_download_urls` exactly as returned. Never append `expires_at` or
 ## Upload rule
 
 MCP arguments do not carry raw file bytes. Call
-`videoAssets_generatePresignedUrl`, upload bytes outside MCP, then pass the
+`video_assets_generate_presigned_url`, upload bytes outside MCP, then pass the
 returned `file_path` to the create tool. The upload tool accepts image, audio,
 and video files despite its name.
 

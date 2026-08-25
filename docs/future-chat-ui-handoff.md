@@ -7,12 +7,12 @@ provide a browser upload UI or upload bridge.
 ## Required flow
 
 1. The user selects a file in the chat UI.
-2. The app gets a presigned URL from `videoAssets_generatePresignedUrl`.
+2. The app gets a presigned URL from `video_assets_generate_presigned_url`.
 3. The browser or backend uploads the bytes.
 4. The app passes the returned `file_path` to the create tool.
 5. The chat resumes with the project ID and polls through `wait_for_*_project`.
 
-Despite its name, `videoAssets_generatePresignedUrl` accepts image, audio, and
+`video_assets_generate_presigned_url` accepts image, audio, and
 video files.
 
 ## Choose upload ownership

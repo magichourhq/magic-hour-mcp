@@ -7,3 +7,5 @@ __pycache__/
 CLAUDE.md
 throwaway
 magic hour testing/
+web/node_modules/
+mcp_magichour/static/project-result/

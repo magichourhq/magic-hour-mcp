@@ -1,5 +1,7 @@
 # Magic Hour MCP Server
 
+[![smithery badge](https://smithery.ai/badge/magichourhq/magic-hour)](https://smithery.ai/servers/magichourhq/magic-hour)
+
 OpenAPI-backed MCP server for Magic Hour image, video, and audio generation.
 
 At startup, this server reads `docs/openapi.json` and builds MCP tools with
@@ -40,10 +42,16 @@ By default, requests go to the production Magic Hour API:
 https://api.magichour.ai
 ```
 
-Every MCP request must include your Magic Hour API key:
+Tool discovery is public. Tool calls must include your Magic Hour API key:
 
 ```text
 Authorization: Bearer <magic_hour_api_key>
+```
+
+Agents can discover the hosted server card at:
+
+```text
+https://mcp.magichour.ai/.well-known/mcp/server-card.json
 ```
 
 Environment variables:
@@ -80,23 +88,25 @@ limits.
    - URL: `http://127.0.0.1:8000/`
    - Header: `Authorization: Bearer <magic_hour_api_key>`
 4. Call `ping`.
-5. Call `videoAssets_generatePresignedUrl` or another generated tool.
+5. Call `video_assets_generate_presigned_url` or another generated tool.
 
 Notes:
 
 - FastMCP generates endpoint tools from OpenAPI at startup.
 - Creation tools return `id` and `credits_charged` immediately.
-- Tool names come from OpenAPI `operationId` values.
-- The shared `/v1/files/upload-urls` endpoint is named `videoAssets_generatePresignedUrl` because that is its upstream `operationId`. It accepts `video`, `audio`, and `image` items.
+- OpenAPI `operationId` values are normalized to descriptive snake_case tool names.
+- The shared `/v1/files/upload-urls` endpoint is named `video_assets_generate_presigned_url`. It accepts `video`, `audio`, and `image` items.
 - Use `wait_for_*_project` to poll jobs. Use `exact_download_urls` exactly as
   returned; never append expiration metadata.
 - Image and audio wait tools also return inline media when supported.
+
+Rebuild and type-check the MCP App UI with `cd web && npm ci && npm run build`.
 
 ## File uploads
 
 Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
 
-1. Call the generated shared upload-URL tool, currently `videoAssets_generatePresignedUrl`
+1. Call the generated shared upload-URL tool, `video_assets_generate_presigned_url`
 2. Upload the file bytes to the returned `upload_url`
 3. Pass the returned `file_path` into the generated creation tool
 
