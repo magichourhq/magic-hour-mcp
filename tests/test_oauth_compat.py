@@ -130,6 +130,19 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(query["state"], ["client-state"])
         return query["code"][0]
 
+    async def register_client(self, redirect_uri="https://client.example/callback"):
+        response = await self.client.post(
+            "/register",
+            json={
+                "redirect_uris": [redirect_uri],
+                "token_endpoint_auth_method": "none",
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        return response.json()
+
     async def test_authorization_code_pkce_flow_returns_original_key_once(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
         self.assertEqual(page.status_code, 200)
@@ -157,6 +170,63 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         replay = await self.client.post("/token", data=token_request)
         self.assertEqual(replay.status_code, 400)
         self.assertEqual(replay.json()["error"], "invalid_grant")
+
+    async def test_dynamic_client_registration_supports_full_code_flow(self):
+        redirect_uri = "http://127.0.0.1:49152/callback"
+        registration = await self.register_client(redirect_uri)
+        client_id = registration["client_id"]
+        self.assertEqual(
+            registration,
+            {
+                "client_id": client_id,
+                "redirect_uris": [redirect_uri],
+                "token_endpoint_auth_method": "none",
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+            },
+        )
+
+        params = self.authorization_params(client_id=client_id, redirect_uri=redirect_uri)
+        authorized = await self.client.post(
+            "/authorize",
+            data={**params, "api_key": "sk_valid"},
+        )
+        self.assertEqual(authorized.status_code, 302)
+        code = parse_qs(urlsplit(authorized.headers["location"]).query)["code"][0]
+        token_request = {
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code": code,
+            "code_verifier": VERIFIER,
+            "resource": RESOURCE,
+        }
+        wrong_client = await self.client.post(
+            "/token",
+            data={**token_request, "client_id": CLIENT_ID},
+        )
+        self.assertEqual(wrong_client.json()["error"], "invalid_grant")
+
+        token = await self.client.post("/token", data=token_request)
+        self.assertEqual(token.status_code, 200)
+        self.assertEqual(token.json()["access_token"], "sk_valid")
+
+    async def test_registration_rejects_unsafe_redirect_and_confidential_client(self):
+        for metadata, error in (
+            ({"redirect_uris": ["http://evil.example/callback"]}, "invalid_redirect_uri"),
+            ({"redirect_uris": ["https://[malformed"]}, "invalid_redirect_uri"),
+            (
+                {
+                    "redirect_uris": ["https://client.example/callback"],
+                    "token_endpoint_auth_method": "client_secret_basic",
+                },
+                "invalid_client_metadata",
+            ),
+        ):
+            with self.subTest(metadata=metadata):
+                response = await self.client.post("/register", json=metadata)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["error"], error)
 
     async def test_authorization_page_preserves_form_and_asset_contracts(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
@@ -299,15 +369,11 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_invalid_redirect_uri_is_rejected_before_key_validation(self):
         redirect_uris = [
-            "https://evil.example/callback",
-            "https://chatgpt.com/connector/oauth/",
-            "https://chatgpt.com/connector/oauth/replacement-connector-id",
-            "https://chatgpt.com.evil.example/connector/oauth/id",
-            "http://localhost:8788/callback",
-            "http://localhost:8787/callback/extra",
-            "http://localhost:8787/callback?next=evil",
+            "http://evil.example/callback",
             "http://localhost:8787/callback#fragment",
             "http://localhost.evil.example:8787/callback",
+            "https://user:password@example.com/callback",
+            "https://[malformed",
         ]
 
         for redirect_uri in redirect_uris:
@@ -463,7 +529,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         authorization = await self.client.get("/.well-known/oauth-authorization-server")
         self.assertEqual(authorization.json()["code_challenge_methods_supported"], ["S256"])
         self.assertEqual(authorization.json()["token_endpoint"], "https://mcp.example/token")
-        self.assertNotIn("registration_endpoint", authorization.json())
+        self.assertEqual(authorization.json()["registration_endpoint"], "https://mcp.example/register")
 
         resource = await self.client.get("/.well-known/oauth-protected-resource")
         self.assertEqual(resource.json()["resource"], RESOURCE)
@@ -515,6 +581,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         store = AuthorizationCodeStore(ttl_seconds=0)
         code = store.issue(
             api_key="sk_valid",
+            client_id=CLIENT_ID,
             redirect_uri=REDIRECT_URI,
             code_challenge=CHALLENGE,
             resource=RESOURCE,
