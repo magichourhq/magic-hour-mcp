@@ -460,11 +460,66 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         authorization = await self.client.get("/.well-known/oauth-authorization-server")
         self.assertEqual(authorization.json()["code_challenge_methods_supported"], ["S256"])
         self.assertEqual(authorization.json()["token_endpoint"], "https://mcp.example/token")
-        self.assertNotIn("registration_endpoint", authorization.json())
+        self.assertEqual(authorization.json()["registration_endpoint"], "https://mcp.example/register")
 
         resource = await self.client.get("/.well-known/oauth-protected-resource")
         self.assertEqual(resource.json()["resource"], RESOURCE)
         self.assertEqual(resource.json()["authorization_servers"], ["https://mcp.example"])
+
+    async def test_dynamic_client_registration_supports_custom_connector_callback(self):
+        registration = await self.client.post(
+            "/register",
+            json={
+                "client_name": "ChatGPT Business",
+                "redirect_uris": ["https://chatgpt.com/connector/oauth/business-callback"],
+            },
+        )
+        self.assertEqual(registration.status_code, 201)
+        registered = registration.json()
+        self.assertTrue(registered["client_id"].startswith("mcp_"))
+        self.assertEqual(
+            registered["redirect_uris"],
+            ["https://chatgpt.com/connector/oauth/business-callback"],
+        )
+
+        params = self.authorization_params(
+            client_id=registered["client_id"],
+            redirect_uri=registered["redirect_uris"][0],
+        )
+        authorized = await self.client.post(
+            "/authorize",
+            data={**params, "api_key": "sk_valid"},
+        )
+        self.assertEqual(authorized.status_code, 302)
+        code = parse_qs(urlsplit(authorized.headers["location"]).query)["code"][0]
+
+        token = await self.client.post(
+            "/token",
+            data={
+                "grant_type": "authorization_code",
+                "client_id": registered["client_id"],
+                "redirect_uri": params["redirect_uri"],
+                "code": code,
+                "code_verifier": VERIFIER,
+                "resource": RESOURCE,
+            },
+        )
+        self.assertEqual(token.status_code, 200)
+        self.assertEqual(token.json(), {"access_token": "sk_valid", "token_type": "Bearer"})
+
+    async def test_dynamic_registration_rejects_insecure_or_query_callback(self):
+        for redirect_uri in (
+            "https://evil.example/callback?next=evil",
+            "http://evil.example/callback",
+            "https://chatgpt.com/connector/oauth/callback#fragment",
+        ):
+            with self.subTest(redirect_uri=redirect_uri):
+                response = await self.client.post(
+                    "/register",
+                    json={"redirect_uris": [redirect_uri]},
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["error"], "invalid_redirect_uri")
 
     async def test_default_key_validator_only_accepts_authenticated_validation_response(self):
         class FakeClient:

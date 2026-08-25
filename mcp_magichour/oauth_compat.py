@@ -49,11 +49,18 @@ class OAuthCapacityError(Exception):
 
 @dataclass(frozen=True)
 class AuthorizationCode:
+    client_id: str
     api_key: str
     redirect_uri: str
     code_challenge: str
     resource: str | None
     expires_at: float
+
+
+@dataclass(frozen=True)
+class RegisteredClient:
+    client_id: str
+    redirect_uris: tuple[str, ...]
 
 
 class AuthorizationCodeStore:
@@ -67,6 +74,7 @@ class AuthorizationCodeStore:
     def issue(
         self,
         *,
+        client_id: str = OAUTH_CLIENT_ID,
         api_key: str,
         redirect_uri: str,
         code_challenge: str,
@@ -75,6 +83,7 @@ class AuthorizationCodeStore:
         code = secrets.token_urlsafe(32)
         now = monotonic()
         authorization_code = AuthorizationCode(
+            client_id=client_id,
             api_key=api_key,
             redirect_uri=redirect_uri,
             code_challenge=code_challenge,
@@ -153,11 +162,13 @@ class OAuthCompatibilityServer:
         self.codes = code_store or AuthorizationCodeStore()
         self.validate_api_key = api_key_validator or self._validate_api_key
         self._validation_slots = asyncio.Semaphore(MAX_CONCURRENT_VALIDATIONS)
+        self._registered_clients: dict[str, RegisteredClient] = {}
 
     def routes(self) -> list[Route]:
         return [
             Route("/authorize", self.authorize, methods=["GET", "POST"]),
             Route("/token", self.token, methods=["POST"]),
+            Route("/register", self.register, methods=["POST"]),
             Route("/.well-known/oauth-authorization-server", self.authorization_server_metadata),
             Route("/.well-known/oauth-protected-resource", self.protected_resource_metadata),
             Route("/.well-known/oauth-protected-resource/mcp", self.protected_resource_metadata),
@@ -207,6 +218,7 @@ class OAuthCompatibilityServer:
 
         try:
             code = self.codes.issue(
+                client_id=authorization["client_id"],
                 api_key=api_key,
                 redirect_uri=authorization["redirect_uri"],
                 code_challenge=authorization["code_challenge"],
@@ -239,7 +251,15 @@ class OAuthCompatibilityServer:
                 "Authorization code is invalid or expired",
             )
 
-        if not hmac.compare_digest(params.get("client_id", ""), OAUTH_CLIENT_ID):
+        client_id = params.get("client_id", "")
+        client = self._client(client_id)
+        if client is None:
+            return _token_rejection(
+                "client_mismatch",
+                "invalid_grant",
+                "Authorization code does not match client",
+            )
+        if not hmac.compare_digest(client_id, authorization.client_id):
             return _token_rejection(
                 "client_mismatch",
                 "invalid_grant",
@@ -294,11 +314,47 @@ class OAuthCompatibilityServer:
                 "issuer": issuer,
                 "authorization_endpoint": f"{issuer}/authorize",
                 "token_endpoint": f"{issuer}/token",
+                "registration_endpoint": f"{issuer}/register",
                 "response_types_supported": ["code"],
                 "grant_types_supported": ["authorization_code"],
                 "code_challenge_methods_supported": ["S256"],
                 "token_endpoint_auth_methods_supported": ["none"],
             }
+        )
+
+    async def register(self, request: Request) -> Response:
+        try:
+            payload = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            return _oauth_error("invalid_client_metadata", "Request body must be JSON")
+
+        redirect_uris = payload.get("redirect_uris") if isinstance(payload, dict) else None
+        if (
+            not isinstance(redirect_uris, list)
+            or not redirect_uris
+            or any(not isinstance(uri, str) or not _valid_redirect_uri(uri) for uri in redirect_uris)
+            or len(set(redirect_uris)) != len(redirect_uris)
+        ):
+            return _oauth_error(
+                "invalid_redirect_uri",
+                "redirect_uris must contain unique HTTPS or localhost callback URLs",
+            )
+
+        client_id = f"mcp_{secrets.token_urlsafe(24)}"
+        self._registered_clients[client_id] = RegisteredClient(
+            client_id=client_id,
+            redirect_uris=tuple(redirect_uris),
+        )
+        return JSONResponse(
+            {
+                "client_id": client_id,
+                "client_name": payload.get("client_name"),
+                "redirect_uris": redirect_uris,
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+                "token_endpoint_auth_method": "none",
+            },
+            status_code=201,
         )
 
     async def protected_resource_metadata(self, request: Request) -> Response:
@@ -329,7 +385,8 @@ class OAuthCompatibilityServer:
 
         if params.get("response_type") != "code":
             raise OAuthRequestError("unsupported_response_type", "response_type must be code")
-        if client_id != OAUTH_CLIENT_ID or redirect_uri not in ALLOWED_REDIRECT_URIS:
+        client = self._client(client_id)
+        if client is None or redirect_uri not in client.redirect_uris:
             raise OAuthRequestError("invalid_request", "Unknown client or redirect_uri")
         if params.get("code_challenge_method") != "S256" or not CHALLENGE_RE.fullmatch(challenge):
             raise OAuthRequestError("invalid_request", "PKCE S256 code_challenge is required")
@@ -342,6 +399,11 @@ class OAuthCompatibilityServer:
             "code_challenge": challenge,
             "resource": resource,
         }
+
+    def _client(self, client_id: str) -> RegisteredClient | None:
+        if client_id == OAUTH_CLIENT_ID:
+            return RegisteredClient(client_id=client_id, redirect_uris=tuple(ALLOWED_REDIRECT_URIS))
+        return self._registered_clients.get(client_id)
 
     async def _validate_api_key(self, api_key: str) -> bool:
         async with httpx.AsyncClient(base_url=self.settings.api_base_url, timeout=10.0) as client:
@@ -597,7 +659,7 @@ def _authorization_page(
       <a href="https://magichour.ai/developer?tab=api-keys" target="_blank" rel="noopener noreferrer">Create your API key</a>
     </div>
     <div class="api-key-control">
-      <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="new-password" autocapitalize="none" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" autofocus{error_attributes}>
+    <input id="api-key" name="api_key" type="password" placeholder="mhk_live_…" required autocomplete="off" autocapitalize="none" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" autofocus{error_attributes}>
       <button id="api-key-visibility" class="visibility-toggle" type="button" aria-label="Show API key" aria-pressed="false">Show</button>
     </div>
     {error_html}
@@ -699,6 +761,10 @@ def _valid_server_url(uri: str) -> bool:
     if parts.scheme == "https":
         return True
     return parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"}
+
+
+def _valid_redirect_uri(uri: str) -> bool:
+    return _valid_server_url(uri)
 
 
 def _validate_settings(settings: OAuthSettings) -> None:
