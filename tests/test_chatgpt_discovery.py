@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from mcp_magichour.openapi_server import (
+    GLAMA_VERIFICATION_PATH,
     MCP_APP_ASSET_PATH,
     MCP_APP_MEDIA_ORIGIN,
     MCP_APP_MIME_TYPE,
@@ -137,6 +138,23 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ping", {tool["name"] for tool in card["tools"]})
         self.assertEqual(response.headers["access-control-allow-origin"], "*")
         self.assertEqual(response.headers["access-control-allow-methods"], "GET")
+        self.assertNotIn("www-authenticate", response.headers)
+
+    async def test_glama_verification_is_public(self):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example",
+        ) as client:
+            response = await client.get(GLAMA_VERIFICATION_PATH)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "$schema": "https://glama.ai/mcp/schemas/connector.json",
+                "maintainers": [{"email": "support@magichour.ai"}],
+            },
+        )
         self.assertNotIn("www-authenticate", response.headers)
 
     async def assert_discovery_and_auth(self, client: httpx.AsyncClient):
