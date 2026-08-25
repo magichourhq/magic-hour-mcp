@@ -58,6 +58,7 @@ MCP_SERVER_INSTRUCTIONS = (
     "Upload local media before passing its file_path, and preserve signed download URLs exactly as returned."
 )
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
+GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
 MCP_SERVER_URL = "https://mcp.magichour.ai/"
 UPLOAD_CHUNK_SIZE = 1024 * 1024
@@ -601,6 +602,15 @@ async def mcp_server_card(_: Request) -> JSONResponse:
     )
 
 
+async def glama_verification(_: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "$schema": "https://glama.ai/mcp/schemas/connector.json",
+            "maintainers": [{"email": "support@magichour.ai"}],
+        }
+    )
+
+
 mcp_app_assets = CORSMiddleware(
     StaticFiles(directory=MCP_APP_DIST_PATH, check_dir=False),
     allow_origins=["*"],
@@ -614,6 +624,7 @@ app = create_oauth_compatibility_app(
         Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
         Mount(MCP_APP_ASSET_PATH, app=mcp_app_assets),
         Route(MCP_SERVER_CARD_PATH, mcp_server_card, methods=["GET"]),
+        Route(GLAMA_VERIFICATION_PATH, glama_verification, methods=["GET"]),
     ],
 )
 lifespan = app.router.lifespan_context
