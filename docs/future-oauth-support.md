@@ -16,7 +16,8 @@ Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 The OAuth shim supports Authorization Code + PKCE for public clients. Its RFC
 7591-compatible `POST /register` endpoint validates callback metadata and
 returns a client ID without keeping a client registry. Authorization requests
-revalidate callback URLs and bind them to the short-lived code.
+require an exact match from the built-in callback allowlist and bind it to the
+short-lived code.
 
 ## Why OAuth exists
 

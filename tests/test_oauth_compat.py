@@ -125,12 +125,12 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             "/authorize",
             data={**self.authorization_params(), "api_key": "sk_valid"},
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 303)
         query = parse_qs(urlsplit(response.headers["location"]).query)
         self.assertEqual(query["state"], ["client-state"])
         return query["code"][0]
 
-    async def register_client(self, redirect_uri="https://client.example/callback"):
+    async def register_client(self, redirect_uri=REDIRECT_URI):
         response = await self.client.post(
             "/register",
             json={
@@ -172,7 +172,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(replay.json()["error"], "invalid_grant")
 
     async def test_dynamic_client_registration_supports_full_code_flow(self):
-        redirect_uri = "http://127.0.0.1:49152/callback"
+        redirect_uri = REDIRECT_URI
         registration = await self.register_client(redirect_uri)
         client_id = registration["client_id"]
         self.assertEqual(
@@ -191,7 +191,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             "/authorize",
             data={**params, "api_key": "sk_valid"},
         )
-        self.assertEqual(authorized.status_code, 302)
+        self.assertEqual(authorized.status_code, 303)
         code = parse_qs(urlsplit(authorized.headers["location"]).query)["code"][0]
         token_request = {
             "grant_type": "authorization_code",
@@ -213,11 +213,12 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_registration_rejects_unsafe_redirect_and_confidential_client(self):
         for metadata, error in (
+            ({"redirect_uris": ["https://client.example/callback"]}, "invalid_redirect_uri"),
             ({"redirect_uris": ["http://evil.example/callback"]}, "invalid_redirect_uri"),
             ({"redirect_uris": ["https://[malformed"]}, "invalid_redirect_uri"),
             (
                 {
-                    "redirect_uris": ["https://client.example/callback"],
+                    "redirect_uris": [REDIRECT_URI],
                     "token_endpoint_auth_method": "client_secret_basic",
                 },
                 "invalid_client_metadata",
@@ -369,7 +370,14 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_invalid_redirect_uri_is_rejected_before_key_validation(self):
         redirect_uris = [
+            "https://evil.example/callback",
+            "https://chatgpt.com/connector/oauth/",
+            "https://chatgpt.com/connector/oauth/replacement-connector-id",
+            "https://chatgpt.com.evil.example/connector/oauth/id",
             "http://evil.example/callback",
+            "http://localhost:8788/callback",
+            "http://localhost:8787/callback/extra",
+            "http://localhost:8787/callback?next=evil",
             "http://localhost:8787/callback#fragment",
             "http://localhost.evil.example:8787/callback",
             "https://user:password@example.com/callback",
@@ -401,7 +409,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
                     },
                 )
 
-                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.status_code, 303)
                 redirect = urlsplit(response.headers["location"])
                 self.assertEqual(
                     f"{redirect.scheme}://{redirect.netloc}{redirect.path}",

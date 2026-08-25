@@ -39,6 +39,11 @@ MAX_CONCURRENT_VALIDATIONS = 10
 API_KEY_VERIFICATION_ERROR = (
     "We couldn't verify this API key. Check that you copied the full key and try again."
 )
+ALLOWED_REDIRECT_URIS = {
+    "https://claude.ai/api/mcp/auth_callback",
+    "https://chatgpt.com/connector/oauth/5swpyzyTpmje",
+    "http://localhost:8787/callback",
+}
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 ApiKeyValidator = Callable[[str], Awaitable[bool]]
@@ -223,7 +228,7 @@ class OAuthCompatibilityServer:
         except OAuthCapacityError:
             return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
         location = _add_query(authorization["redirect_uri"], {"code": code, "state": params.get("state")})
-        return RedirectResponse(location, status_code=302, headers={"Cache-Control": "no-store"})
+        return RedirectResponse(location, status_code=303, headers={"Cache-Control": "no-store"})
 
     async def register(self, request: Request) -> Response:
         try:
@@ -357,7 +362,7 @@ class OAuthCompatibilityServer:
 
         if params.get("response_type") != "code":
             raise OAuthRequestError("unsupported_response_type", "response_type must be code")
-        if not _valid_client_id(client_id) or not _valid_redirect_uri(redirect_uri):
+        if not _valid_client_id(client_id) or redirect_uri not in ALLOWED_REDIRECT_URIS:
             raise OAuthRequestError("invalid_request", "Invalid client or redirect_uri")
         if params.get("code_challenge_method") != "S256" or not CHALLENGE_RE.fullmatch(challenge):
             raise OAuthRequestError("invalid_request", "PKCE S256 code_challenge is required")
@@ -573,7 +578,7 @@ def _validate_client_metadata(metadata: Mapping[str, Any]) -> list[str]:
         not isinstance(redirect_uris, list)
         or not redirect_uris
         or len(redirect_uris) > 10
-        or any(not isinstance(uri, str) or not _valid_redirect_uri(uri) for uri in redirect_uris)
+        or any(not isinstance(uri, str) or uri not in ALLOWED_REDIRECT_URIS for uri in redirect_uris)
         or len(set(redirect_uris)) != len(redirect_uris)
     ):
         raise OAuthRequestError("invalid_redirect_uri", "redirect_uris must contain valid unique URIs")
@@ -590,27 +595,6 @@ def _valid_client_id(client_id: str) -> bool:
     return 0 < len(client_id) <= 512 and client_id.isascii() and all(
         0x20 < ord(character) < 0x7F for character in client_id
     )
-
-
-def _valid_redirect_uri(uri: str) -> bool:
-    if len(uri) > 2_048 or not uri.isascii() or any(ord(character) <= 0x20 for character in uri):
-        return False
-    try:
-        parts = urlsplit(uri)
-        parts.port
-    except ValueError:
-        return False
-    if (
-        not parts.scheme
-        or not parts.hostname
-        or parts.fragment
-        or parts.username
-        or parts.password
-    ):
-        return False
-    if parts.scheme == "https":
-        return True
-    return parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"}
 
 
 def _authorization_page(
