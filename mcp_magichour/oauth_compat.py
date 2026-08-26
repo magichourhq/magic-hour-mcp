@@ -41,9 +41,9 @@ API_KEY_VERIFICATION_ERROR = (
 )
 ALLOWED_REDIRECT_URIS = {
     "https://claude.ai/api/mcp/auth_callback",
-    "https://chatgpt.com/connector/oauth/5swpyzyTpmje",
     "http://localhost:8787/callback",
 }
+CHATGPT_REDIRECT_RE = re.compile(r"^/connector/oauth/[A-Za-z0-9_-]{12}$")
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 ApiKeyValidator = Callable[[str], Awaitable[bool]]
@@ -369,7 +369,7 @@ class OAuthCompatibilityServer:
 
         if params.get("response_type") != "code":
             raise OAuthRequestError("unsupported_response_type", "response_type must be code")
-        if not _valid_client_id(client_id) or redirect_uri not in ALLOWED_REDIRECT_URIS:
+        if not _valid_client_id(client_id) or not _allowed_redirect_uri(redirect_uri):
             raise OAuthRequestError("invalid_request", "Invalid client or redirect_uri")
         if params.get("code_challenge_method") != "S256" or not CHALLENGE_RE.fullmatch(challenge):
             raise OAuthRequestError("invalid_request", "PKCE S256 code_challenge is required")
@@ -585,13 +585,20 @@ def _validate_client_metadata(metadata: Mapping[str, Any]) -> list[str]:
         not isinstance(redirect_uris, list)
         or not redirect_uris
         or len(redirect_uris) > 10
-        or any(not isinstance(uri, str) or uri not in ALLOWED_REDIRECT_URIS for uri in redirect_uris)
+        or any(not isinstance(uri, str) or not _allowed_redirect_uri(uri) for uri in redirect_uris)
         or len(set(redirect_uris)) != len(redirect_uris)
     ):
         raise OAuthRequestError("invalid_redirect_uri", "redirect_uris must contain valid unique URIs")
     if metadata.get("token_endpoint_auth_method", "none") != "none":
         raise OAuthRequestError("invalid_client_metadata", "Only public clients are supported")
-    if metadata.get("grant_types", ["authorization_code"]) != ["authorization_code"]:
+    grant_types = metadata.get("grant_types", ["authorization_code"])
+    if (
+        not isinstance(grant_types, list)
+        or "authorization_code" not in grant_types
+        or any(not isinstance(grant_type, str) for grant_type in grant_types)
+        or len(grant_types) != len(set(grant_types))
+        or any(grant_type not in {"authorization_code", "refresh_token"} for grant_type in grant_types)
+    ):
         raise OAuthRequestError("invalid_client_metadata", "Only authorization_code is supported")
     if metadata.get("response_types", ["code"]) != ["code"]:
         raise OAuthRequestError("invalid_client_metadata", "Only code response_type is supported")
@@ -631,6 +638,22 @@ def _safe_log_text(value: Any) -> str:
 def _safe_redirect_uri_for_log(value: Any) -> str:
     uri = re.split(r"[?#]", _safe_log_text(value), maxsplit=1)[0]
     return re.sub(r"(^[A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@", r"\1<credentials>@", uri)
+
+
+def _allowed_redirect_uri(uri: str) -> bool:
+    if uri in ALLOWED_REDIRECT_URIS:
+        return True
+    try:
+        parts = urlsplit(uri)
+    except ValueError:
+        return False
+    return (
+        parts.scheme == "https"
+        and parts.netloc == "chatgpt.com"
+        and not parts.query
+        and not parts.fragment
+        and CHATGPT_REDIRECT_RE.fullmatch(parts.path) is not None
+    )
 
 
 def _valid_client_id(client_id: str) -> bool:

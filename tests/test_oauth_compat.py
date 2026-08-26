@@ -21,6 +21,7 @@ from mcp_magichour.oauth_compat import (
 CLIENT_ID = "magic-hour-mcp"
 REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 CHATGPT_REDIRECT_URI = "https://chatgpt.com/connector/oauth/5swpyzyTpmje"
+CHATGPT_DYNAMIC_REDIRECT_URI = "https://chatgpt.com/connector/oauth/Z34PofCROM5R"
 CURSOR_REDIRECT_URI = "http://localhost:8787/callback"
 RESOURCE = "https://mcp.example/mcp"
 VERIFIER = "v" * 64
@@ -130,13 +131,13 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(query["state"], ["client-state"])
         return query["code"][0]
 
-    async def register_client(self, redirect_uri=REDIRECT_URI):
+    async def register_client(self, redirect_uri=REDIRECT_URI, grant_types=None):
         response = await self.client.post(
             "/register",
             json={
                 "redirect_uris": [redirect_uri],
                 "token_endpoint_auth_method": "none",
-                "grant_types": ["authorization_code"],
+                "grant_types": grant_types or ["authorization_code"],
                 "response_types": ["code"],
             },
         )
@@ -172,8 +173,11 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(replay.json()["error"], "invalid_grant")
 
     async def test_dynamic_client_registration_supports_full_code_flow(self):
-        redirect_uri = REDIRECT_URI
-        registration = await self.register_client(redirect_uri)
+        redirect_uri = CHATGPT_DYNAMIC_REDIRECT_URI
+        registration = await self.register_client(
+            redirect_uri,
+            ["authorization_code", "refresh_token"],
+        )
         client_id = registration["client_id"]
         self.assertEqual(
             registration,
@@ -221,6 +225,10 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
                     "redirect_uris": [REDIRECT_URI],
                     "token_endpoint_auth_method": "client_secret_basic",
                 },
+                "invalid_client_metadata",
+            ),
+            (
+                {"redirect_uris": [REDIRECT_URI], "grant_types": [{"bad": True}]},
                 "invalid_client_metadata",
             ),
         ):
