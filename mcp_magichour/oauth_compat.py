@@ -43,7 +43,9 @@ ALLOWED_REDIRECT_URIS = {
     "https://claude.ai/api/mcp/auth_callback",
     "http://localhost:8787/callback",
 }
-CHATGPT_REDIRECT_RE = re.compile(r"^/connector/oauth/[A-Za-z0-9_-]{12}$")
+ALLOWED_REDIRECT_URI_PATTERNS = (
+    re.compile(r"https://chatgpt\.com/connector/oauth/[A-Za-z0-9_-]{1,128}"),
+)
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 ApiKeyValidator = Callable[[str], Awaitable[bool]]
@@ -641,18 +643,8 @@ def _safe_redirect_uri_for_log(value: Any) -> str:
 
 
 def _allowed_redirect_uri(uri: str) -> bool:
-    if uri in ALLOWED_REDIRECT_URIS:
-        return True
-    try:
-        parts = urlsplit(uri)
-    except ValueError:
-        return False
-    return (
-        parts.scheme == "https"
-        and parts.netloc == "chatgpt.com"
-        and not parts.query
-        and not parts.fragment
-        and CHATGPT_REDIRECT_RE.fullmatch(parts.path) is not None
+    return uri in ALLOWED_REDIRECT_URIS or any(
+        pattern.fullmatch(uri) for pattern in ALLOWED_REDIRECT_URI_PATTERNS
     )
 
 
