@@ -21,7 +21,7 @@ from mcp_magichour.oauth_compat import (
 CLIENT_ID = "magic-hour-mcp"
 REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 CHATGPT_REDIRECT_URI = "https://chatgpt.com/connector/oauth/5swpyzyTpmje"
-CHATGPT_DYNAMIC_REDIRECT_URI = "https://chatgpt.com/connector/oauth/Z34PofCROM5R_extended"
+CHATGPT_DYNAMIC_REDIRECT_URI = "https://chatgpt.com/connector/oauth/Z34PofCROM5R"
 CURSOR_REDIRECT_URI = "http://localhost:8787/callback"
 RESOURCE = "https://mcp.example/mcp"
 VERIFIER = "v" * 64
@@ -404,6 +404,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             "https://evil.example/callback",
             "https://chatgpt.com/connector/oauth/",
             "https://chatgpt.com/connector/oauth/replacement/connector-id",
+            "https://chatgpt.com/connector/oauth/Z34PofCROM5RA",
             "https://chatgpt.com.evil.example/connector/oauth/id",
             "http://evil.example/callback",
             "http://localhost:8788/callback",
