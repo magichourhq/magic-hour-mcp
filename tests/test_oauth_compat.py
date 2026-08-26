@@ -229,6 +229,29 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertEqual(response.json()["error"], error)
 
+    async def test_registration_logs_rejected_metadata_without_query_values(self):
+        with self.assertLogs("uvicorn.error.mcp_oauth", level="WARNING") as captured:
+            response = await self.client.post(
+                "/register",
+                json={
+                    "redirect_uris": [
+                        "https://chatgpt.com/connector/oauth/new-client?secret=do-not-log",
+                        "https://user:do-not-log@example.com/callback",
+                    ],
+                    "token_endpoint_auth_method": "none",
+                    "grant_types": ["authorization_code"],
+                    "response_types": ["code"],
+                    "application_type": "web",
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        log = "\n".join(captured.output)
+        self.assertIn("registration_rejected", log)
+        self.assertIn("https://chatgpt.com/connector/oauth/new-client", log)
+        self.assertIn("application_type", log)
+        self.assertNotIn("do-not-log", log)
+
     async def test_authorization_page_preserves_form_and_asset_contracts(self):
         page = await self.client.get("/authorize", params=self.authorization_params())
         parser = AuthorizationPageParser()

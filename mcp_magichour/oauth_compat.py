@@ -231,10 +231,17 @@ class OAuthCompatibilityServer:
         return RedirectResponse(location, status_code=303, headers={"Cache-Control": "no-store"})
 
     async def register(self, request: Request) -> Response:
+        metadata: dict[str, Any] | None = None
         try:
             metadata = await _read_json(request)
             redirect_uris = _validate_client_metadata(metadata)
         except OAuthRequestError as error:
+            logger.warning(
+                "registration_rejected error=%s metadata_keys=%s metadata=%s",
+                error.error,
+                sorted(metadata) if metadata else [],
+                _registration_log_metadata(metadata),
+            )
             return _registration_error(error.error, error.description)
 
         return JSONResponse(
@@ -589,6 +596,41 @@ def _validate_client_metadata(metadata: Mapping[str, Any]) -> list[str]:
     if metadata.get("response_types", ["code"]) != ["code"]:
         raise OAuthRequestError("invalid_client_metadata", "Only code response_type is supported")
     return redirect_uris
+
+
+def _registration_log_metadata(metadata: Mapping[str, Any] | None) -> dict[str, Any]:
+    if metadata is None:
+        return {}
+    safe: dict[str, Any] = {}
+    for name in (
+        "redirect_uris",
+        "token_endpoint_auth_method",
+        "grant_types",
+        "response_types",
+        "application_type",
+        "client_name",
+    ):
+        if name not in metadata:
+            continue
+        value = metadata[name]
+        if name == "redirect_uris" and isinstance(value, list):
+            safe[name] = [_safe_redirect_uri_for_log(uri) for uri in value[:10]]
+        elif isinstance(value, list):
+            safe[name] = [_safe_log_text(item) for item in value[:10]]
+        else:
+            safe[name] = _safe_log_text(value)
+    return safe
+
+
+def _safe_log_text(value: Any) -> str:
+    if not isinstance(value, str):
+        return f"<{type(value).__name__}>"
+    return "".join(character if 0x20 <= ord(character) < 0x7F else "?" for character in value)[:512]
+
+
+def _safe_redirect_uri_for_log(value: Any) -> str:
+    uri = re.split(r"[?#]", _safe_log_text(value), maxsplit=1)[0]
+    return re.sub(r"(^[A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@", r"\1<credentials>@", uri)
 
 
 def _valid_client_id(client_id: str) -> bool:
