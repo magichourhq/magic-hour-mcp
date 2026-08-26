@@ -542,6 +542,13 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(discovery.status_code, 401)
         self.assertNotIn("www-authenticate", discovery.headers)
 
+    async def test_unknown_get_returns_not_found_without_auth_challenge(self):
+        for path in ("/plans", "/.well-known/openid-configuration"):
+            with self.subTest(path=path):
+                response = await self.client.get(path)
+                self.assertEqual(response.status_code, 404)
+                self.assertNotIn("www-authenticate", response.headers)
+
     async def test_browser_get_with_invalid_authorization_receives_bearer_challenge(self):
         for authorization in ("Basic dXNlcjpwYXNz", "Bearer"):
             response = await self.client.get(

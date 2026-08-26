@@ -417,6 +417,9 @@ class MCPBearerChallengeMiddleware:
         if scope.get("method") in {"OPTIONS", "POST"}:
             await self.app(scope, receive, send)
             return
+        if scope.get("path") != "/":
+            await self.app(scope, receive, send)
+            return
 
         authorization = next(
             (value.decode("latin-1") for name, value in scope.get("headers", []) if name.lower() == b"authorization"),
