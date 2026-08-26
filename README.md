@@ -76,6 +76,8 @@ access token. Production requires `MCP_OAUTH_ISSUER_URL` and
 `MCP_OAUTH_RESOURCE_URL`. See `docs/future-oauth-support.md` for deployment
 limits.
 
+Public OAuth clients can use the stateless `POST /register` compatibility endpoint.
+
 ## Test with MCP Inspector
 
 1. Start the server.

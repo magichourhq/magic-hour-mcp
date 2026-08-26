@@ -13,9 +13,11 @@ Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 | ChatGPT Custom Connector | Yes, through OAuth |
 | Cursor MCP | Yes, through OAuth |
 
-The OAuth shim supports Authorization Code + PKCE for one fixed client. Client
-ID `magic-hour-mcp` is built in. Exact callback URLs live in the
-`ALLOWED_REDIRECT_URIS` allowlist.
+The OAuth shim supports Authorization Code + PKCE for public clients. Its RFC
+7591-compatible `POST /register` endpoint validates callback metadata and
+returns a client ID without keeping a client registry. Authorization requests
+require an exact match from the built-in callback allowlist and bind it to the
+short-lived code.
 
 ## Why OAuth exists
 
@@ -36,8 +38,9 @@ does not mint refresh tokens or introduce another token system.
 
 Set `MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL` to the canonical public
 MCP URL. Serve production endpoints over HTTPS. Authorization codes are
-process-local, so run one worker. Multi-worker deployment requires a shared
-store. Rate-limit `/authorize` at the public edge.
+process-local, so run one worker. Multi-worker or serverless deployment requires
+a shared code store or encrypted stateless codes. Rate-limit `/register` and
+`/authorize` at the public edge.
 
 This is a connector compatibility layer, not a general-purpose authorization
 server. Access tokens retain the lifetime and privileges of the Magic Hour API

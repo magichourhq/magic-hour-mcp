@@ -5,6 +5,7 @@ import base64
 import hashlib
 import hmac
 import html
+import json
 import logging
 import os
 import re
@@ -31,17 +32,19 @@ from .openapi_auth import AuthError, current_authorization_header
 
 CODE_TTL_SECONDS = 300
 MAX_FORM_BYTES = 16 * 1024
+MAX_REGISTRATION_BYTES = 16 * 1024
 MAX_PENDING_CODES = 1_000
 MAX_CODES_PER_API_KEY = 3
 MAX_CONCURRENT_VALIDATIONS = 10
 API_KEY_VERIFICATION_ERROR = (
     "We couldn't verify this API key. Check that you copied the full key and try again."
 )
-OAUTH_CLIENT_ID = "magic-hour-mcp"
-ALLOWED_REDIRECT_URIS = [
+ALLOWED_REDIRECT_URIS = {
     "https://claude.ai/api/mcp/auth_callback",
-    "https://chatgpt.com/connector/oauth/5swpyzyTpmje",
     "http://localhost:8787/callback",
+}
+ALLOWED_REDIRECT_URI_PATTERNS = [
+    re.compile(r"https://chatgpt\.com/connector/oauth/[A-Za-z0-9_-]{12}"),
 ]
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
@@ -57,6 +60,7 @@ class OAuthCapacityError(Exception):
 @dataclass(frozen=True)
 class AuthorizationCode:
     api_key: str
+    client_id: str
     redirect_uri: str
     code_challenge: str
     resource: str | None
@@ -75,6 +79,7 @@ class AuthorizationCodeStore:
         self,
         *,
         api_key: str,
+        client_id: str,
         redirect_uri: str,
         code_challenge: str,
         resource: str | None,
@@ -83,6 +88,7 @@ class AuthorizationCodeStore:
         now = monotonic()
         authorization_code = AuthorizationCode(
             api_key=api_key,
+            client_id=client_id,
             redirect_uri=redirect_uri,
             code_challenge=code_challenge,
             resource=resource,
@@ -163,6 +169,7 @@ class OAuthCompatibilityServer:
 
     def routes(self) -> list[Route]:
         return [
+            Route("/register", self.register, methods=["POST"]),
             Route("/authorize", self.authorize, methods=["GET", "POST"]),
             Route("/token", self.token, methods=["POST"]),
             Route("/.well-known/oauth-authorization-server", self.authorization_server_metadata),
@@ -215,6 +222,7 @@ class OAuthCompatibilityServer:
         try:
             code = self.codes.issue(
                 api_key=api_key,
+                client_id=authorization["client_id"],
                 redirect_uri=authorization["redirect_uri"],
                 code_challenge=authorization["code_challenge"],
                 resource=authorization["resource"],
@@ -222,7 +230,33 @@ class OAuthCompatibilityServer:
         except OAuthCapacityError:
             return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
         location = _add_query(authorization["redirect_uri"], {"code": code, "state": params.get("state")})
-        return RedirectResponse(location, status_code=302, headers={"Cache-Control": "no-store"})
+        return RedirectResponse(location, status_code=303, headers={"Cache-Control": "no-store"})
+
+    async def register(self, request: Request) -> Response:
+        metadata: dict[str, Any] | None = None
+        try:
+            metadata = await _read_json(request)
+            redirect_uris = _validate_client_metadata(metadata)
+        except OAuthRequestError as error:
+            logger.warning(
+                "registration_rejected error=%s metadata_keys=%s metadata=%s",
+                error.error,
+                sorted(metadata) if metadata else [],
+                _registration_log_metadata(metadata),
+            )
+            return _registration_error(error.error, error.description)
+
+        return JSONResponse(
+            {
+                "client_id": secrets.token_urlsafe(32),
+                "redirect_uris": redirect_uris,
+                "token_endpoint_auth_method": "none",
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+            },
+            status_code=201,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        )
 
     async def token(self, request: Request) -> Response:
         try:
@@ -246,7 +280,7 @@ class OAuthCompatibilityServer:
                 "Authorization code is invalid or expired",
             )
 
-        if not hmac.compare_digest(params.get("client_id", ""), OAUTH_CLIENT_ID):
+        if not hmac.compare_digest(params.get("client_id", ""), authorization.client_id):
             return _token_rejection(
                 "client_mismatch",
                 "invalid_grant",
@@ -301,6 +335,7 @@ class OAuthCompatibilityServer:
                 "issuer": issuer,
                 "authorization_endpoint": f"{issuer}/authorize",
                 "token_endpoint": f"{issuer}/token",
+                "registration_endpoint": f"{issuer}/register",
                 "response_types_supported": ["code"],
                 "grant_types_supported": ["authorization_code"],
                 "code_challenge_methods_supported": ["S256"],
@@ -336,8 +371,8 @@ class OAuthCompatibilityServer:
 
         if params.get("response_type") != "code":
             raise OAuthRequestError("unsupported_response_type", "response_type must be code")
-        if client_id != OAUTH_CLIENT_ID or redirect_uri not in ALLOWED_REDIRECT_URIS:
-            raise OAuthRequestError("invalid_request", "Unknown client or redirect_uri")
+        if not _valid_client_id(client_id) or not _allowed_redirect_uri(redirect_uri):
+            raise OAuthRequestError("invalid_request", "Invalid client or redirect_uri")
         if params.get("code_challenge_method") != "S256" or not CHALLENGE_RE.fullmatch(challenge):
             raise OAuthRequestError("invalid_request", "PKCE S256 code_challenge is required")
         if resource and not _same_resource(resource, expected_resource):
@@ -526,6 +561,99 @@ async def _read_form(request: Request) -> dict[str, str]:
     return {name: values[0] for name, values in parsed.items()}
 
 
+async def _read_json(request: Request) -> dict[str, Any]:
+    content_length = request.headers.get("content-length")
+    if content_length and (
+        not content_length.isdigit() or int(content_length) > MAX_REGISTRATION_BYTES
+    ):
+        raise OAuthRequestError("invalid_client_metadata", "Request body is too large")
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > MAX_REGISTRATION_BYTES:
+            raise OAuthRequestError("invalid_client_metadata", "Request body is too large")
+        body.extend(chunk)
+    try:
+        value = json.loads(bytes(body))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise OAuthRequestError("invalid_client_metadata", "Malformed JSON body") from None
+    if not isinstance(value, dict):
+        raise OAuthRequestError("invalid_client_metadata", "Registration body must be an object")
+    return value
+
+
+def _validate_client_metadata(metadata: Mapping[str, Any]) -> list[str]:
+    redirect_uris = metadata.get("redirect_uris")
+    if (
+        not isinstance(redirect_uris, list)
+        or not redirect_uris
+        or len(redirect_uris) > 10
+        or any(not isinstance(uri, str) or not _allowed_redirect_uri(uri) for uri in redirect_uris)
+        or len(set(redirect_uris)) != len(redirect_uris)
+    ):
+        raise OAuthRequestError("invalid_redirect_uri", "redirect_uris must contain valid unique URIs")
+    if metadata.get("token_endpoint_auth_method", "none") != "none":
+        raise OAuthRequestError("invalid_client_metadata", "Only public clients are supported")
+    grant_types = metadata.get("grant_types", ["authorization_code"])
+    if (
+        not isinstance(grant_types, list)
+        or "authorization_code" not in grant_types
+        or any(not isinstance(grant_type, str) for grant_type in grant_types)
+        or len(grant_types) != len(set(grant_types))
+        or any(grant_type not in {"authorization_code", "refresh_token"} for grant_type in grant_types)
+    ):
+        raise OAuthRequestError("invalid_client_metadata", "Only authorization_code is supported")
+    if metadata.get("response_types", ["code"]) != ["code"]:
+        raise OAuthRequestError("invalid_client_metadata", "Only code response_type is supported")
+    return redirect_uris
+
+
+def _registration_log_metadata(metadata: Mapping[str, Any] | None) -> dict[str, Any]:
+    if metadata is None:
+        return {}
+    safe: dict[str, Any] = {}
+    for name in (
+        "redirect_uris",
+        "token_endpoint_auth_method",
+        "grant_types",
+        "response_types",
+        "application_type",
+        "client_name",
+    ):
+        if name not in metadata:
+            continue
+        value = metadata[name]
+        if name == "redirect_uris" and isinstance(value, list):
+            safe[name] = [_safe_redirect_uri_for_log(uri) for uri in value[:10]]
+        elif isinstance(value, list):
+            safe[name] = [_safe_log_text(item) for item in value[:10]]
+        else:
+            safe[name] = _safe_log_text(value)
+    return safe
+
+
+def _safe_log_text(value: Any) -> str:
+    if not isinstance(value, str):
+        return f"<{type(value).__name__}>"
+    return "".join(character if 0x20 <= ord(character) < 0x7F else "?" for character in value)[:512]
+
+
+def _safe_redirect_uri_for_log(value: Any) -> str:
+    uri = re.split(r"[?#]", _safe_log_text(value), maxsplit=1)[0]
+    return re.sub(r"(^[A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@", r"\1<credentials>@", uri)
+
+
+def _allowed_redirect_uri(uri: str) -> bool:
+    return uri in ALLOWED_REDIRECT_URIS or any(
+        pattern.fullmatch(uri) for pattern in ALLOWED_REDIRECT_URI_PATTERNS
+    )
+
+
+def _valid_client_id(client_id: str) -> bool:
+    return 0 < len(client_id) <= 512 and client_id.isascii() and all(
+        0x20 < ord(character) < 0x7F for character in client_id
+    )
+
+
 def _authorization_page(
     authorization: Mapping[str, str | None],
     error: str | None = None,
@@ -703,6 +831,19 @@ def _token_rejection(reason: str, error: str, description: str) -> JSONResponse:
 
 def _oauth_error(error: str, description: str) -> JSONResponse:
     return JSONResponse({"error": error, "error_description": description}, status_code=400)
+
+
+def _registration_error(
+    error: str,
+    description: str,
+    *,
+    status_code: int = 400,
+) -> JSONResponse:
+    return JSONResponse(
+        {"error": error, "error_description": description},
+        status_code=status_code,
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+    )
 
 
 def _pkce_challenge(verifier: str) -> str:
