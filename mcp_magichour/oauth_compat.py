@@ -43,9 +43,9 @@ ALLOWED_REDIRECT_URIS = {
     "https://claude.ai/api/mcp/auth_callback",
     "http://localhost:8787/callback",
 }
-ALLOWED_REDIRECT_URI_PATTERNS = (
+ALLOWED_REDIRECT_URI_PATTERNS = [
     re.compile(r"https://chatgpt\.com/connector/oauth/[A-Za-z0-9_-]{12}"),
-)
+]
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 ApiKeyValidator = Callable[[str], Awaitable[bool]]
