@@ -45,6 +45,23 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         ) as client:
             await self.assert_discovery_and_auth(client)
 
+    async def test_tools_list_accepts_json_body_with_octet_stream_compatibility_type(self):
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example",
+            headers={"Accept": "application/json, text/event-stream"},
+        ) as client:
+            response = await client.post(
+                "/",
+                headers={"Content-Type": "application/octet-stream"},
+                content=json.dumps(
+                    {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+                ),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(self.result(response)["tools"]), 0)
+
     async def test_mcp_app_http_view_is_public_with_scoped_csp(self):
         async with app.router.lifespan_context(app), httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),

@@ -64,7 +64,7 @@ class BearerPassthroughAuth(httpx.Auth):
 
 
 class BearerPassthroughMiddleware:
-    """Capture the incoming MCP Authorization header for outbound API calls."""
+    """Capture auth and normalize legacy JSON content types for MCP compatibility."""
 
     def __init__(self, app: Any):
         self.app = app
@@ -79,20 +79,40 @@ class BearerPassthroughMiddleware:
         method = scope.get("method", "UNKNOWN")
         path = scope.get("path", "")
         headers = Headers(scope=scope)
+        content_type = headers.get("content-type", "none")
+        content_type_compat = (
+            method == "POST"
+            and content_type.split(";", 1)[0].strip().lower() == "application/octet-stream"
+        )
         started_at = perf_counter()
         status_code: int | None = None
 
         authorization_token = _authorization_header.set(header)
         request_id_token = _request_id.set(request_id)
 
+        if content_type_compat:
+            logger.warning(
+                "request_content_type_compat request_id=%s original=%s normalized=application/json",
+                request_id,
+                content_type,
+            )
+            scope = {
+                **scope,
+                "headers": [
+                    (name, b"application/json" if name.lower() == b"content-type" else value)
+                    for name, value in scope.get("headers", [])
+                ],
+            }
+
         logger.info(
             "request_started request_id=%s method=%s path=%s content_type=%s protocol_version=%s "
-            "session_id_present=%s auth_present=%s auth_scheme=%s",
+            "content_type_compat=%s session_id_present=%s auth_present=%s auth_scheme=%s",
             request_id,
             method,
             path,
-            headers.get("content-type", "none"),
+            content_type,
             headers.get("mcp-protocol-version", "none"),
+            str(content_type_compat).lower(),
             str(bool(headers.get("mcp-session-id"))).lower(),
             str(bool(header)).lower(),
             _safe_auth_scheme(header),
