@@ -53,7 +53,26 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         ) as client:
             response = await client.post(
                 "/",
-                headers={"Content-Type": "application/octet-stream"},
+                headers={
+                    "Content-Type": "application/octet-stream",
+                    "Accept": "*/*",
+                },
+                content=json.dumps(
+                    {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+                ),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(self.result(response)["tools"]), 0)
+
+    async def test_tools_list_accepts_wildcard_accept_header_for_compatibility(self):
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example",
+        ) as client:
+            response = await client.post(
+                "/",
+                headers={"Content-Type": "application/json", "Accept": "*/*"},
                 content=json.dumps(
                     {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
                 ),
