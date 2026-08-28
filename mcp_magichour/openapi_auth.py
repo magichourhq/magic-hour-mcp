@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-import logging
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
 import httpx
+from fastmcp.utilities.logging import get_logger
 from starlette.datastructures import Headers
 
 
 # Inherit Uvicorn's configured INFO handler in standalone and mounted deployments.
-logger = logging.getLogger("uvicorn.error.mcp_auth")
+logger = get_logger("mcp_auth")
 
 
 class AuthError(Exception):
@@ -78,6 +78,7 @@ class BearerPassthroughMiddleware:
         request_id = uuid4().hex
         method = scope.get("method", "UNKNOWN")
         path = scope.get("path", "")
+        headers = Headers(scope=scope)
         started_at = perf_counter()
         status_code: int | None = None
 
@@ -85,10 +86,14 @@ class BearerPassthroughMiddleware:
         request_id_token = _request_id.set(request_id)
 
         logger.info(
-            "request_started request_id=%s method=%s path=%s auth_present=%s auth_scheme=%s",
+            "request_started request_id=%s method=%s path=%s content_type=%s protocol_version=%s "
+            "session_id_present=%s auth_present=%s auth_scheme=%s",
             request_id,
             method,
             path,
+            headers.get("content-type", "none"),
+            headers.get("mcp-protocol-version", "none"),
+            str(bool(headers.get("mcp-session-id"))).lower(),
             str(bool(header)).lower(),
             _safe_auth_scheme(header),
         )

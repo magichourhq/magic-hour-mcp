@@ -10,7 +10,7 @@ from mcp_magichour.openapi_auth import (
 )
 
 
-LOGGER_NAME = "uvicorn.error.mcp_auth"
+LOGGER_NAME = "fastmcp.mcp_auth"
 
 
 class OpenApiAuthLoggingTests(unittest.IsolatedAsyncioTestCase):

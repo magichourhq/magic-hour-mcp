@@ -238,7 +238,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.json()["error"], error)
 
     async def test_registration_logs_rejected_metadata_without_query_values(self):
-        with self.assertLogs("uvicorn.error.mcp_oauth", level="WARNING") as captured:
+        with self.assertLogs("fastmcp.mcp_oauth", level="WARNING") as captured:
             response = await self.client.post(
                 "/register",
                 json={
@@ -269,7 +269,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(api_key_input["type"], "password")
         self.assertEqual(api_key_input["placeholder"], "mhk_live_…")
         self.assertIn("required", api_key_input)
-        self.assertEqual(api_key_input["autocomplete"], "off")
+        self.assertEqual(api_key_input["autocomplete"], "new-password")
         self.assertNotIn("aria-describedby", api_key_input)
 
         hidden = {field["name"]: field["value"] for field in parser.inputs if field.get("type") == "hidden"}
