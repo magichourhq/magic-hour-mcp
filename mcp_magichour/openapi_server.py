@@ -52,11 +52,23 @@ API_RETRIES = 2
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
 MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_VERSION = "0.1.0"
-MCP_SERVER_INSTRUCTIONS = (
-    "Create and edit images, video, and audio with Magic Hour. Tool calls require authentication. "
-    "Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project. "
-    "Upload local media before passing its file_path, and preserve signed download URLs exactly as returned."
-)
+MCP_SERVER_INSTRUCTIONS = """
+Create and edit images, video, and audio with Magic Hour.
+Tool calls require authentication.
+Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
+Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
+
+For video creation, unless the user requests otherwise:
+
+- Prefer AI Image Editor followed by Image-to-Video.
+- Reuse reference images across scenes for visual consistency.
+- Prefer nano-banana-2-lite for image creation and editing.
+- Prefer ltx-2.3 for Image-to-Video.
+- Add voiceovers using AI Voice Generator when a voiceover would suit the video. Choose the voice that would be the best narrator for this video.
+- Let the narration finish each sentence. Never cut it off.
+- Use Text-to-Video only when consistency is unimportant.
+- Keep character identity, visual style, color palette, lighting, and aspect ratio consistent across scenes.
+  """.strip()
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
