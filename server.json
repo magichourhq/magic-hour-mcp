@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.magichourhq/magic-hour",
+  "title": "Magic Hour",
+  "description": "Create and edit images, videos, and audio through Magic Hour's hosted Streamable HTTP MCP server.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/magichourhq/magic-hour-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.magichour.ai/"
+    }
+  ]
+}
