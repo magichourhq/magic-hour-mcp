@@ -45,6 +45,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("wait_for_video_project", names)
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)
+        self.assertNotIn("upload_file_to_presigned_url", names)
 
     async def test_video_download_is_returned_as_embedded_binary_resource(self):
         url = "https://videos.magichour.ai/id/output.mp4?sig=123"

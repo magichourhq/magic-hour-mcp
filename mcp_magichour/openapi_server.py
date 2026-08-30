@@ -221,16 +221,16 @@ def register_custom_tools(mcp: FastMCP) -> None:
             max_bytes_per_download=max_bytes_per_download,
         )
 
-    @mcp.tool(
-        name="upload_file_to_presigned_url",
-        description=(
-            "Upload a local file from the MCP server's filesystem to a presigned `upload_url` returned by "
-            "the upload-URL endpoint. Use this for local CLI testing when the server can read the file path; "
-            "remote web-chat users still need a browser or backend upload bridge."
-        ),
-    )
-    async def upload_file_to_presigned_url(upload_url: str, local_file_path: str, content_type: str | None = None) -> dict[str, Any]:
-        return await _upload_file_to_presigned_url(upload_url, local_file_path, content_type)
+    if os.getenv("MCP_ENABLE_LOCAL_FILE_UPLOAD") == "true":
+        @mcp.tool(
+            name="upload_file_to_presigned_url",
+            description=(
+                "Upload a local file from the MCP server's filesystem to a presigned `upload_url` returned by "
+                "the upload-URL endpoint. Enable only for trusted local CLI use."
+            ),
+        )
+        async def upload_file_to_presigned_url(upload_url: str, local_file_path: str, content_type: str | None = None) -> dict[str, Any]:
+            return await _upload_file_to_presigned_url(upload_url, local_file_path, content_type)
 
     _register_media_fetch_tool(mcp, "image")
     _register_media_fetch_tool(mcp, "audio")

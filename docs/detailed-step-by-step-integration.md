@@ -281,9 +281,9 @@ Example:
 3. pass the returned `file_path` into `image_to_video_create_video.assets.image_file_path`
 
 `video_assets_generate_presigned_url` mints upload URLs for image, audio, and video.
-The custom `upload_file_to_presigned_url` helper can upload local files during
-CLI testing when the MCP server can read the path. Browser chat users still
-need an upload UI or bridge.
+For trusted local CLI testing only, set `MCP_ENABLE_LOCAL_FILE_UPLOAD=true` to
+expose the custom `upload_file_to_presigned_url` helper. Never enable it on a
+shared or hosted server. Browser chat users still need an upload UI or bridge.
 
 ## Step 15: Run the handoff checklist
 
