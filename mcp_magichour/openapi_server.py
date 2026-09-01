@@ -73,7 +73,6 @@ MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
 MCP_SERVER_URL = "https://mcp.magichour.ai/"
-UPLOAD_CHUNK_SIZE = 1024 * 1024
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
     "Returns sanitized download fields. Use `exact_download_urls[n]` or `downloads[n].url` exactly as returned; "
@@ -221,42 +220,9 @@ def register_custom_tools(mcp: FastMCP) -> None:
             max_bytes_per_download=max_bytes_per_download,
         )
 
-    @mcp.tool(
-        name="upload_file_to_presigned_url",
-        description=(
-            "Upload a local file from the MCP server's filesystem to a presigned `upload_url` returned by "
-            "the upload-URL endpoint. Use this for local CLI testing when the server can read the file path; "
-            "remote web-chat users still need a browser or backend upload bridge."
-        ),
-    )
-    async def upload_file_to_presigned_url(upload_url: str, local_file_path: str, content_type: str | None = None) -> dict[str, Any]:
-        return await _upload_file_to_presigned_url(upload_url, local_file_path, content_type)
-
     _register_media_fetch_tool(mcp, "image")
     _register_media_fetch_tool(mcp, "audio")
     _register_media_fetch_tool(mcp, "video")
-
-
-async def _upload_file_to_presigned_url(upload_url: str, local_file_path: str, content_type: str | None = None) -> dict[str, Any]:
-    path = Path(local_file_path).expanduser().resolve()
-    headers = {"Content-Type": content_type} if content_type else None
-
-    async with httpx.AsyncClient(timeout=API_TIMEOUT, follow_redirects=True) as client:
-        response = await client.put(upload_url, content=_LocalFileByteStream(path), headers=headers)
-        response.raise_for_status()
-
-    return {"uploaded": True, "status_code": response.status_code, "local_file_path": str(path)}
-
-
-class _LocalFileByteStream(httpx.AsyncByteStream):
-    def __init__(self, path: Path, chunk_size: int = UPLOAD_CHUNK_SIZE) -> None:
-        self.path = path
-        self.chunk_size = chunk_size
-
-    async def __aiter__(self):
-        with self.path.open("rb") as file_obj:
-            while chunk := file_obj.read(self.chunk_size):
-                yield chunk
 
 
 def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
