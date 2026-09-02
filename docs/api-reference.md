@@ -180,8 +180,8 @@ AI Talking Photo
 
 **Request Body:**
 - `name` (string, optional) default=Talking Photo - dateTime: Give your image a custom name for easy identification.
-- `start_seconds` (number, required) range=[0,None]: The start time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 180s, prompted 45s.
-- `end_seconds` (number, required) range=[0.1,None]: The end time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 180s, prompted 45s.
+- `start_seconds` (number, required) range=[0,None]: The start time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 300s, prompted 45s.
+- `end_seconds` (number, required) range=[0.1,None]: The end time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 300s, prompted 45s.
 - `assets` (object, required): Provide the assets for creating a talking photo
   - `image_file_path` (string, required): The source image to animate. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
   - `audio_file_path` (string, required): The audio file to sync with the image. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
@@ -203,9 +203,9 @@ AI Video Editor
 **Request Body:**
 - `name` (string, optional) default=Video Editor - dateTime: Give your video a custom name for easy identification.
 - `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
-- `end_seconds` (number, required) range=[0.1,None]: End time of your clip in seconds. Must be greater than `start_seconds`. Minimum duration depends on model: `gemini-omni`: 3s, `ltx-2.3`: 0.5s. Maximum duration depends on model: `gemini-omni`: 10s, `ltx-2.3`: 45s.
-- `model` (string, optional) enum=['gemini-omni', 'ltx-2.3']: Editing model. Defaults to `ltx-2.3` for free tier and `gemini-omni` for paid. Use `ltx-2.3` for LTX video edit.
-- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output resolution. Defaults to `480p` for free tier and `720p` for paid. Google Omni supports 720p only; LTX-2.3 supports 480p, 720p, and 1080p.
+- `end_seconds` (number, required) range=[0.1,None]: End time of your clip in seconds. Must be greater than `start_seconds`. Minimum duration depends on model: `gemini-omni-1.1`: 3s, `ltx-2.3`: 0.5s. Maximum duration depends on model: `gemini-omni-1.1`: 10s, `ltx-2.3`:...
+- `model` (string, optional) enum=['gemini-omni-1.1', 'gemini-omni', 'ltx-2.3']: Editing model. Defaults to `ltx-2.3` for free tier and `gemini-omni-1.1` for paid. `gemini-omni` is deprecated; use `gemini-omni-1.1` instead.
+- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output resolution. Defaults to `480p` for free tier and `720p` for paid. `gemini-omni-1.1` and deprecated `gemini-omni` support 720p and 1080p; LTX-2.3 supports 480p, 720p, and 1080p.
 - `style` (object, required): 
   - `prompt` (string, required): The prompt used to edit the video.
 - `assets` (object, required): Provide the assets for video editing.
@@ -357,7 +357,7 @@ Image-to-Video
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `model` (string, optional) enum=[19 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'minimax-h3', 'wan-2.2', 'seedance-1.5'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'ltx-2.5', 'minimax-h3', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
@@ -404,7 +404,7 @@ Text-to-Video
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
 - `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
-- `model` (string, optional) enum=[19 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'minimax-h3', 'wan-2.2', 'seedance-1.5'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'ltx-2.5', 'minimax-h3', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required): 
   - `prompt` (string, required): The prompt used for the video.
@@ -490,7 +490,7 @@ AI Clothes Changer
 - `assets` (object, required): Provide the assets for clothes changer
   - `person_file_path` (string, required): The image with the person. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
   - `garment_file_path` (string, required): The image of the outfit. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
-  - `garment_type` (string, optional) enum=['entire_outfit', 'upper_body', 'lower_body', 'dresses']: Type of garment to swap. If not provided, swaps the entire outfit. * `upper_body` - for shirts/jackets * `lower_body` - for pants/skirts * `dresses` - for entire outfit (deprecated, use `entire_outfit` instead) *...
+  - `garment_type` (string, optional) enum=['entire_outfit', 'upper_body', 'lower_body', 'dresses']: Type of clothing item to swap. If not provided, swaps the entire outfit. * `upper_body` - for shirts/jackets * `lower_body` - for pants/skirts * `dresses` - for entire outfit (deprecated, use `entire_outfit` instead) *...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
