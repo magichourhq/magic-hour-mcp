@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-import logging
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
 import httpx
+from fastmcp.utilities.logging import get_logger
 from starlette.datastructures import Headers
 
 
 # Inherit Uvicorn's configured INFO handler in standalone and mounted deployments.
-logger = logging.getLogger("uvicorn.error.mcp_auth")
+logger = get_logger("mcp_auth")
 
 
 class AuthError(Exception):
@@ -64,7 +64,7 @@ class BearerPassthroughAuth(httpx.Auth):
 
 
 class BearerPassthroughMiddleware:
-    """Capture the incoming MCP Authorization header for outbound API calls."""
+    """Capture auth and normalize legacy JSON content types for MCP compatibility."""
 
     def __init__(self, app: Any):
         self.app = app
@@ -78,17 +78,66 @@ class BearerPassthroughMiddleware:
         request_id = uuid4().hex
         method = scope.get("method", "UNKNOWN")
         path = scope.get("path", "")
+        headers = Headers(scope=scope)
+        content_type = headers.get("content-type", "none")
+        accept = headers.get("accept", "")
+        content_type_compat = (
+            method == "POST"
+            and content_type.split(";", 1)[0].strip().lower() == "application/octet-stream"
+        )
+        accept_compat = method == "POST" and accept.strip().lower() in {"", "*/*"}
         started_at = perf_counter()
         status_code: int | None = None
 
         authorization_token = _authorization_header.set(header)
         request_id_token = _request_id.set(request_id)
 
+        if content_type_compat:
+            logger.warning(
+                "request_content_type_compat request_id=%s original=%s normalized=application/json",
+                request_id,
+                content_type,
+            )
+
+        if accept_compat:
+            logger.warning(
+                "request_accept_compat request_id=%s original=%s normalized=application/json, text/event-stream",
+                request_id,
+                accept or "none",
+            )
+
+        if content_type_compat or accept_compat:
+            normalized_headers = []
+            accept_header_seen = False
+            for name, value in scope.get("headers", []):
+                lower_name = name.lower()
+                if accept_compat and lower_name == b"accept":
+                    value = b"application/json, text/event-stream"
+                    accept_header_seen = True
+                elif content_type_compat and lower_name == b"content-type":
+                    value = b"application/json"
+                normalized_headers.append((name, value))
+            if accept_compat and not accept_header_seen:
+                normalized_headers.append((b"accept", b"application/json, text/event-stream"))
+
+            scope = {
+                **scope,
+                "headers": normalized_headers,
+            }
+
         logger.info(
-            "request_started request_id=%s method=%s path=%s auth_present=%s auth_scheme=%s",
+            "request_started request_id=%s method=%s path=%s content_type=%s protocol_version=%s "
+            "content_type_compat=%s accept_present=%s accept_compat=%s session_id_present=%s "
+            "auth_present=%s auth_scheme=%s",
             request_id,
             method,
             path,
+            content_type,
+            headers.get("mcp-protocol-version", "none"),
+            str(content_type_compat).lower(),
+            str(bool(accept)).lower(),
+            str(accept_compat).lower(),
+            str(bool(headers.get("mcp-session-id"))).lower(),
             str(bool(header)).lower(),
             _safe_auth_scheme(header),
         )

@@ -6,7 +6,6 @@ import hashlib
 import hmac
 import html
 import json
-import logging
 import os
 import re
 import secrets
@@ -21,6 +20,7 @@ import httpx
 from fastmcp.server.dependencies import get_http_request
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.tools.base import Tool, ToolResult
+from fastmcp.utilities.logging import get_logger
 from mcp.types import TextContent
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -49,7 +49,7 @@ ALLOWED_REDIRECT_URI_PATTERNS = [
 PKCE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 ApiKeyValidator = Callable[[str], Awaitable[bool]]
-logger = logging.getLogger("uvicorn.error.mcp_oauth")
+logger = get_logger("mcp_oauth")
 OAUTH_SECURITY_SCHEMES = [{"type": "oauth2", "scopes": []}]
 
 
