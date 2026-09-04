@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "OpenAPI-backed MCP server wrapping the Magic Hour API"
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=3.4.0,<4",
+    "fastmcp>=3.4.0,<4.0",
     "httpx>=0.28.1",
     "jsonschema>=4.20.0",
     "python-dotenv>=1.0.0",

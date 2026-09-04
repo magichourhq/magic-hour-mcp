@@ -37,9 +37,11 @@ The repo adds these custom helpers:
 - `fetch_image_download`
 - `fetch_audio_download`
 - `fetch_video_download`
-- `upload_file_to_presigned_url`
 
 OpenAPI policies add agent guidance by endpoint group rather than by individual endpoint.
+
+The server intentionally has no tool that reads caller-supplied local filesystem
+paths. Upload file bytes from the caller or a dedicated upload bridge.
 
 ## Required lifespan wiring
 

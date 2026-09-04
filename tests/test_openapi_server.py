@@ -2,7 +2,6 @@ import re
 import unittest
 from base64 import b64encode
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -14,7 +13,6 @@ from mcp_magichour.openapi_server import (
     _project_structured_content_for_agent,
     _project_to_tool_result,
     _resolve_media_mime_type,
-    _upload_file_to_presigned_url,
     app,
     mcp,
 )
@@ -45,6 +43,11 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("wait_for_video_project", names)
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)
+
+    async def test_server_does_not_expose_local_filesystem_upload_tool(self):
+        names = {tool.name for tool in await mcp.list_tools()}
+
+        self.assertNotIn("upload_file_to_presigned_url", names)
 
     async def test_video_download_is_returned_as_embedded_binary_resource(self):
         url = "https://videos.magichour.ai/id/output.mp4?sig=123"
@@ -109,56 +112,6 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(mime_type, "video/mp4")
-
-    async def test_upload_file_to_presigned_url_sends_bytes_with_async_client(self):
-        class FakeResponse:
-            status_code = 204
-
-            def raise_for_status(self):
-                return None
-
-        class FakeAsyncClient:
-            def __init__(self):
-                self.calls = []
-
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc, traceback):
-                return None
-
-            async def put(self, url, content, headers=None):
-                body = bytearray()
-                async for chunk in content:
-                    body.extend(chunk)
-                self.calls.append({"url": url, "content": bytes(body), "headers": headers})
-                return FakeResponse()
-
-        fake_client = FakeAsyncClient()
-
-        with TemporaryDirectory() as temp_dir:
-            upload_path = Path(temp_dir) / "asset.png"
-            upload_path.write_bytes(b"image-bytes")
-
-            with patch("mcp_magichour.openapi_server.httpx.AsyncClient", return_value=fake_client):
-                result = await _upload_file_to_presigned_url(
-                    "https://uploads.example.test/signed",
-                    str(upload_path),
-                    "image/png",
-                )
-
-        self.assertEqual(result["uploaded"], True)
-        self.assertEqual(result["status_code"], 204)
-        self.assertEqual(
-            fake_client.calls,
-            [
-                {
-                    "url": "https://uploads.example.test/signed",
-                    "content": b"image-bytes",
-                    "headers": {"Content-Type": "image/png"},
-                }
-            ],
-        )
 
     async def test_wait_result_can_include_inline_media_and_structured_content(self):
         project = {

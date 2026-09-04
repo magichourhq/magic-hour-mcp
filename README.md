@@ -113,6 +113,6 @@ Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
 3. Pass the returned `file_path` into the generated creation tool
 
 Direct public media URLs may work, but uploaded `file_path` values are more
-reliable. `upload_file_to_presigned_url` handles local files when the server can
-read them. Browser chat needs a separate upload UI or bridge; see
-`docs/future-chat-ui-handoff.md`.
+reliable. Upload bytes from the caller or a dedicated upload bridge; the hosted
+MCP server never reads caller-supplied local filesystem paths. Browser chat needs
+a separate upload UI or bridge; see `docs/future-chat-ui-handoff.md`.
