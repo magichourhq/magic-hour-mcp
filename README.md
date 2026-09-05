@@ -1,6 +1,6 @@
 # Magic Hour MCP Server
 
-[![smithery badge](https://smithery.ai/badge/magichourhq/magic-hour)](https://smithery.ai/servers/magichourhq/magic-hour)
+[![LightNow MCP capabilities](https://lightnow.ai/badge/io.github.magichourhq/magic-hour)](https://lightnow.ai/servers/io.github.magichourhq/magic-hour)
 
 OpenAPI-backed MCP server for Magic Hour image, video, and audio generation.
 
