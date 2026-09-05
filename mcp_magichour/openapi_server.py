@@ -566,6 +566,12 @@ async def mcp_server_card(_: Request) -> JSONResponse:
             "description": MCP_SERVER_DESCRIPTION,
             "version": MCP_SERVER_VERSION,
             "serverUrl": MCP_SERVER_URL,
+            "remotes": [
+                {
+                    "type": "streamable-http",
+                    "url": MCP_SERVER_URL,
+                }
+            ],
             "tools": [
                 tool.model_dump(mode="json", by_alias=True, exclude_none=True)
                 for tool in await mcp.list_tools()
