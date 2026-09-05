@@ -144,6 +144,10 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(card["version"], MCP_SERVER_VERSION)
         self.assertEqual(MCP_SERVER_URL, "https://mcp.magichour.ai/")
         self.assertEqual(card["serverUrl"], MCP_SERVER_URL)
+        self.assertEqual(
+            card["remotes"],
+            [{"type": "streamable-http", "url": MCP_SERVER_URL}],
+        )
         self.assertGreater(len(card["tools"]), 0)
         self.assertTrue(
             all(
