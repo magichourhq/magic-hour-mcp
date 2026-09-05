@@ -358,7 +358,7 @@ Image-to-Video
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
 - `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'ltx-2.5', 'minimax-h3', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
-- `resolution` (string, optional) enum=['480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
+- `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
   - `prompt` (string, optional): The prompt used for the video.
@@ -403,7 +403,7 @@ Text-to-Video
 - `name` (string, optional) default=Text To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
 - `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
-- `resolution` (string, optional) enum=['480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
+- `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'ltx-2.5', 'minimax-h3', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required): 
