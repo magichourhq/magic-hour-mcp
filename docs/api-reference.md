@@ -111,6 +111,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/ai-voice-generator` | Audio Projects | AI Voice Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
+| GET | `/v1/account` | Account | Get account details |
 
 ## Per-endpoint detail
 
