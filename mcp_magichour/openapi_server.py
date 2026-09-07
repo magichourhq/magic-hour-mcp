@@ -23,10 +23,19 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
+from .openapi_auth import (
+    BearerPassthroughAuth,
+    BearerPassthroughMiddleware,
+    current_authorization_header,
+)
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
-from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
+from .openapi_policies import (
+    LOGGING_GUIDANCE,
+    apply_magic_hour_policies,
+    customize_openapi_component,
+    private_tool_annotations,
+)
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
     MCP_APP_DIST_PATH,
@@ -55,6 +64,8 @@ MCP_SERVER_VERSION = "0.1.0"
 MCP_SERVER_INSTRUCTIONS = """
 Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
+Only create or edit media when the user requests execution. Ideas, writing, prompts, and how-to questions alone do not authorize generation.
+Never repeat a create call to poll progress. Reuse its returned project id.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
 
@@ -78,9 +89,44 @@ SIGNED_DOWNLOAD_GUIDANCE = (
     "Returns sanitized download fields. Use `exact_download_urls[n]` or `downloads[n].url` exactly as returned; "
     "do not shorten it, remove query parameters, or append expiration metadata."
 )
+PROJECT_RESULT_SCHEMA = {
+    "type": "object",
+    "required": ["project_type"],
+    "properties": {
+        "project_type": {"enum": ["image", "video", "audio"]},
+        "status": {"type": "string"},
+        "id": {"type": "string"},
+        "credits_charged": {"type": "number"},
+        "downloads": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"url": {"type": "string"}},
+                "required": ["url"],
+            },
+        },
+        "exact_download_urls": {"type": "array", "items": {"type": "string"}},
+        "download_expiration_metadata": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    key: {"type": "string"}
+                    for key in ("download_index", "expires_at", "note")
+                },
+                "required": ["download_index", "expires_at", "note"],
+            },
+        },
+        "last_project": {"type": "object"},
+        "message": {"type": "string"},
+    },
+    "additionalProperties": True,
+}
 
 
-def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
+def load_openapi_spec(
+    path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH,
+) -> dict[str, Any]:
     with Path(path).open("r", encoding="utf-8") as spec_file:
         return json.load(spec_file)
 
@@ -106,7 +152,12 @@ def create_mcp() -> FastMCP:
         version=MCP_SERVER_VERSION,
         instructions=MCP_SERVER_INSTRUCTIONS,
         route_maps=[
-            RouteMap(methods=["POST"], pattern=r".*", mcp_type=MCPType.TOOL, mcp_tags={"write-operation"}),
+            RouteMap(
+                methods=["POST"],
+                pattern=r".*",
+                mcp_type=MCPType.TOOL,
+                mcp_tags={"write-operation"},
+            ),
             RouteMap(pattern=r".*", mcp_type=MCPType.TOOL),
         ],
         mcp_component_fn=customize_openapi_component,
@@ -137,16 +188,19 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="ping",
-        description="Check that the Magic Hour MCP server is reachable.",
+        description=f"Check that the Magic Hour MCP server is reachable; returns pong. {LOGGING_GUIDANCE}",
+        annotations=private_tool_annotations(),
     )
     def ping() -> str:
         return "pong"
 
     @mcp.tool(
         name="wait_for_video_project",
+        annotations=private_tool_annotations(),
+        output_schema=PROJECT_RESULT_SCHEMA,
         description=(
             "Poll a video project until it completes, errors, is canceled, or times out. "
-            f"{SIGNED_DOWNLOAD_GUIDANCE}"
+            f"{SIGNED_DOWNLOAD_GUIDANCE} {LOGGING_GUIDANCE} Does not start a generation or charge credits."
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
@@ -168,10 +222,12 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="wait_for_image_project",
+        annotations=private_tool_annotations(),
+        output_schema=PROJECT_RESULT_SCHEMA,
         description=(
             "Poll an image project until it completes, errors, is canceled, or times out. Returns the final "
             "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
-            f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
+            f"clients. {SIGNED_DOWNLOAD_GUIDANCE} {LOGGING_GUIDANCE} Does not start a generation or charge credits."
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
@@ -195,10 +251,12 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="wait_for_audio_project",
+        annotations=private_tool_annotations(),
+        output_schema=PROJECT_RESULT_SCHEMA,
         description=(
             "Poll an audio project until it completes, errors, is canceled, or times out. Returns the final "
             "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
-            f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
+            f"clients. {SIGNED_DOWNLOAD_GUIDANCE} {LOGGING_GUIDANCE} Does not start a generation or charge credits."
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
     )
@@ -227,16 +285,28 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
 def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
     tool_name = f"fetch_{media_type}_download"
-    content_kind = f"inline MCP {media_type} content" if media_type != "video" else "an embedded MCP binary resource"
+    content_kind = (
+        f"inline MCP {media_type} content"
+        if media_type != "video"
+        else "an embedded MCP binary resource"
+    )
     description = (
         f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as "
         f"{content_kind} for compatible clients. Pass the exact full signed URL from "
         "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
     )
 
-    @mcp.tool(name=tool_name, description=description)
-    async def fetch_download(download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES):
-        data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
+    @mcp.tool(
+        name=tool_name,
+        description=f"{description} {LOGGING_GUIDANCE} Does not start a generation or charge credits.",
+        annotations=private_tool_annotations(),
+    )
+    async def fetch_download(
+        download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES
+    ):
+        data, mime_type = await _fetch_media_bytes(
+            download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes
+        )
         return _media_content(media_type, data, mime_type, source_uri=download_url)
 
 
@@ -251,7 +321,9 @@ async def _wait_for_project(
 
     async with build_api_client() as client:
         while True:
-            response = await client.get(path, headers={"Authorization": current_authorization_header()})
+            response = await client.get(
+                path, headers={"Authorization": current_authorization_header()}
+            )
             response.raise_for_status()
             project = response.json()
             status = project.get("status")
@@ -279,7 +351,9 @@ async def _wait_for_project_result(
     max_inline_downloads: int = 0,
     max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
 ) -> ToolResult:
-    project = await _wait_for_project(project_type, project_id, poll_interval_seconds, timeout_seconds)
+    project = await _wait_for_project(
+        project_type, project_id, poll_interval_seconds, timeout_seconds
+    )
     return await _project_to_tool_result(
         project_type,
         project,
@@ -289,11 +363,16 @@ async def _wait_for_project_result(
     )
 
 
-async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:
+async def _fetch_media_bytes(
+    download_url: str, expected_prefix: str, max_bytes: int
+) -> tuple[bytes, str]:
     if max_bytes <= 0:
         raise ValueError("max_bytes must be greater than 0.")
     parsed_url = urlparse(download_url)
-    if parsed_url.scheme != "https" or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname:
+    if (
+        parsed_url.scheme != "https"
+        or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname
+    ):
         raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
 
     async with httpx.AsyncClient(timeout=API_TIMEOUT, follow_redirects=True) as client:
@@ -339,10 +418,14 @@ async def _project_to_tool_result(
             )
         )
 
-    if status == "complete" and _can_inline_media(project_type, include_inline_downloads, max_inline_downloads):
+    if status == "complete" and _can_inline_media(
+        project_type, include_inline_downloads, max_inline_downloads
+    ):
         media_project_type = project_type
         assert media_project_type in {"image", "audio"}
-        for index, download_url in enumerate(download_urls[:max_inline_downloads], start=1):
+        for index, download_url in enumerate(
+            download_urls[:max_inline_downloads], start=1
+        ):
             try:
                 data, mime_type = await _fetch_media_bytes(
                     download_url,
@@ -384,11 +467,19 @@ async def _project_to_tool_result(
     return ToolResult(content=content, structured_content=structured_content)
 
 
-def _can_inline_media(project_type: ProjectType, include_inline_downloads: bool, max_inline_downloads: int) -> bool:
-    return include_inline_downloads and max_inline_downloads > 0 and project_type in {"image", "audio"}
+def _can_inline_media(
+    project_type: ProjectType, include_inline_downloads: bool, max_inline_downloads: int
+) -> bool:
+    return (
+        include_inline_downloads
+        and max_inline_downloads > 0
+        and project_type in {"image", "audio"}
+    )
 
 
-def _media_content(media_type: ProjectType, data: bytes, mime_type: str, source_uri: str | None = None) -> Any:
+def _media_content(
+    media_type: ProjectType, data: bytes, mime_type: str, source_uri: str | None = None
+) -> Any:
     if media_type == "image":
         return Image(data=data).to_image_content(mime_type=mime_type)
     if media_type == "audio":
@@ -509,7 +600,9 @@ def _project_download_guidance_text(
     return "\n".join(lines)
 
 
-def _resolve_media_mime_type(download_url: str, header_value: str | None, expected_prefix: str) -> str:
+def _resolve_media_mime_type(
+    download_url: str, header_value: str | None, expected_prefix: str
+) -> str:
     if header_value:
         mime_type = header_value.partition(";")[0].strip().lower()
         if mime_type.startswith(expected_prefix):
@@ -537,7 +630,12 @@ middleware = [
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["mcp-protocol-version", "mcp-session-id", "Authorization", "Content-Type"],
+        allow_headers=[
+            "mcp-protocol-version",
+            "mcp-session-id",
+            "Authorization",
+            "Content-Type",
+        ],
         expose_headers=["mcp-session-id"],
     ),
 ]

@@ -4,6 +4,8 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from mcp.types import ToolAnnotations
+
 
 PROJECT_TAG_TO_ASSET = {
     "Video Projects": "video",
@@ -18,8 +20,53 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
 }
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
-PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()}
+PROJECT_DETAIL_PATHS = {
+    f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()
+}
 GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
+LOGGING_GUIDANCE = (
+    "Calls write private diagnostic logs, including for status and download reads."
+)
+REVIEWED_GENERATION_PATHS = {
+    f"/v1/{name}"
+    for name in (
+        "ai-talking-photo",
+        "ai-video-editor",
+        "animation",
+        "audio-to-video",
+        "auto-subtitle-generator",
+        "character-replace",
+        "face-swap",
+        "image-to-video",
+        "lip-sync",
+        "text-to-video",
+        "video-to-video",
+        "ai-clothes-changer",
+        "ai-face-editor",
+        "ai-gif-generator",
+        "ai-image-editor",
+        "ai-headshot-generator",
+        "ai-image-generator",
+        "ai-image-upscaler",
+        "ai-meme-generator",
+        "ai-qr-code-generator",
+        "body-swap",
+        "face-swap-photo",
+        "head-swap",
+        "image-background-remover",
+        "photo-colorizer",
+        "ai-voice-generator",
+        "ai-voice-cloner",
+    )
+}
+
+
+def private_tool_annotations(*, destructive: bool = False) -> ToolAnnotations:
+    # OpenAI's review definition includes log writes. ToolCallLoggingMiddleware
+    # runs for every tool, including otherwise read-only helpers.
+    return ToolAnnotations(
+        readOnlyHint=False, openWorldHint=False, destructiveHint=destructive
+    )
 
 
 def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
@@ -32,7 +79,9 @@ def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
                 continue
             if operation_id := operation.get("operationId"):
                 operation["operationId"] = normalize_mcp_tool_name(operation_id)
-            _apply_operation_policy(path=path, method=method.upper(), operation=operation)
+            _apply_operation_policy(
+                path=path, method=method.upper(), operation=operation
+            )
 
     return spec
 
@@ -44,15 +93,21 @@ def normalize_mcp_tool_name(operation_id: str) -> str:
     words = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").lower().split("_")
     normalized = "_".join(GENERIC_ACTION_REPLACEMENTS.get(word, word) for word in words)
     if len(normalized) < 4:
-        raise ValueError(f"MCP tool name must contain at least 4 characters: {operation_id!r}")
+        raise ValueError(
+            f"MCP tool name must contain at least 4 characters: {operation_id!r}"
+        )
     return normalized
 
 
-def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]) -> None:
+def _apply_operation_policy(
+    *, path: str, method: str, operation: dict[str, Any]
+) -> None:
     tags = set(operation.get("tags") or [])
-    additions: list[str] = []
+    additions: list[str] = [LOGGING_GUIDANCE]
 
-    asset_type = next((asset for tag, asset in PROJECT_TAG_TO_ASSET.items() if tag in tags), None)
+    asset_type = next(
+        (asset for tag, asset in PROJECT_TAG_TO_ASSET.items() if tag in tags), None
+    )
 
     if path == "/v1/files/upload-urls":
         additions.append(
@@ -75,6 +130,11 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
             "or `canceled`. Completed projects include `downloads` with direct URLs. The custom wait helper also "
             "returns `exact_download_urls` separately from expiration metadata."
         )
+        additions.append(
+            "Creates a new private project and charges the applicable Magic Hour credits; it does not publish "
+            "the result. Only start generation when the user asks to create or edit media, not for ideas, "
+            "prompts, or instructions alone. Do not repeat a create call to check progress; reuse its id."
+        )
 
     if method == "GET" and path in PROJECT_DETAIL_PATHS:
         additions.append(
@@ -95,7 +155,9 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         )
 
     if additions:
-        operation["description"] = _append_mcp_guidance(operation.get("description", ""), additions)
+        operation["description"] = _append_mcp_guidance(
+            operation.get("description", ""), additions
+        )
 
 
 def _operation_mentions_file_path(operation: dict[str, Any]) -> bool:
@@ -114,15 +176,33 @@ def _append_mcp_guidance(description: str, additions: list[str]) -> str:
 
 def customize_openapi_component(route: Any, component: Any) -> None:
     """Small runtime component policy for tags; text policy is applied to the spec."""
-    tags = getattr(component, "tags", None)
-    if tags is None:
-        return
-
-    tags.add("magic-hour")
-
     method = str(getattr(route, "method", "")).upper()
     path = str(getattr(route, "path", ""))
     route_tags = set(getattr(route, "tags", []) or [])
+
+    # Fail closed when the OpenAPI sync introduces a new kind of operation.
+    # These groups were reviewed against the API handlers, not tool names.
+    project_details = path in PROJECT_DETAIL_PATHS
+    supported = (
+        (project_details and method in {"GET", "DELETE"})
+        or (method == "GET" and path == "/v1/face-detection/{id}")
+        or (
+            method == "POST" and path in {"/v1/files/upload-urls", "/v1/face-detection"}
+        )
+        or (
+            method == "POST"
+            and path in REVIEWED_GENERATION_PATHS
+            and bool(route_tags.intersection(PROJECT_TAG_TO_ASSET))
+        )
+    )
+    if not supported:
+        raise ValueError(f"Review MCP side effects before exposing {method} {path}")
+    component.annotations = private_tool_annotations(destructive=method == "DELETE")
+
+    tags = getattr(component, "tags", None)
+    if tags is None:
+        return
+    tags.add("magic-hour")
 
     if method == "POST":
         tags.add("write-operation")
