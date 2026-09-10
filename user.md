@@ -67,6 +67,18 @@ codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var 
 
 Start Codex from that same shell and ask it to call the Magic Hour `ping` tool.
 
+## Improve output quality with Magic Hour skills
+
+The MCP gives your agent access to Magic Hour tools. The [Magic Hour skills cookbook](https://github.com/magichourhq/skills) adds tested guidance for choosing and sequencing those tools, writing stronger prompts, reviewing outputs, and recovering without duplicate paid jobs.
+
+Install all three skills:
+
+```sh
+npx skills add magichourhq/skills --all
+```
+
+For controlled product or character animation, create or edit the still image first, fix composition and identity issues there, then use that approved image as the image-to-video start frame. Prompt the video step mainly for motion, camera movement, timing, and what must stay fixed.
+
 ## Prompt cookbook
 
 These examples cover the most-used Magic Hour endpoints. For inputs, use uploaded files or existing Magic Hour `file_path` values when possible.
