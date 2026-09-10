@@ -9,6 +9,7 @@ and project downloads.
 
 Docs:
 
+- [Magic Hour agent skills](https://github.com/magichourhq/skills) - tested workflows for prompting, sequencing, output review, and recovery
 - `user.md` - hosted endpoint user guide
 - `integration-handoff.md` - FastAPI mount checklist
 - `docs/detailed-step-by-step-integration.md` - full backend integration guide
