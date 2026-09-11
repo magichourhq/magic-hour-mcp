@@ -1,0 +1,596 @@
+{
+  "$schema": "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "Magic Hour",
+    "subtitle": "Create images and videos",
+    "description": "Magic Hour lets ChatGPT create and edit images, video, and audio through authenticated Magic Hour tools. Generate images, edit supplied photos, animate images, swap faces, and retrieve completed media. Generation uses the applicable Magic Hour credits.",
+    "category": "DESIGN"
+  },
+  "tools": {
+    "ping": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Returns a reachability response while the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "wait_for_video_project": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "wait_for_image_project": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "wait_for_audio_project": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "fetch_image_download": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "fetch_audio_download": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "fetch_video_download": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "video_assets_generate_presigned_url": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Signs expiring upload URLs without uploading bytes or creating storage objects, while the MCP call writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Returns upload URLs for new unique paths without deleting or overwriting media."
+      }
+    },
+    "face_detection_retrieve_details": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "face_detection_detect_faces": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Starts an asynchronous private face-detection task and writes diagnostic logs, currently without charging generation credits.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Creates a detection task without deleting or overwriting the source media."
+      }
+    },
+    "video_projects_retrieve_details": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "video_projects_delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes the selected project outputs and changes private project records, with diagnostic logging.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Permanently removes rendered media and may remove an associated unapproved template; the deleted files cannot be restored by this tool."
+      }
+    },
+    "ai_talking_photo_create_talking_photo": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_video_editor_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "animation_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "audio_to_video_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "auto_subtitle_generator_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "character_replace_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "face_swap_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "image_to_video_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "lip_sync_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "text_to_video_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "video_to_video_create_video": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "image_projects_retrieve_details": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "image_projects_delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes the selected project outputs and changes private project records, with diagnostic logging.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Permanently removes rendered media and may remove an associated unapproved template; the deleted files cannot be restored by this tool."
+      }
+    },
+    "ai_clothes_changer_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_face_editor_edit_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_gif_generator_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_image_editor_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_headshot_generator_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_image_generator_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_image_upscaler_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_meme_generator_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_qr_code_generator_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "body_swap_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "face_swap_photo_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "head_swap_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "image_background_remover_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "photo_colorizer_create_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "audio_projects_retrieve_details": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Retrieves data or media without starting a generation, but the MCP call writes private diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Does not delete, overwrite, publish, or revoke access to media or projects."
+      }
+    },
+    "audio_projects_delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes the selected project outputs and changes private project records, with diagnostic logging.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Permanently removes rendered media and may remove an associated unapproved template; the deleted files cannot be restored by this tool."
+      }
+    },
+    "ai_voice_generator_create_audio": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    },
+    "ai_voice_cloner_create_audio": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a private media-generation project, enqueues processing, charges applicable Magic Hour credits, and writes diagnostic logs.",
+        "open_world_justification": "Operates within private Magic Hour processing and storage without publishing content or sending messages to external recipients.",
+        "destructive_justification": "Adds a new generated output without deleting or overwriting the source media or existing projects."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Generate one product image.",
+      "user_prompt": "Create a cinematic product photo of a perfume bottle on black marble with warm studio lighting.",
+      "file_attachment_urls": null,
+      "tools_triggered": "ai_image_generator_create_image, wait_for_image_project",
+      "expected_output": "Creates exactly one image project, waits for terminal success, and returns the completed image using its exact download URL without repeating generation.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Edit an attached image containing a background person; provide a reviewer fixture before running.",
+      "user_prompt": "Remove the person in the background from this image and keep everything else the same.",
+      "file_attachment_urls": null,
+      "tools_triggered": "video_assets_generate_presigned_url, ai_image_editor_create_image, wait_for_image_project",
+      "expected_output": "Transfers the attached image into accessible storage before generation, uses Image Editor once, waits for terminal success, and returns the edited image with the background person removed and other content preserved.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Animate an attached product photo; provide a reviewer fixture before running.",
+      "user_prompt": "Turn this product photo into a subtle five-second cinematic product video. Keep the product identity unchanged.",
+      "file_attachment_urls": null,
+      "tools_triggered": "video_assets_generate_presigned_url, image_to_video_create_video, wait_for_video_project",
+      "expected_output": "Transfers or references the supplied image, creates exactly one five-second Image-to-Video project, waits for terminal success, and returns the finished video with the product identity preserved.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Swap faces between two attached consenting-adult or synthetic photos; provide reviewer fixtures before running.",
+      "user_prompt": "Put the face from the first photo onto the person in the second photo. Keep the second photo\u2019s background and clothing unchanged.",
+      "file_attachment_urls": null,
+      "tools_triggered": "video_assets_generate_presigned_url, face_swap_photo_create_image, wait_for_image_project",
+      "expected_output": "Correctly assigns source and target images, uploads both before generation, creates one Face Swap Photo project, waits for terminal success, and returns the completed swap.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Create one source image and animate it into one video.",
+      "user_prompt": "Create a cinematic perfume product photo on black marble, then animate it into a subtle five-second video.",
+      "file_attachment_urls": null,
+      "tools_triggered": "ai_image_generator_create_image, wait_for_image_project, image_to_video_create_video, wait_for_video_project",
+      "expected_output": "Creates one source image, waits for it, uses that completed image as the Image-to-Video input, creates one five-second video, waits for success, and returns the final video without duplicate jobs.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Writing without media generation.",
+      "user_prompt": "Write three hooks for my video ad. Don't create any media.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Answers with text or asks for writing context; does not invoke any Magic Hour tool or spend generation credits.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Unrelated calendar action.",
+      "user_prompt": "Move tomorrow's team meeting to Friday.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Does not invoke Magic Hour; routes to an appropriate calendar capability or explains that calendar access is unavailable.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Informational product-video advice.",
+      "user_prompt": "What makes a good product video?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Answers with guidance without invoking Magic Hour or starting paid generation.",
+      "expected_output_url": null
+    }
+  ]
+}

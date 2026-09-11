@@ -1,5 +1,7 @@
 import re
+import json
 import unittest
+import jsonschema
 from base64 import b64encode
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -44,6 +46,95 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)
 
+    async def test_every_exposed_tool_has_explicit_submission_hints(self):
+        for tool in await mcp.list_tools():
+            with self.subTest(tool=tool.name):
+                self.assertIsNotNone(tool.annotations)
+                for hint in ("readOnlyHint", "openWorldHint", "destructiveHint"):
+                    self.assertIs(type(getattr(tool.annotations, hint)), bool)
+                # Every call passes through the diagnostic logging middleware.
+                self.assertFalse(tool.annotations.readOnlyHint)
+                self.assertFalse(tool.annotations.openWorldHint)
+                self.assertEqual(
+                    tool.annotations.destructiveHint,
+                    tool.name
+                    in {
+                        f"{asset}_projects_delete"
+                        for asset in ("image", "video", "audio")
+                    },
+                )
+
+    async def test_wait_schemas_accept_terminal_and_timeout_results(self):
+        for asset in ("image", "video", "audio"):
+            tool = await mcp.get_tool(f"wait_for_{asset}_project")
+            self.assertIsNotNone(tool.output_schema)
+            for project in (
+                {
+                    "id": "example",
+                    "status": "complete",
+                    "downloads": [
+                        {
+                            "url": "https://videos.magichour.ai/example",
+                            "expires_at": "2026-09-07T00:00:00Z",
+                        }
+                    ],
+                },
+                {
+                    "id": "example",
+                    "status": "error",
+                    "downloads": [],
+                    "error": {"message": "failed", "code": "failed"},
+                },
+                {"id": "example", "status": "canceled", "downloads": []},
+                {
+                    "status": "timeout",
+                    "message": "Timed out",
+                    "last_project": {"status": "rendering"},
+                },
+            ):
+                result = await _project_to_tool_result(
+                    asset,
+                    project,
+                    include_inline_downloads=False,
+                    max_inline_downloads=0,
+                    max_bytes_per_download=1024,
+                )
+                jsonschema.validate(result.structured_content, tool.output_schema)
+
+    async def test_primary_workflows_advertise_output_schemas(self):
+        names = {
+            "ai_image_generator_create_image",
+            "ai_image_editor_create_image",
+            "image_to_video_create_video",
+            "video_assets_generate_presigned_url",
+            "face_swap_create_video",
+            "face_swap_photo_create_image",
+            "ai_talking_photo_create_talking_photo",
+            "lip_sync_create_video",
+        }
+        names.update(
+            f"{asset}_projects_retrieve_details"
+            for asset in ("image", "video", "audio")
+        )
+        for name in names:
+            self.assertIsNotNone((await mcp.get_tool(name)).output_schema, name)
+
+    async def test_submission_matches_exposed_tools(self):
+        submission = json.loads(
+            (Path(__file__).parents[1] / "chatgpt-app-submission.json").read_text()
+        )
+        tools = {tool.name: tool for tool in await mcp.list_tools()}
+        self.assertEqual(set(submission["tools"]), set(tools))
+        for name, entry in submission["tools"].items():
+            self.assertEqual(
+                entry["annotations"],
+                tools[name].annotations.model_dump(exclude_none=True),
+            )
+        self.assertEqual(len(submission["test_cases"]), 5)
+        self.assertEqual(len(submission["negative_test_cases"]), 3)
+        for case in submission["test_cases"]:
+            self.assertTrue(set(case["tools_triggered"].split(", ")) <= set(tools))
+
     async def test_server_does_not_expose_local_filesystem_upload_tool(self):
         names = {tool.name for tool in await mcp.list_tools()}
 
@@ -63,14 +154,22 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(content.type, "resource")
         self.assertEqual(str(content.resource.uri), url)
         self.assertEqual(content.resource.mimeType, "video/mp4")
-        self.assertEqual(content.resource.blob, b64encode(b"video-bytes").decode("ascii"))
+        self.assertEqual(
+            content.resource.blob, b64encode(b"video-bytes").decode("ascii")
+        )
 
     async def test_media_fetch_rejects_non_magic_hour_url(self):
-        with self.assertRaisesRegex(ValueError, "download_url must use https://videos.magichour.ai"):
+        with self.assertRaisesRegex(
+            ValueError, "download_url must use https://videos.magichour.ai"
+        ):
             await _fetch_media_bytes("https://example.test/output.mp4", "video/", 1024)
 
     async def test_video_wait_accepts_shared_inline_options(self):
-        tool = next(tool for tool in await mcp.list_tools() if tool.name == "wait_for_video_project")
+        tool = next(
+            tool
+            for tool in await mcp.list_tools()
+            if tool.name == "wait_for_video_project"
+        )
         properties = tool.parameters["properties"]
 
         self.assertEqual(properties["include_inline_downloads"]["default"], False)
@@ -82,9 +181,15 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ping", names)
         self.assertIn("ai_image_generator_create_image", names)
         self.assertIn("face_detection_retrieve_details", names)
-        self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in names))
+        self.assertTrue(
+            all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in names)
+        )
         self.assertTrue(all(len(name) >= 4 for name in names))
-        self.assertTrue(all(not {"do", "get", "run"}.intersection(name.split("_")) for name in names))
+        self.assertTrue(
+            all(
+                not {"do", "get", "run"}.intersection(name.split("_")) for name in names
+            )
+        )
 
     def test_resolve_media_mime_type_prefers_matching_header(self):
         mime_type = _resolve_media_mime_type(
@@ -137,12 +242,24 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
                 max_bytes_per_download=1024,
             )
 
-        self.assertEqual(result.structured_content["exact_download_urls"], ["https://videos.magichour.ai/id/output.png?sig=123"])
-        self.assertEqual(result.structured_content["downloads"], [{"url": "https://videos.magichour.ai/id/output.png?sig=123"}])
+        self.assertEqual(
+            result.structured_content["exact_download_urls"],
+            ["https://videos.magichour.ai/id/output.png?sig=123"],
+        )
+        self.assertEqual(
+            result.structured_content["downloads"],
+            [{"url": "https://videos.magichour.ai/id/output.png?sig=123"}],
+        )
         self.assertEqual(result.structured_content["project_type"], "image")
         self.assertNotIn("expires_at", result.structured_content["downloads"][0])
-        self.assertEqual(result.content[0].text, "Image project img-123 completed with 1 download(s).")
-        self.assertIn("EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.png?sig=123", result.content[1].text)
+        self.assertEqual(
+            result.content[0].text,
+            "Image project img-123 completed with 1 download(s).",
+        )
+        self.assertIn(
+            "EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.png?sig=123",
+            result.content[1].text,
+        )
         self.assertEqual(result.content[2].type, "image")
 
     async def test_video_wait_result_uses_sanitized_download_fields(self):
@@ -165,18 +282,37 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
             max_bytes_per_download=1024,
         )
 
-        self.assertEqual(result.structured_content["exact_download_urls"], ["https://videos.magichour.ai/id/output.mp4?sig=123"])
-        self.assertEqual(result.structured_content["downloads"], [{"url": "https://videos.magichour.ai/id/output.mp4?sig=123"}])
+        self.assertEqual(
+            result.structured_content["exact_download_urls"],
+            ["https://videos.magichour.ai/id/output.mp4?sig=123"],
+        )
+        self.assertEqual(
+            result.structured_content["downloads"],
+            [{"url": "https://videos.magichour.ai/id/output.mp4?sig=123"}],
+        )
         self.assertEqual(result.structured_content["project_type"], "video")
-        self.assertEqual(result.structured_content["download_expiration_metadata"][0]["expires_at"], "2026-07-04T15:23:44.751Z")
+        self.assertEqual(
+            result.structured_content["download_expiration_metadata"][0]["expires_at"],
+            "2026-07-04T15:23:44.751Z",
+        )
         self.assertNotIn("expires_at", result.structured_content["downloads"][0])
-        self.assertEqual(result.content[0].text, "Video project vid-123 completed with 1 download(s).")
-        self.assertIn("EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.mp4?sig=123", result.content[1].text)
+        self.assertEqual(
+            result.content[0].text,
+            "Video project vid-123 completed with 1 download(s).",
+        )
+        self.assertIn(
+            "EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.mp4?sig=123",
+            result.content[1].text,
+        )
 
     def test_project_status_text_uses_timeout_message(self):
         text = _project_status_text(
             "audio",
-            {"id": "aud-123", "status": "timeout", "message": "Timed out waiting for audio project aud-123."},
+            {
+                "id": "aud-123",
+                "status": "timeout",
+                "message": "Timed out waiting for audio project aud-123.",
+            },
         )
 
         self.assertEqual(text, "Timed out waiting for audio project aud-123.")
@@ -196,7 +332,10 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("Do not shorten the URL.", text)
         self.assertIn("Do not append `downloads[n].expires_at` to the URL.", text)
-        self.assertIn("EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.wav?sig=123", text)
+        self.assertIn(
+            "EXACT_DOWNLOAD_URL[0] = https://videos.magichour.ai/id/output.wav?sig=123",
+            text,
+        )
         self.assertIn("EXPIRES_AT[0] = 2026-07-04T15:23:44.751Z", text)
 
     def test_structured_content_separates_download_urls_from_expiration_metadata(self):
@@ -213,10 +352,19 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        self.assertEqual(structured_content["exact_download_urls"], ["https://videos.magichour.ai/id/output.wav?sig=123"])
-        self.assertEqual(structured_content["downloads"], [{"url": "https://videos.magichour.ai/id/output.wav?sig=123"}])
+        self.assertEqual(
+            structured_content["exact_download_urls"],
+            ["https://videos.magichour.ai/id/output.wav?sig=123"],
+        )
+        self.assertEqual(
+            structured_content["downloads"],
+            [{"url": "https://videos.magichour.ai/id/output.wav?sig=123"}],
+        )
         self.assertNotIn("expires_at", structured_content["downloads"][0])
-        self.assertEqual(structured_content["download_expiration_metadata"][0]["expires_at"], "2026-07-04T15:23:44.751Z")
+        self.assertEqual(
+            structured_content["download_expiration_metadata"][0]["expires_at"],
+            "2026-07-04T15:23:44.751Z",
+        )
 
 
 if __name__ == "__main__":
