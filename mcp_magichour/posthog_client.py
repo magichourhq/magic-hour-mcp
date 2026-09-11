@@ -18,6 +18,7 @@ AnalyticsEvent = Literal[
 ]
 ProjectType = Literal["video", "image", "audio"]
 POSTHOG_TOKEN_PLACEHOLDER = "phc_your_project_token_here"
+DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com"
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +41,7 @@ def _missing_configuration_error(variable: str) -> RuntimeError:
 def initialize_posthog() -> Posthog | None:
     """Create the shared PostHog client when its environment is configured."""
     project_token = os.getenv("POSTHOG_PROJECT_TOKEN")
-    host = os.getenv("POSTHOG_HOST")
+    host = os.getenv("POSTHOG_HOST") or DEFAULT_POSTHOG_HOST
 
     if not project_token or project_token == POSTHOG_TOKEN_PLACEHOLDER:
         if _is_debug():
@@ -48,12 +49,6 @@ def initialize_posthog() -> Posthog | None:
         logger.warning(
             "PostHog analytics disabled: POSTHOG_PROJECT_TOKEN is missing or unconfigured"
         )
-        return None
-
-    if not host:
-        if _is_debug():
-            raise _missing_configuration_error("POSTHOG_HOST")
-        logger.warning("PostHog analytics disabled: POSTHOG_HOST is missing")
         return None
 
     return Posthog(
