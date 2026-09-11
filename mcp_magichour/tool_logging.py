@@ -9,6 +9,8 @@ import mcp.types as mt
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 
+from .posthog_client import analytics
+
 
 logger = logging.getLogger("uvicorn.error.mcp_tools")
 MAX_STRING_LENGTH = 200
@@ -70,4 +72,8 @@ class ToolCallLoggingMiddleware(Middleware):
             )
             raise
         logger.info("tool_call_completed name=%s is_error=%s", name, result.is_error)
+        analytics.capture_mcp_tool_completed(
+            tool_name=name,
+            outcome="error" if result.is_error else "success",
+        )
         return result

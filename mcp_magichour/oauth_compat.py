@@ -28,6 +28,7 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Re
 from starlette.routing import BaseRoute, Mount, Route
 
 from .openapi_auth import AuthError, current_authorization_header
+from .posthog_client import analytics
 
 
 CODE_TTL_SECONDS = 300
@@ -230,6 +231,7 @@ class OAuthCompatibilityServer:
         except OAuthCapacityError:
             return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
         location = _add_query(authorization["redirect_uri"], {"code": code, "state": params.get("state")})
+        analytics.capture_oauth_connection_completed()
         return RedirectResponse(location, status_code=303, headers={"Cache-Control": "no-store"})
 
     async def register(self, request: Request) -> Response:

@@ -27,6 +27,7 @@ from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, cu
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
+from .posthog_client import analytics
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
     MCP_APP_DIST_PATH,
@@ -280,6 +281,10 @@ async def _wait_for_project_result(
     max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
 ) -> ToolResult:
     project = await _wait_for_project(project_type, project_id, poll_interval_seconds, timeout_seconds)
+    analytics.capture_media_project_resolved(
+        project_type=project_type,
+        status=str(project.get("status", "unknown")),
+    )
     return await _project_to_tool_result(
         project_type,
         project,
