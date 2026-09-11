@@ -231,7 +231,6 @@ class OAuthCompatibilityServer:
         except OAuthCapacityError:
             return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
         location = _add_query(authorization["redirect_uri"], {"code": code, "state": params.get("state")})
-        analytics.capture_oauth_connection_completed()
         return RedirectResponse(location, status_code=303, headers={"Cache-Control": "no-store"})
 
     async def register(self, request: Request) -> Response:
@@ -325,6 +324,7 @@ class OAuthCompatibilityServer:
                 "Authorization code is invalid or expired",
             )
 
+        analytics.capture_oauth_connection_completed()
         return JSONResponse(
             {"access_token": authorization.api_key, "token_type": "Bearer"},
             headers={"Cache-Control": "no-store", "Pragma": "no-cache"},

@@ -27,7 +27,7 @@ from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, cu
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
-from .posthog_client import analytics
+from .posthog_client import PostHogFlushMiddleware, analytics
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
     MCP_APP_DIST_PATH,
@@ -117,6 +117,7 @@ def create_mcp() -> FastMCP:
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(MCPToolOAuthMiddleware())
     install_structured_tool_errors(mcp)
+    analytics.instrument_mcp(mcp)
     return mcp
 
 
@@ -537,6 +538,7 @@ def _resolve_media_mime_type(download_url: str, header_value: str | None, expect
 mcp = create_mcp()
 
 middleware = [
+    Middleware(PostHogFlushMiddleware),
     Middleware(BearerPassthroughMiddleware),
     Middleware(
         CORSMiddleware,
