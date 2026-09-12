@@ -1,7 +1,6 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import { useEffect, useState, type MouseEvent } from "react";
-
-type MediaType = "image" | "video" | "audio" | "media";
+import { useEffect, useState, type MouseEvent, type SyntheticEvent } from "react";
+import { captureUiEvent, type MediaType } from "./analytics";
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -43,6 +42,22 @@ function projectType(result: Record<string, unknown>, url: string | null): Media
   return "media";
 }
 
+function reportToolResult(result: unknown): void {
+  const envelope = record(result);
+  const project = record(envelope.structuredContent);
+  const rawUrls = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
+  const urls = rawUrls.map(safeMediaUrl).filter((url): url is string => url !== null);
+  const properties = { media_type: projectType(project, urls[0] ?? null), output_count: Math.min(urls.length, 1000) };
+  const status = text(project.status, "waiting").toLowerCase();
+  const reason = envelope.isError ? "tool_error"
+    : !Object.keys(project).length ? "missing_result"
+    : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "project_failed"
+    : rawUrls.length !== urls.length ? "unsafe_download"
+    : status === "complete" && !urls.length ? "missing_download"
+    : undefined;
+  captureUiEvent("tool_result", reason ? "failed" : "succeeded", { ...properties, reason });
+}
+
 type PlaceholderProps = {
   icon: string;
   heading: string;
@@ -68,17 +83,24 @@ type PreviewProps = {
 };
 
 function Preview({ type, url, name, status, message }: PreviewProps) {
+  const loaded = () => captureUiEvent("media_preview", "succeeded", { media_type: type });
+  const failed = (event: SyntheticEvent<HTMLImageElement | HTMLMediaElement>) => {
+    const code = event.currentTarget instanceof HTMLMediaElement ? event.currentTarget.error?.code : undefined;
+    const reason = code === 1 ? "media_aborted" : code === 2 ? "media_network"
+      : code === 3 ? "media_decode" : code === 4 ? "media_unsupported" : "load_failed";
+    captureUiEvent("media_preview", "failed", { media_type: type, reason });
+  };
   if (status !== "complete" || !url) {
     const failed = ["error", "canceled", "cancelled", "timeout"].includes(status);
     return <Placeholder icon={failed ? "!" : "…"} heading={failed ? "Project unavailable" : "Waiting for result"} message={message} />;
   }
-  if (type === "image") return <img src={url} alt={name} />;
-  if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} />;
+  if (type === "image") return <img src={url} alt={name} onLoad={loaded} onError={failed} />;
+  if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onLoadedMetadata={loaded} onError={failed} />;
   if (type === "audio") {
     return (
       <div className="audio-preview">
         <div className="audio-mark" aria-hidden="true">♪</div>
-        <audio src={url} controls preload="metadata" aria-label={name} />
+        <audio src={url} controls preload="metadata" aria-label={name} onLoadedMetadata={loaded} onError={failed} />
       </div>
     );
   }
@@ -88,7 +110,7 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
 export default function App() {
   const [toolOutput, setToolOutput] = useState<unknown>();
   const [canFullscreen, setCanFullscreen] = useState(false);
-  const { app } = useApp({
+  const { app, isConnected, error: connectionError } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (createdApp) => {
@@ -96,6 +118,9 @@ export default function App() {
       createdApp.onhostcontextchanged = (context) => {
         if (context.availableDisplayModes) setCanFullscreen(context.availableDisplayModes.includes("fullscreen"));
       };
+      createdApp.addEventListener("toolresult", reportToolResult);
+      createdApp.ontoolcancelled = () => captureUiEvent("tool_result", "cancelled");
+      createdApp.onerror = () => captureUiEvent("bridge", "failed", { reason: "transport_error" });
     },
   });
 
@@ -103,6 +128,11 @@ export default function App() {
     const availableModes = app?.getHostContext()?.availableDisplayModes;
     if (availableModes) setCanFullscreen(availableModes.includes("fullscreen"));
   }, [app]);
+
+  useEffect(() => {
+    if (connectionError) captureUiEvent("bridge", "failed", { reason: "connect_failed" });
+    else if (isConnected) captureUiEvent("bridge", "succeeded");
+  }, [isConnected, connectionError]);
 
   const project = record(toolOutput);
   const style = record(project.style);
@@ -120,19 +150,37 @@ export default function App() {
   const model = optionalText(project.model) ?? optionalText(style.model);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
 
-  const openDownload = (event: MouseEvent<HTMLAnchorElement>) => {
+  const openDownload = async (event: MouseEvent<HTMLAnchorElement>) => {
+    captureUiEvent("download", "requested", { media_type: type });
     if (!app || !downloadUrl) return;
     const capabilities = app.getHostCapabilities();
-    if (capabilities?.downloadFile) {
-      event.preventDefault();
-      void app.downloadFile({ contents: [{ type: "resource_link", uri: downloadUrl, name }] });
-    } else if (capabilities?.openLinks) {
-      event.preventDefault();
-      void app.openLink({ url: downloadUrl });
+    if (!capabilities?.downloadFile && !capabilities?.openLinks) return;
+    event.preventDefault();
+    try {
+      const result = capabilities.downloadFile
+        ? await app.downloadFile({ contents: [{ type: "resource_link", uri: downloadUrl, name }] })
+        : await app.openLink({ url: downloadUrl });
+      captureUiEvent("download", result.isError ? "failed" : "succeeded", {
+        media_type: type,
+        reason: result.isError ? "host_rejected" : undefined,
+      });
+    } catch {
+      captureUiEvent("download", "failed", { media_type: type, reason: "request_failed" });
     }
   };
 
-  const requestFullscreen = () => void app?.requestDisplayMode({ mode: "fullscreen" });
+  const requestFullscreen = async () => {
+    if (!app) return;
+    captureUiEvent("fullscreen", "requested");
+    try {
+      const result = await app.requestDisplayMode({ mode: "fullscreen" });
+      captureUiEvent("fullscreen", result.mode === "fullscreen" ? "succeeded" : "failed", {
+        reason: result.mode === "fullscreen" ? undefined : "host_rejected",
+      });
+    } catch {
+      captureUiEvent("fullscreen", "failed", { reason: "request_failed" });
+    }
+  };
 
   return (
     <main className="card" aria-live="polite">

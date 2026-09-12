@@ -42,6 +42,29 @@ process-local, so run one worker. Multi-worker or serverless deployment requires
 a shared code store or encrypted stateless codes. Rate-limit `/register` and
 `/authorize` at the public edge.
 
+## Measuring code lookup failures
+
+When PostHog is configured, OAuth emits `oauth_authorization_code_issued`,
+`oauth_authorization_code_lookup_missed`, and the existing
+`oauth_connection_completed` event. Match them by `authorization_code_hash`
+(SHA-256). No raw authorization codes, API keys, client IDs, redirect URLs, or
+PKCE values are included. `code_store_id` identifies the in-memory store and
+process; it changes across instances or restarts. OAuth response formats and
+authorization codes are unchanged.
+
+For a suspected cross-instance failure, find a lookup miss with a matching
+issuance on a different `code_store_id`, within the issuance's
+`code_ttl_seconds`, and without a matching completion. Use `occurred_at` (Unix
+seconds) for ordering: events are captured after responses and may arrive out
+of order. Count distinct code hashes rather than misses, since retries repeat
+the same failure. A completion indicates redemption/replay; a miss after the
+TTL indicates expiry. Misses without an issuance are inconclusive.
+
+This is diagnostic evidence, not proof: missing telemetry, clock skew, and
+concurrent redemption can affect classification. Capture runs after the OAuth
+response in a background thread so PostHog latency does not delay the redirect
+or token response. No shared storage is required to collect these events.
+
 This is a connector compatibility layer, not a general-purpose authorization
 server. Access tokens retain the lifetime and privileges of the Magic Hour API
 key.

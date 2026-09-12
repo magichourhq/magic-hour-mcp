@@ -23,6 +23,7 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from .app_events import app_events
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
@@ -285,6 +286,7 @@ async def _wait_for_project_result(
     analytics.capture_media_project_resolved(
         project_type=project_type,
         status=str(project.get("status", "unknown")),
+        download_count=len(_project_download_urls(project)),
     )
     return await _project_to_tool_result(
         project_type,
@@ -356,6 +358,11 @@ async def _project_to_tool_result(
                     max_bytes=max_bytes_per_download,
                 )
             except Exception as exc:
+                analytics.capture_media_inline_download_failed(
+                    project_type=project_type,
+                    error_type=type(exc).__name__,
+                    http_status=exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None,
+                )
                 content.append(
                     TextContent(
                         type="text",
@@ -611,6 +618,7 @@ mcp_app_assets = CORSMiddleware(
 app = create_oauth_compatibility_app(
     mcp_app,
     public_routes=[
+        Route("/app/events", app_events, methods=["POST", "OPTIONS"]),
         Route("/favicon.ico", favicon, methods=["GET"]),
         Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
         Mount(MCP_APP_ASSET_PATH, app=mcp_app_assets),

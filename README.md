@@ -14,6 +14,7 @@ Docs:
 - `integration-handoff.md` - FastAPI mount checklist
 - `docs/detailed-step-by-step-integration.md` - full backend integration guide
 - `docs/api-reference.md` - generated API reference
+- [Reliability analytics](docs/analytics.md) - tool usage, connection failures, and result-app diagnostics
 
 ## Setup
 
