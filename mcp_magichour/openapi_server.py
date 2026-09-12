@@ -358,10 +358,13 @@ async def _project_to_tool_result(
                     max_bytes=max_bytes_per_download,
                 )
             except Exception as exc:
-                analytics.capture_media_inline_download_failed(
-                    project_type=project_type,
-                    error_type=type(exc).__name__,
-                    http_status=exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None,
+                analytics.capture(
+                    "media_inline_download_failed",
+                    {
+                        "project_type": project_type,
+                        "error_type": type(exc).__name__,
+                        "http_status": exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None,
+                    },
                 )
                 content.append(
                     TextContent(

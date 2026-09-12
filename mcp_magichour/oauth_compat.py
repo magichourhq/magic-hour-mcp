@@ -174,12 +174,14 @@ class OAuthCompatibilityServer:
         # Capture operation time before the response; send telemetry afterward.
         # The PID also distinguishes workers forked after the store was created.
         return BackgroundTask(
-            analytics.capture_oauth_code_event,
+            analytics.capture,
             event,
-            authorization_code_hash=hashlib.sha256(code.encode()).hexdigest(),
-            code_store_id=f"{self.codes.instance_id}:{os.getpid()}",
-            code_ttl_seconds=self.codes.ttl_seconds,
-            occurred_at=time(),
+            {
+                "authorization_code_hash": hashlib.sha256(code.encode()).hexdigest(),
+                "code_store_id": f"{self.codes.instance_id}:{os.getpid()}",
+                "code_ttl_seconds": self.codes.ttl_seconds,
+                "occurred_at": time(),
+            },
         )
 
     def routes(self) -> list[Route]:
@@ -206,9 +208,7 @@ class OAuthCompatibilityServer:
             "state": params.get("state"),
         }
         if request.method == "GET":
-            response = _authorization_page(page_params)
-            response.background = BackgroundTask(analytics.capture_oauth_authorization_viewed)
-            return response
+            return _authorization_page(page_params)
 
         api_key = params.get("api_key", "").strip()
         if not api_key:
@@ -466,10 +466,6 @@ class MCPBearerChallengeMiddleware:
                         f'Bearer resource_metadata="{issuer}/.well-known/oauth-protected-resource"'
                     )
                 },
-                background=BackgroundTask(
-                    analytics.capture_mcp_authentication_challenged,
-                    reason="missing_bearer" if authorization is None else "malformed_bearer",
-                ),
             )
             await response(scope, receive, send)
             return
@@ -855,7 +851,8 @@ def _authorization_failure(
 ) -> HTMLResponse:
     response = _authorization_page(params, error, status_code=status_code)
     response.background = BackgroundTask(
-        analytics.capture_oauth_failure, stage="authorize", reason=reason, http_status=status_code
+        analytics.capture, "oauth_request_failed",
+        {"stage": "authorize", "reason": reason, "http_status": status_code},
     )
     return response
 
@@ -865,7 +862,10 @@ def _token_rejection(
 ) -> JSONResponse:
     logger.warning("token_rejected reason=%s", reason)
     tasks = BackgroundTasks([background] if background is not None else [])
-    tasks.add_task(analytics.capture_oauth_failure, stage="token", reason=reason, http_status=400)
+    tasks.add_task(
+        analytics.capture, "oauth_request_failed",
+        {"stage": "token", "reason": reason, "http_status": 400},
+    )
     response = _token_error(error, description)
     response.background = tasks
     return response
@@ -875,7 +875,8 @@ def _oauth_error(error: str, description: str) -> JSONResponse:
     return JSONResponse(
         {"error": error, "error_description": description}, status_code=400,
         background=BackgroundTask(
-            analytics.capture_oauth_failure, stage="authorize", reason=error, http_status=400
+            analytics.capture, "oauth_request_failed",
+            {"stage": "authorize", "reason": error, "http_status": 400},
         ),
     )
 
@@ -891,7 +892,8 @@ def _registration_error(
         status_code=status_code,
         headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
         background=BackgroundTask(
-            analytics.capture_oauth_failure, stage="register", reason=error, http_status=status_code
+            analytics.capture, "oauth_request_failed",
+            {"stage": "register", "reason": error, "http_status": status_code},
         ),
     )
 

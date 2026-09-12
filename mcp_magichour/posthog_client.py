@@ -20,10 +20,8 @@ OAuthCodeEvent = Literal[
 AnalyticsEvent = Literal[
     "media_project_resolved",
     "media_inline_download_failed",
-    "mcp_app_event",
+    "mcp_app_error",
     "oauth_request_failed",
-    "oauth_authorization_viewed",
-    "mcp_authentication_challenged",
     OAuthCodeEvent,
 ]
 ProjectType = Literal["video", "image", "audio"]
@@ -76,7 +74,7 @@ class Analytics:
         self._client = client
         self._mcp: McpAnalytics | None = None
 
-    def _capture(
+    def capture(
         self, event: AnalyticsEvent, properties: Mapping[str, object] | None = None
     ) -> None:
         if self._client is not None:
@@ -84,60 +82,12 @@ class Analytics:
                 event, properties=dict(properties) if properties else None
             )
 
-    def capture_oauth_code_event(
-        self,
-        event: OAuthCodeEvent,
-        *,
-        authorization_code_hash: str,
-        code_store_id: str,
-        code_ttl_seconds: int,
-        occurred_at: float,
-    ) -> None:
-        self._capture(
-            event,
-            {
-                "authorization_code_hash": authorization_code_hash,
-                "code_store_id": code_store_id,
-                "code_ttl_seconds": code_ttl_seconds,
-                "occurred_at": occurred_at,
-            },
-        )
-
     def capture_media_project_resolved(
         self, *, project_type: ProjectType, status: str, download_count: int
     ) -> None:
-        self._capture(
+        self.capture(
             "media_project_resolved",
             {"project_type": project_type, "status": status, "download_count": download_count},
-        )
-
-    def capture_media_inline_download_failed(
-        self, *, project_type: ProjectType, error_type: str, http_status: int | None
-    ) -> None:
-        self._capture(
-            "media_inline_download_failed",
-            {"project_type": project_type, "error_type": error_type, "http_status": http_status},
-        )
-
-    def capture_app_event(self, properties: Mapping[str, object]) -> None:
-        self._capture("mcp_app_event", properties)
-
-    def capture_oauth_authorization_viewed(self) -> None:
-        self._capture("oauth_authorization_viewed")
-
-    def capture_mcp_authentication_challenged(
-        self, *, reason: Literal["missing_bearer", "malformed_bearer"]
-    ) -> None:
-        self._capture("mcp_authentication_challenged", {"reason": reason})
-
-    def capture_oauth_failure(
-        self, *, stage: Literal["authorize", "token", "register"],
-        reason: str,
-        http_status: int,
-    ) -> None:
-        self._capture(
-            "oauth_request_failed",
-            {"stage": stage, "reason": reason, "http_status": http_status},
         )
 
     def capture_exception(self, exception: BaseException) -> None:
