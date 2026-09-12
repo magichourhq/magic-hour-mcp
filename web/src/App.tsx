@@ -87,12 +87,16 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
 
 export default function App() {
   const [toolOutput, setToolOutput] = useState<unknown>();
+  const [selectedOutput, setSelectedOutput] = useState(0);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const { app } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (createdApp) => {
-      createdApp.ontoolresult = (result) => setToolOutput(result.structuredContent);
+      createdApp.ontoolresult = (result) => {
+        setToolOutput(result.structuredContent);
+        setSelectedOutput(0);
+      };
       createdApp.onhostcontextchanged = (context) => {
         if (context.availableDisplayModes) setCanFullscreen(context.availableDisplayModes.includes("fullscreen"));
       };
@@ -112,7 +116,7 @@ export default function App() {
     const url = safeMediaUrl(value);
     return url ? [url] : [];
   });
-  const downloadUrl = urls[0] ?? null;
+  const downloadUrl = urls[selectedOutput] ?? null;
   const type = projectType(project, downloadUrl);
   const name = text(project.name, `${capitalize(type)} project`);
   const message = text(project.message || project.error, "Magic Hour is preparing the result.");
@@ -142,6 +146,14 @@ export default function App() {
       <section className="content">
         <span className="badge" data-tone={tone}>{capitalize(status)}</span>
         <h1>{name}</h1>
+        {urls.length > 1 && (
+          <label className="output-picker">
+            Output
+            <select value={selectedOutput} onChange={(event) => setSelectedOutput(Number(event.target.value))}>
+              {urls.map((_, index) => <option key={index} value={index}>{index + 1} of {urls.length}</option>)}
+            </select>
+          </label>
+        )}
         <details className="details">
           <summary>Generation details</summary>
           <dl className="detail-list">

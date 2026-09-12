@@ -98,6 +98,8 @@ button, a { font: inherit; }
 .badge[data-tone="warning"] { color: var(--warning); }
 .badge[data-tone="danger"] { color: var(--danger); }
 h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+.output-picker { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 700; }
+.output-picker select { flex: 1; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-muted); color: var(--text); font: inherit; }
 .details { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-muted); }
 .details summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; padding: 0 14px; cursor: pointer; font-size: 13px; font-weight: 700; list-style: none; }
 .details summary::-webkit-details-marker { display: none; }
