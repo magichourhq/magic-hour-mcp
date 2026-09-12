@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 import httpx
+import jsonschema
 
 ROOT = Path(__file__).resolve().parents[1]
 VIEW_URI = "ui://magic-hour/project-result-v1.html"
@@ -41,7 +42,7 @@ def local_server(*, live=False):
     """Run this checkout on a reserved loopback socket, without loading any .env."""
     env = {
         key: value for key, value in os.environ.items()
-        if not key.startswith(("MAGIC_HOUR_", "MCP_", "VERCEL", "UPSTASH_", "POSTHOG_"))
+        if not key.startswith(("MAGIC_HOUR_", "MCP_", "VERCEL", "UPSTASH_", "KV_", "POSTHOG_"))
     }
     env.update(
         PYTHONPATH=str(ROOT), POSTHOG_PROJECT_TOKEN="", POSTHOG_HOST="",
@@ -327,20 +328,16 @@ def live_smoke(env_file):
     if not api_key or not api_key.strip():
         raise RuntimeError("Dedicated MAGIC_HOUR_API_KEY missing from the specified .env.e2e file.")
     api_key = api_key.strip()
-    # Load this checkout's spec; packaging may move its default location.
-    sys.path.insert(0, str(ROOT))
-    os.environ.update(POSTHOG_PROJECT_TOKEN="", POSTHOG_HOST="", DEBUG="false", ENVIRONMENT="review")
-    from mcp_magichour.openapi_server import load_openapi_spec
-
-    schema = load_openapi_spec()["paths"]["/v1/ai-image-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
-    import jsonschema
-    jsonschema.validate(IMAGE_ARGUMENTS, schema)
     print("Live smoke: local checkout -> Magic Hour API; one flux-2-klein 640px image, then deletion.", flush=True)
     with local_server(live=True) as url, httpx.Client(
         base_url=url, timeout=210, trust_env=False, headers={"Accept": "application/json, text/event-stream"},
     ) as http:
         mcp = MCPClient(http)
         mcp.initialize()
+        # Validate against the local server's actual schema, regardless of where its spec is packaged.
+        image_tool = next(tool for tool in mcp.rpc("tools/list")["tools"]
+                          if tool["name"] == "ai_image_generator_create_image")
+        jsonschema.validate(IMAGE_ARGUMENTS, image_tool["inputSchema"])
         oauth_login(http, api_key)
         image_workflow(mcp)
     print("Live E2E passed.", flush=True)
