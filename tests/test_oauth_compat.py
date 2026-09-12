@@ -617,9 +617,9 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(httpx.HTTPStatusError):
                 await server._validate_api_key("sk_secret")
 
-    def test_expired_authorization_code_cannot_be_consumed(self):
+    async def test_expired_authorization_code_cannot_be_consumed(self):
         store = AuthorizationCodeStore(ttl_seconds=0)
-        code = store.issue(
+        code = await store.issue(
             api_key="sk_valid",
             client_id=CLIENT_ID,
             redirect_uri=REDIRECT_URI,
@@ -627,7 +627,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             resource=RESOURCE,
         )
 
-        self.assertIsNone(store.consume(code))
+        self.assertIsNone(await store.consume(code))
 
 
 if __name__ == "__main__":
