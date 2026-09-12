@@ -5,6 +5,8 @@ import json
 import mimetypes
 import os
 from base64 import b64encode
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -97,12 +99,22 @@ def build_api_client() -> httpx.AsyncClient:
 
 
 def create_mcp() -> FastMCP:
+    """Create a server and API client for one application lifecycle."""
     spec_path = os.getenv("MAGIC_HOUR_OPENAPI_PATH", str(DEFAULT_OPENAPI_PATH))
     spec = apply_magic_hour_policies(load_openapi_spec(spec_path))
+    client = build_api_client()
+
+    @asynccontextmanager
+    async def api_client_lifespan(_: FastMCP) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            await client.aclose()
 
     mcp = FastMCP.from_openapi(
         openapi_spec=spec,
-        client=build_api_client(),
+        client=client,
+        lifespan=api_client_lifespan,
         name=MCP_SERVER_NAME,
         version=MCP_SERVER_VERSION,
         instructions=MCP_SERVER_INSTRUCTIONS,
