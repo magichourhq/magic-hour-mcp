@@ -296,8 +296,8 @@ async def _wait_for_project_result(
 
 
 async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:
-    if max_bytes <= 0:
-        raise ValueError("max_bytes must be greater than 0.")
+    if not 0 < max_bytes <= DEFAULT_MEDIA_FETCH_MAX_BYTES:
+        raise ValueError(f"max_bytes must be between 1 and {DEFAULT_MEDIA_FETCH_MAX_BYTES}.")
     parsed_url = urlparse(download_url)
     if parsed_url.scheme != "https" or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname:
         raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
@@ -313,11 +313,12 @@ async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes:
 
             media = bytearray()
             async for chunk in response.aiter_bytes():
-                media.extend(chunk)
-                if len(media) > max_bytes:
+                size = len(media) + len(chunk)
+                if size > max_bytes:
                     raise ValueError(
-                        f"Downloaded media is too large for inline MCP content ({len(media)} bytes > {max_bytes} bytes)."
+                        f"Downloaded media is too large for inline MCP content ({size} bytes > {max_bytes} bytes)."
                     )
+                media.extend(chunk)
 
     return bytes(media), mime_type
 
