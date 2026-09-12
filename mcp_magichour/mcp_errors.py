@@ -14,8 +14,11 @@ def install_structured_tool_errors(mcp: FastMCP) -> None:
         if tool is None:
             raise _invalid_params(f"Unknown tool: {request.params.name!r}")
 
+        # OpenAPI-generated schemas omit additionalProperties; an unknown arg on a
+        # parameterless GET would otherwise be sent upstream as a request body.
+        schema = {"additionalProperties": False, **tool.parameters}
         try:
-            jsonschema.validate(request.params.arguments or {}, tool.parameters)
+            jsonschema.validate(request.params.arguments or {}, schema)
         except jsonschema.ValidationError as error:
             raise _invalid_params(
                 f"Invalid arguments for tool {request.params.name!r}: {error.message}"
