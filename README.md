@@ -103,6 +103,14 @@ Notes:
 
 Rebuild and type-check the MCP App UI with `cd web && npm ci && npm run build`.
 
+For a custom deployment, set `MCP_APP_ORIGIN` to its full origin (for example,
+`https://mcp.example.com`) in both the frontend build and Python runtime.
+Asset URLs and the app's Content Security Policy use the same precedence:
+`MCP_APP_ORIGIN`, then `https://$VERCEL_URL`, then `https://$VITE_VERCEL_URL`,
+then `https://mcp.magichour.ai`. Empty values are ignored and trailing slashes
+are removed. Keep these variables consistent between build and runtime;
+Vercel's `VERCEL_URL` supplies the default for preview deployments.
+
 ## File uploads
 
 Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
