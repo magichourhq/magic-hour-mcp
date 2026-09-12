@@ -37,10 +37,53 @@ does not mint refresh tokens or introduce another token system.
 ## Deployment
 
 Set `MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL` to the canonical public
-MCP URL. Serve production endpoints over HTTPS. Authorization codes are
-process-local, so run one worker. Multi-worker or serverless deployment requires
-a shared code store or encrypted stateless codes. Rate-limit `/register` and
+MCP URL. Serve production endpoints over HTTPS. Rate-limit `/register` and
 `/authorize` at the public edge.
+
+### Vercel and multiple workers
+
+Configure shared Redis storage **before deploying this change to Vercel**. Connect
+an Upstash Redis database through the Vercel Marketplace, or use an existing
+Upstash-compatible Redis REST service. No database is provisioned by this server.
+Set these environment variables on every worker, then redeploy:
+
+```sh
+UPSTASH_REDIS_REST_URL=https://your-database.upstash.io
+UPSTASH_REDIS_REST_TOKEN=<read-write REST token>
+MCP_OAUTH_REDIS_PREFIX=magic-hour-mcp:production
+```
+
+The complete legacy pair `KV_REST_API_URL` / `KV_REST_API_TOKEN` also works when
+neither Upstash variable is set. A TCP `REDIS_URL` or read-only token does not
+work. The REST endpoint must support `EVAL`, `TIME`, `GET`, `SET`, `DEL`, `EXPIRE`,
+`ZADD`, `ZCARD`, `ZREM`, and `ZREMRANGEBYSCORE`. See the
+[Upstash REST API](https://upstash.com/docs/redis/features/restapi) and
+[Lua scripting documentation](https://redis.io/docs/latest/develop/programmability/eval-intro/).
+
+Use the **same prefix and database for all workers serving the same OAuth issuer**.
+Set different prefixes (or databases) for different apps and production/preview
+issuers; separate preview deployments should each have their own prefix. Keep a
+stable production prefix across deployments so in-flight codes survive deploys.
+Each prefix shares a limit of 1,000 pending codes and three per API key.
+
+Codes expire in Redis after five minutes. Reads use
+[`EVAL` on the primary](https://upstash.com/blog/replicated-cache-backed-by-redis#step-6-read-from-the-primary-not-from-a-replica)
+so a worker cannot reject a just-issued code due to replica lag. Atomic scripts enforce
+issuance quotas and consume a code exactly once, only after the server verifies
+client, redirect, resource and PKCE bindings. Successful redemption immediately releases its quota.
+Redis stores the API key inside the short-lived code record; use a trusted database,
+restrict credential access and never enable request-body logging for this service.
+API keys and raw authorization codes are hashed before use in Redis key names.
+
+With `VERCEL` set, missing or incomplete shared-store configuration disables
+`/authorize` and `/token` with an explicit HTTP 503. Discovery, registration and
+direct bearer-token MCP calls remain available. Redis outages also return 503;
+the server never falls back to local codes. A timeout during redemption can consume
+the code without delivering a token; restart OAuth in that case.
+
+Without Redis configuration and outside Vercel, codes remain process-local for
+local development and single-worker hosting. Any other deployment with multiple
+workers must explicitly configure the same shared store.
 
 This is a connector compatibility layer, not a general-purpose authorization
 server. Access tokens retain the lifetime and privileges of the Magic Hour API

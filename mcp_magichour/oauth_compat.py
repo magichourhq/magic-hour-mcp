@@ -12,8 +12,6 @@ import re
 import secrets
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from threading import Lock
-from time import monotonic
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
@@ -28,14 +26,18 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Re
 from starlette.routing import BaseRoute, Mount, Route
 
 from .openapi_auth import AuthError, current_authorization_header
+from .oauth_store import (
+    AuthorizationCodeStore,
+    OAuthCapacityError,
+    OAuthStoreUnavailable,
+    RedisAuthorizationCodeStore,
+    configured_code_store,
+)
 from .posthog_client import analytics
 
 
-CODE_TTL_SECONDS = 300
 MAX_FORM_BYTES = 16 * 1024
 MAX_REGISTRATION_BYTES = 16 * 1024
-MAX_PENDING_CODES = 1_000
-MAX_CODES_PER_API_KEY = 3
 MAX_CONCURRENT_VALIDATIONS = 10
 API_KEY_VERIFICATION_ERROR = (
     "We couldn't verify this API key. Check that you copied the full key and try again."
@@ -52,86 +54,6 @@ CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 ApiKeyValidator = Callable[[str], Awaitable[bool]]
 logger = logging.getLogger("uvicorn.error.mcp_oauth")
 OAUTH_SECURITY_SCHEMES = [{"type": "oauth2", "scopes": []}]
-
-
-class OAuthCapacityError(Exception):
-    pass
-
-
-@dataclass(frozen=True)
-class AuthorizationCode:
-    api_key: str
-    client_id: str
-    redirect_uri: str
-    code_challenge: str
-    resource: str | None
-    expires_at: float
-
-
-class AuthorizationCodeStore:
-    """Small process-local store for short-lived, single-use codes."""
-
-    def __init__(self, ttl_seconds: int = CODE_TTL_SECONDS) -> None:
-        self.ttl_seconds = ttl_seconds
-        self._codes: dict[str, AuthorizationCode] = {}
-        self._lock = Lock()
-
-    def issue(
-        self,
-        *,
-        api_key: str,
-        client_id: str,
-        redirect_uri: str,
-        code_challenge: str,
-        resource: str | None,
-    ) -> str:
-        code = secrets.token_urlsafe(32)
-        now = monotonic()
-        authorization_code = AuthorizationCode(
-            api_key=api_key,
-            client_id=client_id,
-            redirect_uri=redirect_uri,
-            code_challenge=code_challenge,
-            resource=resource,
-            expires_at=now + self.ttl_seconds,
-        )
-        with self._lock:
-            self._remove_expired(now)
-            if sum(value.api_key == api_key for value in self._codes.values()) >= MAX_CODES_PER_API_KEY:
-                raise OAuthCapacityError
-            if len(self._codes) >= MAX_PENDING_CODES:
-                raise OAuthCapacityError
-            self._codes[code] = authorization_code
-        return code
-
-    def consume(self, code: str) -> AuthorizationCode | None:
-        now = monotonic()
-        with self._lock:
-            authorization_code = self._codes.pop(code, None)
-            self._remove_expired(now)
-        if authorization_code is None or authorization_code.expires_at <= now:
-            return None
-        return authorization_code
-
-    def get(self, code: str) -> AuthorizationCode | None:
-        now = monotonic()
-        with self._lock:
-            self._remove_expired(now)
-            return self._codes.get(code)
-
-    def has_capacity(self, api_key: str) -> bool:
-        now = monotonic()
-        with self._lock:
-            self._remove_expired(now)
-            return (
-                len(self._codes) < MAX_PENDING_CODES
-                and sum(value.api_key == api_key for value in self._codes.values()) < MAX_CODES_PER_API_KEY
-            )
-
-    def _remove_expired(self, now: float) -> None:
-        for code, value in list(self._codes.items()):
-            if value.expires_at <= now:
-                del self._codes[code]
 
 
 @dataclass(frozen=True)
@@ -160,11 +82,17 @@ class OAuthCompatibilityServer:
         *,
         settings: OAuthSettings | None = None,
         api_key_validator: ApiKeyValidator | None = None,
-        code_store: AuthorizationCodeStore | None = None,
+        code_store: AuthorizationCodeStore | RedisAuthorizationCodeStore | None = None,
     ) -> None:
         self.settings = settings or OAuthSettings.from_env()
         _validate_settings(self.settings)
-        self.codes = code_store or AuthorizationCodeStore()
+        self._store_error: str | None = None
+        try:
+            self.codes = code_store if code_store is not None else configured_code_store()
+        except OAuthStoreUnavailable as error:
+            self.codes = None
+            self._store_error = str(error)
+            logger.error("OAuth disabled: %s", self._store_error)
         self.validate_api_key = api_key_validator or self._validate_api_key
         self._validation_slots = asyncio.Semaphore(MAX_CONCURRENT_VALIDATIONS)
 
@@ -178,7 +106,20 @@ class OAuthCompatibilityServer:
             Route("/.well-known/oauth-protected-resource/mcp", self.protected_resource_metadata),
         ]
 
+    def _store_unavailable(self) -> JSONResponse:
+        return JSONResponse(
+            {
+                "error": "temporarily_unavailable",
+                "error_description": self._store_error
+                or "Authorization storage is unavailable. Try again.",
+            },
+            status_code=503,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        )
+
     async def authorize(self, request: Request) -> Response:
+        if self.codes is None:
+            return self._store_unavailable()
         try:
             params = request.query_params if request.method == "GET" else await _read_form(request)
             authorization = self._validate_authorization_request(params, self.resource(request))
@@ -199,8 +140,11 @@ class OAuthCompatibilityServer:
             return _authorization_page(page_params, "API key is required.", status_code=400)
         if len(api_key) > 512 or any(character.isspace() for character in api_key):
             return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
-        if not self.codes.has_capacity(api_key):
-            return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
+        try:
+            if not await self.codes.has_capacity(api_key):
+                return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
+        except OAuthStoreUnavailable:
+            return self._store_unavailable()
 
         try:
             await asyncio.wait_for(self._validation_slots.acquire(), timeout=0.1)
@@ -221,7 +165,7 @@ class OAuthCompatibilityServer:
             return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
 
         try:
-            code = self.codes.issue(
+            code = await self.codes.issue(
                 api_key=api_key,
                 client_id=authorization["client_id"],
                 redirect_uri=authorization["redirect_uri"],
@@ -230,6 +174,8 @@ class OAuthCompatibilityServer:
             )
         except OAuthCapacityError:
             return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
+        except OAuthStoreUnavailable:
+            return self._store_unavailable()
         location = _add_query(authorization["redirect_uri"], {"code": code, "state": params.get("state")})
         return RedirectResponse(location, status_code=303, headers={"Cache-Control": "no-store"})
 
@@ -260,6 +206,8 @@ class OAuthCompatibilityServer:
         )
 
     async def token(self, request: Request) -> Response:
+        if self.codes is None:
+            return self._store_unavailable()
         try:
             params = await _read_form(request)
         except OAuthRequestError as error:
@@ -273,7 +221,10 @@ class OAuthCompatibilityServer:
             )
 
         code = params.get("code", "")
-        authorization = self.codes.get(code)
+        try:
+            authorization = await self.codes.get(code)
+        except OAuthStoreUnavailable:
+            return self._store_unavailable()
         if authorization is None:
             return _token_rejection(
                 "code_invalid_or_expired",
@@ -317,7 +268,11 @@ class OAuthCompatibilityServer:
         ):
             return _token_rejection("pkce_failed", "invalid_grant", "PKCE verification failed")
 
-        if self.codes.consume(code) is not authorization:
+        try:
+            consumed = await self.codes.consume(code, authorization)
+        except OAuthStoreUnavailable:
+            return self._store_unavailable()
+        if consumed != authorization:
             return _token_rejection(
                 "code_already_consumed",
                 "invalid_grant",

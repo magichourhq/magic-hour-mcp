@@ -72,8 +72,9 @@ MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/late
 
 The optional OAuth shim validates a Magic Hour API key and uses that key as the
 access token. Production requires `MCP_OAUTH_ISSUER_URL` and
-`MCP_OAUTH_RESOURCE_URL`. See `docs/future-oauth-support.md` for deployment
-limits.
+`MCP_OAUTH_RESOURCE_URL`. Vercel and multi-worker deployments also require shared
+Redis storage; see [OAuth deployment setup](docs/future-oauth-support.md#vercel-and-multiple-workers)
+for environment variables. Missing shared storage on Vercel disables OAuth with HTTP 503.
 
 Public OAuth clients can use the stateless `POST /register` compatibility endpoint.
 
