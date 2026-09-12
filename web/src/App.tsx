@@ -115,10 +115,13 @@ export default function App() {
   const downloadUrl = urls[0] ?? null;
   const type = projectType(project, downloadUrl);
   const name = text(project.name, `${capitalize(type)} project`);
-  const message = text(project.message || project.error, "Magic Hour is preparing the result.");
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
+  const message = optionalText(project.message)
+    ?? optionalText(project.error)
+    ?? optionalText(record(project.error).message)
+    ?? (tone === "danger" ? "Magic Hour could not complete this project." : "Magic Hour is preparing the result.");
 
   const openDownload = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!app || !downloadUrl) return;
