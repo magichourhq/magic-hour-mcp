@@ -472,13 +472,15 @@ class MCPToolOAuthMiddleware(Middleware):
 
     async def on_call_tool(self, context: MiddlewareContext, call_next: Any) -> ToolResult:
         try:
-            current_authorization_header()
+            authorization = current_authorization_header()
             return await call_next(context)
         except Exception as error:
             cause: BaseException | None = error
             while cause is not None:
                 if isinstance(cause, AuthError) or (
-                    isinstance(cause, httpx.HTTPStatusError) and cause.response.status_code == 401
+                    isinstance(cause, httpx.HTTPStatusError)
+                    and cause.response.status_code == 401
+                    and cause.request.headers.get("Authorization") == authorization
                 ):
                     break
                 cause = cause.__cause__
