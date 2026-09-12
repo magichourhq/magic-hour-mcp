@@ -77,6 +77,43 @@ limits.
 
 Public OAuth clients can use the stateless `POST /register` compatibility endpoint.
 
+## Automated smoke checks
+
+Build the UI, then run all tests (including the offline HTTP E2E checks):
+
+```sh
+npm --prefix web ci
+npm --prefix web run build
+python -m unittest discover -s tests -v
+```
+
+For only the E2E checks, run `python tests/test_e2e.py`. They start this
+checkout's MCP app in a separate localhost process and exercise public discovery,
+resources and assets, OAuth registration/PKCE/code replay rejection, generated
+tools, image polling, signed media download, deletion, and failure responses.
+All upstream HTTP requests are intercepted; unrecognized requests fail closed.
+No API key, internet access, or generation credits are needed after dependencies
+are installed. CI runs these checks on every PR and push to `main`.
+This checks the MCP protocol and served UI assets, not browser rendering.
+
+Live smoke testing is optional and spends credits. Put a dedicated test key in
+local `.env.e2e` (gitignored) as `MAGIC_HOUR_API_KEY=...`, then explicitly opt in:
+
+```sh
+python tests/test_e2e.py --live --generate-one-image --env-file .env.e2e
+```
+
+The live check starts **this local checkout**, pins its upstream to the real
+Magic Hour API, validates the key through OAuth, then creates exactly one
+`flux-2-klein` image at `640px` and `1:1` (5 credits in the checked-in spec,
+tied for the lowest listed price). It polls, downloads the image through MCP,
+and attempts deletion in `finally` using the original creation ID. It never
+loads `.env`, calls the deployed MCP endpoint, or retries image creation.
+Subprocess logs are discarded to avoid retaining keys or signed media URLs.
+If cleanup fails, the command exits unsuccessfully and prints the project ID
+for manual deletion. Force-killing the process, or losing the creation response
+before an ID arrives, can require manual cleanup in the test account.
+
 ## Test with MCP Inspector
 
 1. Start the server.
