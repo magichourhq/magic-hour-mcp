@@ -13,7 +13,7 @@ import secrets
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from threading import Lock
-from time import monotonic, time
+from time import monotonic
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
@@ -23,13 +23,12 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.tools.base import Tool, ToolResult
 from mcp.types import TextContent
 from starlette.applications import Starlette
-from starlette.background import BackgroundTask, BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import BaseRoute, Mount, Route
 
 from .openapi_auth import AuthError, current_authorization_header
-from .posthog_client import OAuthCodeEvent, analytics
+from .posthog_client import analytics
 
 
 CODE_TTL_SECONDS = 300
@@ -74,7 +73,6 @@ class AuthorizationCodeStore:
 
     def __init__(self, ttl_seconds: int = CODE_TTL_SECONDS) -> None:
         self.ttl_seconds = ttl_seconds
-        self.instance_id = secrets.token_hex(16)
         self._codes: dict[str, AuthorizationCode] = {}
         self._lock = Lock()
 
@@ -170,20 +168,6 @@ class OAuthCompatibilityServer:
         self.validate_api_key = api_key_validator or self._validate_api_key
         self._validation_slots = asyncio.Semaphore(MAX_CONCURRENT_VALIDATIONS)
 
-    def _code_event(self, event: OAuthCodeEvent, code: str) -> BackgroundTask:
-        # Capture operation time before the response; send telemetry afterward.
-        # The PID also distinguishes workers forked after the store was created.
-        return BackgroundTask(
-            analytics.capture,
-            event,
-            {
-                "authorization_code_hash": hashlib.sha256(code.encode()).hexdigest(),
-                "code_store_id": f"{self.codes.instance_id}:{os.getpid()}",
-                "code_ttl_seconds": self.codes.ttl_seconds,
-                "occurred_at": time(),
-            },
-        )
-
     def routes(self) -> list[Route]:
         return [
             Route("/register", self.register, methods=["POST"]),
@@ -212,29 +196,29 @@ class OAuthCompatibilityServer:
 
         api_key = params.get("api_key", "").strip()
         if not api_key:
-            return _authorization_failure(page_params, "api_key_missing", "API key is required.", 400)
+            return _authorization_page(page_params, "API key is required.", status_code=400)
         if len(api_key) > 512 or any(character.isspace() for character in api_key):
-            return _authorization_failure(page_params, "api_key_rejected", API_KEY_VERIFICATION_ERROR, 401)
+            return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
         if not self.codes.has_capacity(api_key):
-            return _authorization_failure(page_params, "code_capacity", "Server is busy. Try again.", 503)
+            return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
 
         try:
             await asyncio.wait_for(self._validation_slots.acquire(), timeout=0.1)
         except TimeoutError:
-            return _authorization_failure(page_params, "validation_capacity", "Server is busy. Try again.", 503)
+            return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
         try:
             try:
                 valid = await self.validate_api_key(api_key)
             finally:
                 self._validation_slots.release()
         except httpx.HTTPError:
-            return _authorization_failure(
-                page_params, "validation_unavailable",
+            return _authorization_page(
+                page_params,
                 "Could not validate API key. Try again.",
-                503,
+                status_code=503,
             )
         if not valid:
-            return _authorization_failure(page_params, "api_key_rejected", API_KEY_VERIFICATION_ERROR, 401)
+            return _authorization_page(page_params, API_KEY_VERIFICATION_ERROR, status_code=401)
 
         try:
             code = self.codes.issue(
@@ -245,12 +229,9 @@ class OAuthCompatibilityServer:
                 resource=authorization["resource"],
             )
         except OAuthCapacityError:
-            return _authorization_failure(page_params, "code_capacity", "Server is busy. Try again.", 503)
+            return _authorization_page(page_params, "Server is busy. Try again.", status_code=503)
         location = _add_query(authorization["redirect_uri"], {"code": code, "state": params.get("state")})
-        return RedirectResponse(
-            location, status_code=303, headers={"Cache-Control": "no-store"},
-            background=self._code_event("oauth_authorization_code_issued", code),
-        )
+        return RedirectResponse(location, status_code=303, headers={"Cache-Control": "no-store"})
 
     async def register(self, request: Request) -> Response:
         metadata: dict[str, Any] | None = None
@@ -298,7 +279,6 @@ class OAuthCompatibilityServer:
                 "code_invalid_or_expired",
                 "invalid_grant",
                 "Authorization code is invalid or expired",
-                background=self._code_event("oauth_authorization_code_lookup_missed", code),
             )
 
         if not hmac.compare_digest(params.get("client_id", ""), authorization.client_id):
@@ -344,10 +324,10 @@ class OAuthCompatibilityServer:
                 "Authorization code is invalid or expired",
             )
 
+        analytics.capture_oauth_connection_completed()
         return JSONResponse(
             {"access_token": authorization.api_key, "token_type": "Bearer"},
             headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
-            background=self._code_event("oauth_connection_completed", code),
         )
 
     async def authorization_server_metadata(self, request: Request) -> Response:
@@ -846,39 +826,13 @@ def _token_error(error: str, description: str) -> JSONResponse:
     )
 
 
-def _authorization_failure(
-    params: Mapping[str, str | None], reason: str, error: str, status_code: int
-) -> HTMLResponse:
-    response = _authorization_page(params, error, status_code=status_code)
-    response.background = BackgroundTask(
-        analytics.capture, "oauth_request_failed",
-        {"stage": "authorize", "reason": reason, "http_status": status_code},
-    )
-    return response
-
-
-def _token_rejection(
-    reason: str, error: str, description: str, *, background: BackgroundTask | None = None
-) -> JSONResponse:
+def _token_rejection(reason: str, error: str, description: str) -> JSONResponse:
     logger.warning("token_rejected reason=%s", reason)
-    tasks = BackgroundTasks([background] if background is not None else [])
-    tasks.add_task(
-        analytics.capture, "oauth_request_failed",
-        {"stage": "token", "reason": reason, "http_status": 400},
-    )
-    response = _token_error(error, description)
-    response.background = tasks
-    return response
+    return _token_error(error, description)
 
 
 def _oauth_error(error: str, description: str) -> JSONResponse:
-    return JSONResponse(
-        {"error": error, "error_description": description}, status_code=400,
-        background=BackgroundTask(
-            analytics.capture, "oauth_request_failed",
-            {"stage": "authorize", "reason": error, "http_status": 400},
-        ),
-    )
+    return JSONResponse({"error": error, "error_description": description}, status_code=400)
 
 
 def _registration_error(
@@ -891,10 +845,6 @@ def _registration_error(
         {"error": error, "error_description": description},
         status_code=status_code,
         headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
-        background=BackgroundTask(
-            analytics.capture, "oauth_request_failed",
-            {"stage": "register", "reason": error, "http_status": status_code},
-        ),
     )
 
 
