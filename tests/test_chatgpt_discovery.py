@@ -30,13 +30,15 @@ Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
+Omit optional resolution and model unless the user explicitly requests them, allowing the API to choose plan-compatible defaults.
+After a subscription-tier restriction, retry at most once after omitting only unrequested optional fields; explain the restriction instead of changing an explicit requirement or guessing alternatives.
 
 For video creation, unless the user requests otherwise:
 
 - Prefer AI Image Editor followed by Image-to-Video.
 - Reuse reference images across scenes for visual consistency.
-- Prefer nano-banana-2-lite for image creation and editing.
-- Prefer ltx-2.3 for Image-to-Video.
+- When the user asks for an image model recommendation, prefer nano-banana-2-lite only if account support is known; otherwise recommend default.
+- When the user asks for an Image-to-Video model recommendation, prefer ltx-2.5.
 - Add voiceovers using AI Voice Generator when a voiceover would suit the video. Choose the voice that would be the best narrator for this video.
 - Let the narration finish each sentence. Never cut it off.
 - Use Text-to-Video only when consistency is unimportant.
