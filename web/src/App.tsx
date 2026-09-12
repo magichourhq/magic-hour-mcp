@@ -10,6 +10,14 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function chatGptOutput(globals: unknown): unknown {
+  const host = record(globals);
+  const output = record(host.toolOutput);
+  return Object.keys(output).length
+    ? output
+    : record(record(host.toolResponseMetadata).call_tool_result).structuredContent;
+}
+
 function text(value: unknown, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -103,12 +111,17 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
 
 export default function App() {
   const [toolOutput, setToolOutput] = useState<unknown>();
+  const [storedOutput, setStoredOutput] = useState<unknown>();
   const [canFullscreen, setCanFullscreen] = useState(false);
   const { app, error: connectionError } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (createdApp) => {
-      createdApp.ontoolresult = (result) => setToolOutput(result.structuredContent);
+      createdApp.ontoolresult = (result) => {
+        if (result.isError || Object.keys(record(result.structuredContent)).length) {
+          setToolOutput(result.structuredContent ?? {});
+        }
+      };
       createdApp.onhostcontextchanged = (context) => {
         if (context.availableDisplayModes) setCanFullscreen(context.availableDisplayModes.includes("fullscreen"));
       };
@@ -116,6 +129,17 @@ export default function App() {
       createdApp.onerror = () => captureUiError("bridge_transport");
     },
   });
+
+  useEffect(() => {
+    const readStoredOutput = (event?: Event) => {
+      const host = (window as Window & { openai?: unknown }).openai;
+      const updates = record((event as CustomEvent | undefined)?.detail).globals;
+      setStoredOutput(chatGptOutput({ ...record(host), ...record(updates) }));
+    };
+    window.addEventListener("openai:set_globals", readStoredOutput);
+    readStoredOutput();
+    return () => window.removeEventListener("openai:set_globals", readStoredOutput);
+  }, []);
 
   useEffect(() => {
     const availableModes = app?.getHostContext()?.availableDisplayModes;
@@ -126,7 +150,7 @@ export default function App() {
     if (connectionError) captureUiError("bridge_connection");
   }, [connectionError]);
 
-  const project = record(toolOutput);
+  const project = record(toolOutput ?? storedOutput);
   const style = record(project.style);
   const status = text(project.status, "waiting").toLowerCase();
   const rawUrls = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
