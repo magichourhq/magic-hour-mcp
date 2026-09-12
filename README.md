@@ -2,7 +2,7 @@
 
 OpenAPI-backed MCP server for Magic Hour image, video, and audio generation.
 
-At startup, this server reads `docs/openapi.json` and builds MCP tools with
+At startup, this server reads `mcp_magichour/openapi.json` and builds MCP tools with
 `FastMCP.from_openapi()`. The OpenAPI spec supplies endpoint coverage, while
 Magic Hour MCP policies add agent-facing guidance for async polling, uploads,
 and project downloads.
@@ -57,7 +57,7 @@ Environment variables:
 
 ```sh
 MAGIC_HOUR_API_BASE_URL=https://api.magichour.ai
-MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
+MAGIC_HOUR_OPENAPI_PATH=mcp_magichour/openapi.json
 MCP_OAUTH_ISSUER_URL=https://mcp.magichour.ai
 MCP_OAUTH_RESOURCE_URL=https://mcp.magichour.ai
 ```

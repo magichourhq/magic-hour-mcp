@@ -45,7 +45,7 @@ from .tool_logging import ToolCallLoggingMiddleware
 ProjectType = Literal["video", "image", "audio"]
 
 DEFAULT_API_BASE_URL = "https://api.magichour.ai"
-DEFAULT_OPENAPI_PATH = Path(__file__).resolve().parent.parent / "docs" / "openapi.json"
+DEFAULT_OPENAPI_PATH = Path(__file__).with_name("openapi.json")
 FAVICON_PATH = Path(__file__).with_name("favicon.ico")
 API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0)
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
