@@ -173,8 +173,8 @@ def image_workflow(mcp):
     project_id = created.get("id")
     if not isinstance(project_id, str) or not project_id:
         raise RuntimeError("Creation returned no project ID; inspect the test account for cleanup. Do not retry creation.")
-    print(f"Created test project {project_id}; credits charged: {created.get('credits_charged', 'unknown')}", flush=True)
     try:
+        print(f"Created test project {project_id}; credits charged: {created.get('credits_charged', 'unknown')}", flush=True)
         project = structured(mcp.call("wait_for_image_project", {
             "id": project_id, "poll_interval_seconds": 1, "timeout_seconds": 180,
             "include_inline_downloads": False,
