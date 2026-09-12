@@ -1,5 +1,6 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent, type SyntheticEvent } from "react";
+import { captureUiError } from "./analytics";
 
 type MediaType = "image" | "video" | "audio" | "media";
 
@@ -43,6 +44,17 @@ function projectType(result: Record<string, unknown>, url: string | null): Media
   return "media";
 }
 
+function reportToolResult(result: unknown): void {
+  const envelope = record(result);
+  const project = record(envelope.structuredContent);
+  // Tool and project failures are already captured by server instrumentation.
+  if (envelope.isError || ["error", "canceled", "cancelled", "timeout"].includes(text(project.status).toLowerCase())) return;
+  const rawUrls = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
+  if (!Object.keys(project).length) captureUiError("result_missing");
+  else if (rawUrls.some((url) => !safeMediaUrl(url))) captureUiError("result_unsafe_download");
+  else if (text(project.status).toLowerCase() === "complete" && !rawUrls.length) captureUiError("result_missing_download");
+}
+
 type PlaceholderProps = {
   icon: string;
   heading: string;
@@ -68,17 +80,21 @@ type PreviewProps = {
 };
 
 function Preview({ type, url, name, status, message }: PreviewProps) {
+  const failed = (event: SyntheticEvent<HTMLImageElement | HTMLMediaElement>) => {
+    const code = event.currentTarget instanceof HTMLMediaElement ? event.currentTarget.error?.code : undefined;
+    if (code !== 1) captureUiError(code === 2 ? "media_network" : code === 3 ? "media_decode" : code === 4 ? "media_unsupported" : "media_load");
+  };
   if (status !== "complete" || !url) {
     const failed = ["error", "canceled", "cancelled", "timeout"].includes(status);
     return <Placeholder icon={failed ? "!" : "…"} heading={failed ? "Project unavailable" : "Waiting for result"} message={message} />;
   }
-  if (type === "image") return <img src={url} alt={name} />;
-  if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} />;
+  if (type === "image") return <img src={url} alt={name} onError={failed} />;
+  if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onError={failed} />;
   if (type === "audio") {
     return (
       <div className="audio-preview">
         <div className="audio-mark" aria-hidden="true">♪</div>
-        <audio src={url} controls preload="metadata" aria-label={name} />
+        <audio src={url} controls preload="metadata" aria-label={name} onError={failed} />
       </div>
     );
   }
@@ -88,7 +104,7 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
 export default function App() {
   const [toolOutput, setToolOutput] = useState<unknown>();
   const [canFullscreen, setCanFullscreen] = useState(false);
-  const { app } = useApp({
+  const { app, error: connectionError } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (createdApp) => {
@@ -96,6 +112,8 @@ export default function App() {
       createdApp.onhostcontextchanged = (context) => {
         if (context.availableDisplayModes) setCanFullscreen(context.availableDisplayModes.includes("fullscreen"));
       };
+      createdApp.addEventListener("toolresult", reportToolResult);
+      createdApp.onerror = () => captureUiError("bridge_transport");
     },
   });
 
@@ -103,6 +121,10 @@ export default function App() {
     const availableModes = app?.getHostContext()?.availableDisplayModes;
     if (availableModes) setCanFullscreen(availableModes.includes("fullscreen"));
   }, [app]);
+
+  useEffect(() => {
+    if (connectionError) captureUiError("bridge_connection");
+  }, [connectionError]);
 
   const project = record(toolOutput);
   const style = record(project.style);
@@ -120,19 +142,30 @@ export default function App() {
   const model = optionalText(project.model) ?? optionalText(style.model);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
 
-  const openDownload = (event: MouseEvent<HTMLAnchorElement>) => {
+  const openDownload = async (event: MouseEvent<HTMLAnchorElement>) => {
     if (!app || !downloadUrl) return;
     const capabilities = app.getHostCapabilities();
-    if (capabilities?.downloadFile) {
-      event.preventDefault();
-      void app.downloadFile({ contents: [{ type: "resource_link", uri: downloadUrl, name }] });
-    } else if (capabilities?.openLinks) {
-      event.preventDefault();
-      void app.openLink({ url: downloadUrl });
+    if (!capabilities?.downloadFile && !capabilities?.openLinks) return;
+    event.preventDefault();
+    try {
+      const result = capabilities.downloadFile
+        ? await app.downloadFile({ contents: [{ type: "resource_link", uri: downloadUrl, name }] })
+        : await app.openLink({ url: downloadUrl });
+      if (result.isError) captureUiError("download_rejected");
+    } catch {
+      captureUiError("download_failed");
     }
   };
 
-  const requestFullscreen = () => void app?.requestDisplayMode({ mode: "fullscreen" });
+  const requestFullscreen = async () => {
+    if (!app) return;
+    try {
+      const result = await app.requestDisplayMode({ mode: "fullscreen" });
+      if (result.mode !== "fullscreen") captureUiError("fullscreen_rejected");
+    } catch {
+      captureUiError("fullscreen_failed");
+    }
+  };
 
   return (
     <main className="card" aria-live="polite">

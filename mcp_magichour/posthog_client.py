@@ -12,9 +12,17 @@ from posthog.mcp import MCPAnalyticsOptions, McpAnalytics, instrument
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 
+OAuthCodeEvent = Literal[
+    "oauth_authorization_code_issued",
+    "oauth_authorization_code_lookup_missed",
+    "oauth_connection_completed",
+]
 AnalyticsEvent = Literal[
     "media_project_resolved",
-    "oauth_connection_completed",
+    "media_inline_download_failed",
+    "mcp_app_error",
+    "oauth_request_failed",
+    OAuthCodeEvent,
 ]
 ProjectType = Literal["video", "image", "audio"]
 POSTHOG_TOKEN_PLACEHOLDER = "phc_your_project_token_here"
@@ -66,7 +74,7 @@ class Analytics:
         self._client = client
         self._mcp: McpAnalytics | None = None
 
-    def _capture(
+    def capture(
         self, event: AnalyticsEvent, properties: Mapping[str, object] | None = None
     ) -> None:
         if self._client is not None:
@@ -74,14 +82,12 @@ class Analytics:
                 event, properties=dict(properties) if properties else None
             )
 
-    def capture_oauth_connection_completed(self) -> None:
-        self._capture("oauth_connection_completed")
-
     def capture_media_project_resolved(
-        self, *, project_type: ProjectType, status: str
+        self, *, project_type: ProjectType, status: str, download_count: int
     ) -> None:
-        self._capture(
-            "media_project_resolved", {"project_type": project_type, "status": status}
+        self.capture(
+            "media_project_resolved",
+            {"project_type": project_type, "status": status, "download_count": download_count},
         )
 
     def capture_exception(self, exception: BaseException) -> None:
