@@ -91,8 +91,7 @@ def build_api_client() -> httpx.AsyncClient:
         base_url=os.getenv("MAGIC_HOUR_API_BASE_URL", DEFAULT_API_BASE_URL),
         auth=BearerPassthroughAuth(),
         timeout=API_TIMEOUT,
-        limits=API_LIMITS,
-        transport=httpx.AsyncHTTPTransport(retries=API_RETRIES),
+        transport=httpx.AsyncHTTPTransport(retries=API_RETRIES, limits=API_LIMITS),
     )
 
 
