@@ -570,7 +570,7 @@ AI Image Editor
 **Request Body:**
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
-- `model` (string, optional) enum=[12 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'flux-2-klein', 'nano-banana-2-lite'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[13 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'flux-2-klein', 'nano-banana-2-lite'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): 
@@ -592,7 +592,7 @@ AI Image Generator
 **Request Body:**
 - `name` (string, optional) default=Ai Image - dateTime: Give your image a custom name for easy identification.
 - `image_count` (integer, required) range=[1,16]: Number of images to generate. Maximum varies by model.
-- `model` (string, optional) enum=[13 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'z-image-turbo', 'flux-2-klein'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[14 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'z-image-turbo', 'flux-2-klein'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): The art style to use for image generation.
@@ -822,7 +822,7 @@ Get audio details
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
 - `name` (string, required): The name of the audio.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the audio.
-- `type` (string, required): The type of the audio project. Possible values are VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR
+- `type` (string, required): The type of the audio project. Possible values are AUDIO_TRANSLATOR, VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR
 - `created_at` (string, required): 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
