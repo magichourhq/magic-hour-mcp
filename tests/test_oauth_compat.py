@@ -269,7 +269,7 @@ class OAuthCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(api_key_input["type"], "password")
         self.assertEqual(api_key_input["placeholder"], "mhk_live_…")
         self.assertIn("required", api_key_input)
-        self.assertEqual(api_key_input["autocomplete"], "off")
+        self.assertEqual(api_key_input["autocomplete"], "new-password")
         self.assertNotIn("aria-describedby", api_key_input)
 
         hidden = {field["name"]: field["value"] for field in parser.inputs if field.get("type") == "hidden"}
