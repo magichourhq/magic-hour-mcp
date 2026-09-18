@@ -301,13 +301,13 @@ class OAuthCompatibilityServer:
                 background=self._code_event("oauth_authorization_code_lookup_missed", code),
             )
 
-        if not hmac.compare_digest(params.get("client_id", ""), authorization.client_id):
+        if not hmac.compare_digest(params.get("client_id", "").encode("utf-8"), authorization.client_id.encode("utf-8")):
             return _token_rejection(
                 "client_mismatch",
                 "invalid_grant",
                 "Authorization code does not match client",
             )
-        if not hmac.compare_digest(params.get("redirect_uri", ""), authorization.redirect_uri):
+        if not hmac.compare_digest(params.get("redirect_uri", "").encode("utf-8"), authorization.redirect_uri.encode("utf-8")):
             return _token_rejection(
                 "redirect_uri_mismatch",
                 "invalid_grant",
@@ -913,8 +913,11 @@ def _add_query(uri: str, values: Mapping[str, str | None]) -> str:
 
 
 def _same_resource(left: str, right: str) -> bool:
-    left_parts = urlsplit(left)
-    right_parts = urlsplit(right)
+    try:
+        left_parts = urlsplit(left)
+        right_parts = urlsplit(right)
+    except ValueError:
+        return False
     return (
         left_parts.scheme.lower(),
         left_parts.netloc.lower(),
