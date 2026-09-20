@@ -20,13 +20,11 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 
 1. In Claude, open **Settings > Connectors** and add a custom connector.
 2. Enter `https://mcp.magichour.ai/` as the connector URL.
-3. Open **Advanced settings** and set **OAuth Client ID** to
-   `magic-hour-mcp`. This is required because the server does not support dynamic
-   client registration.
-4. Add the connector, then select **Connect**.
-5. On the Magic Hour authorization page, paste your Magic Hour API key and select
-   **Connect**.
-6. Return to Claude and verify the connector is enabled. Ask Claude to call the
+3. Add the connector, then select **Connect**.
+4. Sign in to Magic Hour if asked, then select **Allow** on the authorization page.
+   This creates an API key named "Claude connector" in your Developer Hub; delete it
+   there to disconnect.
+5. Return to Claude and verify the connector is enabled. Ask Claude to call the
    Magic Hour `ping` tool; the expected result is `pong`.
 
 ## Connect with Claude Code

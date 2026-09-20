@@ -68,14 +68,12 @@ Override `MAGIC_HOUR_API_BASE_URL` to use a mock or another API base:
 MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/latest python main.py
 ```
 
-## OAuth compatibility
+## OAuth
 
-The optional OAuth shim validates a Magic Hour API key and uses that key as the
-access token. Production requires `MCP_OAUTH_ISSUER_URL` and
-`MCP_OAUTH_RESOURCE_URL`. See `docs/future-oauth-support.md` for deployment
-limits.
-
-Public OAuth clients can use the stateless `POST /register` compatibility endpoint.
+This server is an OAuth protected resource only. The authorization server is the Magic Hour
+web app (`https://magichour.ai`): users sign in and consent there, and it returns a Magic Hour
+API key as the access token, which this server passes through to the API. Production requires
+`MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL`. See `docs/future-oauth-support.md`.
 
 ## Test with MCP Inspector
 

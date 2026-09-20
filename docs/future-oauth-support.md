@@ -1,6 +1,4 @@
-# OAuth compatibility for web connectors
-
-Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
+# OAuth for web connectors
 
 ## Current support
 
@@ -13,11 +11,11 @@ Implemented as a small compatibility shim in `mcp_magichour/oauth_compat.py`.
 | ChatGPT Custom Connector | Yes, through OAuth |
 | Cursor MCP | Yes, through OAuth |
 
-The OAuth shim supports Authorization Code + PKCE for public clients. Its RFC
-7591-compatible `POST /register` endpoint validates callback metadata and
-returns a client ID without keeping a client registry. Authorization requests
-require an exact match from the built-in callback allowlist and bind it to the
-short-lived code.
+OAuth clients are sent to the Magic Hour web app, which is the authorization
+server (`https://magichour.ai/.well-known/oauth-authorization-server`). It
+handles dynamic client registration, sign-in, consent, and Authorization Code +
+PKCE. This server only publishes protected resource metadata and challenges
+unauthenticated requests (`mcp_magichour/oauth_compat.py`).
 
 ## Why OAuth exists
 
@@ -29,22 +27,17 @@ Authorization: Bearer <magic_hour_api_key>
 
 Claude and ChatGPT web connectors expect OAuth, not an arbitrary static bearer header.
 
-The authorization page asks for a Magic Hour API key. The server validates it
-against the existing API, stores it in a short-lived single-use authorization
-code, then returns that same key from `/token` as the bearer access token. It
-does not mint refresh tokens or introduce another token system.
+The web app returns a newly created Magic Hour API key as the OAuth access
+token, so OAuth clients and static-bearer clients authenticate the same way.
+Users revoke a connection by deleting that key in the Developer Hub. There are
+no refresh tokens.
 
 ## Deployment
 
 Set `MCP_OAUTH_ISSUER_URL` and `MCP_OAUTH_RESOURCE_URL` to the canonical public
-MCP URL. Serve production endpoints over HTTPS. Authorization codes are
-process-local, so run one worker. Multi-worker or serverless deployment requires
-a shared code store or encrypted stateless codes. Rate-limit `/register` and
-`/authorize` at the public edge.
-
-This is a connector compatibility layer, not a general-purpose authorization
-server. Access tokens retain the lifetime and privileges of the Magic Hour API
-key.
+MCP URL. The web app only issues codes for `resource=https://mcp.magichour.ai`,
+so OAuth cannot complete against preview deployment URLs. This server holds no
+OAuth state, so any number of workers or serverless instances is fine.
 
 OAuth does not handle file uploads. See `docs/future-chat-ui-handoff.md` for the
 browser upload flow.
