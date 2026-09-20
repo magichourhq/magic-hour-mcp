@@ -12,17 +12,10 @@ from posthog.mcp import MCPAnalyticsOptions, McpAnalytics, instrument
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 
-OAuthCodeEvent = Literal[
-    "oauth_authorization_code_issued",
-    "oauth_authorization_code_lookup_missed",
-    "oauth_connection_completed",
-]
 AnalyticsEvent = Literal[
     "media_project_resolved",
     "media_inline_download_failed",
     "mcp_app_error",
-    "oauth_request_failed",
-    OAuthCodeEvent,
 ]
 ProjectType = Literal["video", "image", "audio"]
 POSTHOG_TOKEN_PLACEHOLDER = "phc_your_project_token_here"
