@@ -9,7 +9,7 @@
 | Claude Desktop Connectors UI | Yes, through OAuth |
 | claude.ai web Custom Connector | Yes, through OAuth |
 | ChatGPT Custom Connector | Yes, through OAuth |
-| Cursor MCP | Yes, through OAuth |
+| Cursor MCP | Yes, with a static bearer header. OAuth is not supported yet |
 
 OAuth clients are sent to the Magic Hour web app, which is the authorization
 server (`https://magichour.ai/.well-known/oauth-authorization-server`). It
