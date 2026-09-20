@@ -78,6 +78,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/face-detection` | Files | Face Detection |
 | GET | `/v1/face-detection/{id}` | Files | Get face detection details |
 | POST | `/v1/files/upload-urls` | Files | Generate asset upload urls |
+| GET | `/v1/saved-items` | Files | List saved items |
 | POST | `/v1/ai-talking-photo` | Video Projects | AI Talking Photo |
 | POST | `/v1/ai-video-editor` | Video Projects | AI Video Editor |
 | POST | `/v1/animation` | Video Projects | Animation |
@@ -111,6 +112,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/ai-voice-generator` | Audio Projects | AI Voice Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
+| GET | `/v1/account` | Account | Get account details |
 
 ## Per-endpoint detail
 
@@ -168,6 +170,31 @@ Generate asset upload urls
     - `upload_url` (string, required): Used to upload the file to storage, send a PUT request with the file as data to upload.
     - `expires_at` (string, required): when the upload url expires, and will need to request a new one.
     - `file_path` (string, required): this value is used in APIs that needs assets, such as image_file_path, video_file_path, and audio_file_path
+
+#### GET /v1/saved-items
+`operationId: savedItems.list`
+
+List saved items
+
+**Path Parameters:**
+- `type` (query, optional): Only return saved items of this type.
+- `limit` (query, optional): Maximum number of saved items to return. Defaults to 20.
+- `cursor` (query, optional): Opaque pagination cursor from the previous response's next_cursor.
+
+**Response 200:**
+- `items` (array, required): 
+  items:
+    - `id` (string, required): Unique ID of the saved item.
+    - `type` (string, required) enum=['character', 'reference', 'voice', 'moodboard', 'brand_kit']: Saved item type.
+    - `name` (string, required): User-provided name of the saved item.
+    - `assets` (array, required): 
+      items:
+        - `file_path` (string, required): Durable asset path. Pass it to a compatible API asset field without uploading it again.
+        - `media_kind` (string, required) enum=['IMAGE', 'VIDEO', 'AUDIO']: Media type of the asset.
+        - `is_primary` (boolean, required): Whether this asset is the saved item's primary asset.
+        - `url` (string, required): Signed URL for previewing or downloading the asset. Expires after 24 hours.
+        - `url_expires_at` (string, required): When the signed URL expires. The saved asset and file_path do not expire.
+- `next_cursor` (string, required): Cursor for the next page, or null when there are no more saved items.
 
 ### Video projects
 
@@ -357,7 +384,7 @@ Image-to-Video
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'ltx-2.5', 'minimax-h3', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[22 values, e.g. ['default', 'ltx-2', 'ltx-2.5', 'minimax-h3', 'wan-3.0', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
@@ -404,7 +431,7 @@ Text-to-Video
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
 - `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
-- `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.3', 'ltx-2.5', 'minimax-h3', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[22 values, e.g. ['default', 'ltx-2', 'ltx-2.5', 'minimax-h3', 'wan-3.0', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required): 
   - `prompt` (string, required): The prompt used for the video.
@@ -569,7 +596,7 @@ AI Image Editor
 **Request Body:**
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
-- `model` (string, optional) enum=[11 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'flux-2-klein', 'nano-banana-2-lite', 'qwen-edit'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[13 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'flux-2-klein', 'nano-banana-2-lite'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): 
@@ -591,7 +618,7 @@ AI Image Generator
 **Request Body:**
 - `name` (string, optional) default=Ai Image - dateTime: Give your image a custom name for easy identification.
 - `image_count` (integer, required) range=[1,16]: Number of images to generate. Maximum varies by model.
-- `model` (string, optional) enum=[12 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'z-image-turbo', 'flux-2-klein', 'nano-banana-2-lite'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[14 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'z-image-turbo', 'flux-2-klein'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): The art style to use for image generation.
@@ -631,7 +658,7 @@ AI Meme Generator
 - `name` (string, optional): The name of the meme.
 - `style` (object, required): 
   - `topic` (string, required): The topic of the meme.
-  - `template` (string, required) enum=[13 values, e.g. ['Random', 'Drake Hotline Bling', 'Galaxy Brain', 'Two Buttons', "Gru's Plan", 'Tuxedo Winnie The Pooh'], ...]: To use our templates, pass in one of the enum values.
+  - `template` (string, required) enum=[101 values, e.g. ['Random', 'Drake Hotline Bling', 'Galaxy Brain', 'Two Buttons', "Gru's Plan", 'Tuxedo Winnie The Pooh'], ...]: To use our templates, pass in one of the enum values.
   - `searchWeb` (boolean, optional) default=False: Whether to search the web for meme content.
 
 **Response 200:**
@@ -738,7 +765,7 @@ Get image details
 - `name` (string, required): The name of the image.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the image.
 - `image_count` (integer, required): Number of images generated
-- `type` (string, required): The type of the image project. Possible values are FACE_EDITOR, AI_IMAGE_EDITOR, AI_SELFIE, AI_HEADSHOT, AI_INFLUENCER, AI_IMAGE, AI_MEME, CLOTHES_CHANGER, BACKGROUND_REMOVER, FACE_SWAP, IMAGE_UPSCALER, IMAGE_ENHANCER,...
+- `type` (string, required): The type of the image project. Possible values are FACE_EDITOR, AI_IMAGE_EDITOR, GENERATIVE_FILL, AI_SELFIE, AI_HEADSHOT, AI_INFLUENCER, AI_IMAGE, AI_MEME, CLOTHES_CHANGER, BACKGROUND_REMOVER, FACE_SWAP, IMAGE_UPSCALER,...
 - `created_at` (string, required): 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
@@ -803,7 +830,7 @@ AI Voice Generator
 - `name` (string, optional) default=Voice Generator - dateTime: Give your audio a custom name for easy identification.
 - `style` (object, required): The content used to generate speech.
   - `prompt` (string, required): Text used to generate speech. The character limit is 1000 characters.
-  - `voice_name` (string, required) enum=[492 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Available voices: Elon Musk, Mark Zuckerberg, Joe Rogan, Barack Obama, Morgan Freeman, Kanye West, Donald Trump, Joe Biden, Kim Kardashian, Taylor Swift, James Earl Jones, Samuel L....
+  - `voice_name` (string, required) enum=[1267 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Available voices: Elon Musk, Mark Zuckerberg, Joe Rogan, Barack Obama, Morgan Freeman, Kanye West, Donald Trump, Joe Biden, Kim Kardashian, Taylor Swift, James Earl Jones, Samuel L....
 
 **Response 200:**
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
@@ -821,7 +848,7 @@ Get audio details
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
 - `name` (string, required): The name of the audio.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the audio.
-- `type` (string, required): The type of the audio project. Possible values are VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR
+- `type` (string, required): The type of the audio project. Possible values are AUDIO_TRANSLATOR, VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR, SOUND_EFFECT_GENERATOR
 - `created_at` (string, required): 
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.

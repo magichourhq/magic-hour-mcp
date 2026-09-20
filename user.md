@@ -20,13 +20,11 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 
 1. In Claude, open **Settings > Connectors** and add a custom connector.
 2. Enter `https://mcp.magichour.ai/` as the connector URL.
-3. Open **Advanced settings** and set **OAuth Client ID** to
-   `magic-hour-mcp`. This is required because the server does not support dynamic
-   client registration.
-4. Add the connector, then select **Connect**.
-5. On the Magic Hour authorization page, paste your Magic Hour API key and select
-   **Connect**.
-6. Return to Claude and verify the connector is enabled. Ask Claude to call the
+3. Add the connector, then select **Connect**.
+4. Sign in to Magic Hour if asked, then select **Allow** on the authorization page.
+   This creates an API key named "Claude connector" in your Developer Hub; delete it
+   there to disconnect.
+5. Return to Claude and verify the connector is enabled. Ask Claude to call the
    Magic Hour `ping` tool; the expected result is `pong`.
 
 ## Connect with Claude Code
@@ -66,6 +64,27 @@ codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var 
 ```
 
 Start Codex from that same shell and ask it to call the Magic Hour `ping` tool.
+
+## Verify API access before generating
+
+After `ping`, ask the agent to call `account_retrieve` and confirm eligibility for
+the intended generation. Tool discovery can work without credentials, and an
+invalid API key can still receive `pong`; only the account read checks actual
+API authorization. `Authentication required` means the bearer token is missing;
+an account `401` means authorization failed. Check the key and the environment
+that launched the agent before reinstalling anything. Keep account details private.
+
+## Improve output quality with Magic Hour skills
+
+The MCP gives your agent access to Magic Hour tools. The [Magic Hour skills cookbook](https://github.com/magichourhq/skills) adds workflows and published examples for choosing and sequencing those tools, writing prompts, reviewing outputs, and recovering without duplicate paid jobs. Each example records its validation limits.
+
+Install the cookbook and choose your agent:
+
+```sh
+npx skills add magichourhq/skills --skill '*'
+```
+
+For controlled product or character animation, create or edit the still image first, fix composition and identity issues there, then use that approved image as the image-to-video start frame. Prompt the video step mainly for motion, camera movement, timing, and what must stay fixed.
 
 ## Prompt cookbook
 

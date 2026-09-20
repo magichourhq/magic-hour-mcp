@@ -23,6 +23,7 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from .app_events import app_events
 from .openapi_auth import (
     BearerPassthroughAuth,
     BearerPassthroughMiddleware,
@@ -36,6 +37,7 @@ from .openapi_policies import (
     customize_openapi_component,
     private_tool_annotations,
 )
+from .posthog_client import PostHogFlushMiddleware, analytics
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
     MCP_APP_DIST_PATH,
@@ -68,13 +70,15 @@ Only create or edit media when the user requests execution. Ideas, writing, prom
 Never repeat a create call to poll progress. Reuse its returned project id.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
+Omit optional resolution and model unless the user explicitly requests them, allowing the API to choose plan-compatible defaults.
+After a subscription-tier restriction, retry at most once after omitting only unrequested optional fields; explain the restriction instead of changing an explicit requirement or guessing alternatives.
 
 For video creation, unless the user requests otherwise:
 
 - Prefer AI Image Editor followed by Image-to-Video.
 - Reuse reference images across scenes for visual consistency.
-- Prefer nano-banana-2-lite for image creation and editing.
-- Prefer ltx-2.3 for Image-to-Video.
+- When the user asks for an image model recommendation, prefer nano-banana-2-lite only if account support is known; otherwise recommend default.
+- When the user asks for an Image-to-Video model recommendation, prefer ltx-2.5.
 - Add voiceovers using AI Voice Generator when a voiceover would suit the video. Choose the voice that would be the best narrator for this video.
 - Let the narration finish each sentence. Never cut it off.
 - Use Text-to-Video only when consistency is unimportant.
@@ -136,8 +140,7 @@ def build_api_client() -> httpx.AsyncClient:
         base_url=os.getenv("MAGIC_HOUR_API_BASE_URL", DEFAULT_API_BASE_URL),
         auth=BearerPassthroughAuth(),
         timeout=API_TIMEOUT,
-        limits=API_LIMITS,
-        transport=httpx.AsyncHTTPTransport(retries=API_RETRIES),
+        transport=httpx.AsyncHTTPTransport(retries=API_RETRIES, limits=API_LIMITS),
     )
 
 
@@ -167,6 +170,7 @@ def create_mcp() -> FastMCP:
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(MCPToolOAuthMiddleware())
     install_structured_tool_errors(mcp)
+    analytics.instrument_mcp(mcp)
     return mcp
 
 
@@ -354,6 +358,11 @@ async def _wait_for_project_result(
     project = await _wait_for_project(
         project_type, project_id, poll_interval_seconds, timeout_seconds
     )
+    analytics.capture_media_project_resolved(
+        project_type=project_type,
+        status=str(project.get("status", "unknown")),
+        download_count=len(_project_download_urls(project)),
+    )
     return await _project_to_tool_result(
         project_type,
         project,
@@ -433,6 +442,14 @@ async def _project_to_tool_result(
                     max_bytes=max_bytes_per_download,
                 )
             except Exception as exc:
+                analytics.capture(
+                    "media_inline_download_failed",
+                    {
+                        "project_type": project_type,
+                        "error_type": type(exc).__name__,
+                        "http_status": exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None,
+                    },
+                )
                 content.append(
                     TextContent(
                         type="text",
@@ -625,6 +642,7 @@ def _resolve_media_mime_type(
 mcp = create_mcp()
 
 middleware = [
+    Middleware(PostHogFlushMiddleware),
     Middleware(BearerPassthroughMiddleware),
     Middleware(
         CORSMiddleware,
@@ -702,6 +720,7 @@ mcp_app_assets = CORSMiddleware(
 app = create_oauth_compatibility_app(
     mcp_app,
     public_routes=[
+        Route("/app/events", app_events, methods=["POST", "OPTIONS"]),
         Route("/favicon.ico", favicon, methods=["GET"]),
         Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
         Mount(MCP_APP_ASSET_PATH, app=mcp_app_assets),
