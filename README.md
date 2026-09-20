@@ -77,6 +77,11 @@ limits.
 
 Public OAuth clients can use the stateless `POST /register` compatibility endpoint.
 
+Set `MCP_OAUTH_AUTHORIZATION_SERVER_URL=https://magichour.ai` to advertise the Magic Hour
+web app as the authorization server instead. Clients then run a real login and consent
+flow there, and this app only serves protected resource metadata and passes the bearer
+token through. Unset it to fall back to the shim.
+
 ## Test with MCP Inspector
 
 1. Start the server.

@@ -140,6 +140,9 @@ class AuthorizationCodeStore:
 class OAuthSettings:
     issuer_url: str | None = None
     resource_url: str | None = None
+    # When set, clients are sent to this authorization server (the Magic Hour web app) instead
+    # of the API-key shim served by this app.
+    authorization_server_url: str | None = None
     api_base_url: str = "https://api.magichour.ai"
     validation_path: str = "/v1/ai-image-generator"
 
@@ -148,6 +151,7 @@ class OAuthSettings:
         return cls(
             issuer_url=os.getenv("MCP_OAUTH_ISSUER_URL"),
             resource_url=os.getenv("MCP_OAUTH_RESOURCE_URL"),
+            authorization_server_url=os.getenv("MCP_OAUTH_AUTHORIZATION_SERVER_URL"),
             api_base_url=os.getenv("MAGIC_HOUR_API_BASE_URL", "https://api.magichour.ai"),
             validation_path=os.getenv(
                 "MAGIC_HOUR_OAUTH_VALIDATION_PATH",
@@ -366,11 +370,13 @@ class OAuthCompatibilityServer:
         )
 
     async def protected_resource_metadata(self, request: Request) -> Response:
-        issuer = self.issuer(request)
+        authorization_server = (
+            self.settings.authorization_server_url or self.issuer(request)
+        ).rstrip("/")
         return JSONResponse(
             {
                 "resource": self.resource(request),
-                "authorization_servers": [issuer],
+                "authorization_servers": [authorization_server],
                 "bearer_methods_supported": ["header"],
             }
         )
@@ -941,6 +947,7 @@ def _validate_settings(settings: OAuthSettings) -> None:
     for name, value in (
         ("MCP_OAUTH_ISSUER_URL", settings.issuer_url),
         ("MCP_OAUTH_RESOURCE_URL", settings.resource_url),
+        ("MCP_OAUTH_AUTHORIZATION_SERVER_URL", settings.authorization_server_url),
         ("MAGIC_HOUR_API_BASE_URL", settings.api_base_url),
     ):
         if value and not _valid_server_url(value):
