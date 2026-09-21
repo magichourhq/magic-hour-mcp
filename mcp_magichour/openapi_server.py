@@ -305,7 +305,7 @@ async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes:
     if parsed_url.scheme != "https" or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname:
         raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
 
-    async with httpx.AsyncClient(timeout=API_TIMEOUT, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=API_TIMEOUT, follow_redirects=False) as client:
         async with client.stream("GET", download_url) as response:
             response.raise_for_status()
             mime_type = _resolve_media_mime_type(
