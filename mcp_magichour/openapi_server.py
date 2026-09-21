@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import mimetypes
 import os
 from base64 import b64encode
@@ -250,27 +251,35 @@ async def _wait_for_project(
     poll_interval_seconds: float,
     timeout_seconds: float,
 ) -> dict[str, Any]:
-    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be finite and greater than 0.")
+    if not math.isfinite(poll_interval_seconds) or poll_interval_seconds < 0:
+        raise ValueError("poll_interval_seconds must be finite and nonnegative.")
     path = f"/v1/{project_type}-projects/{project_id}"
+    last_project: dict[str, Any] | None = None
 
-    async with build_api_client() as client:
-        while True:
-            response = await client.get(path, headers={"Authorization": current_authorization_header()})
-            response.raise_for_status()
-            project = response.json()
-            status = project.get("status")
+    async def poll() -> dict[str, Any]:
+        nonlocal last_project
+        async with build_api_client() as client:
+            while True:
+                response = await client.get(path, headers={"Authorization": current_authorization_header()})
+                response.raise_for_status()
+                last_project = response.json()
+                if last_project.get("status") in TERMINAL_PROJECT_STATUSES:
+                    return last_project
 
-            if status in TERMINAL_PROJECT_STATUSES:
-                return project
+                await asyncio.sleep(max(poll_interval_seconds, 0.5))
 
-            if asyncio.get_running_loop().time() >= deadline:
-                return {
-                    "status": "timeout",
-                    "message": f"Timed out waiting for {project_type} project {project_id}.",
-                    "last_project": project,
-                }
-
-            await asyncio.sleep(max(poll_interval_seconds, 0.5))
+    try:
+        return await asyncio.wait_for(poll(), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        result: dict[str, Any] = {
+            "status": "timeout",
+            "message": f"Timed out waiting for {project_type} project {project_id}.",
+        }
+        if last_project is not None:
+            result["last_project"] = last_project
+        return result
 
 
 async def _wait_for_project_result(
