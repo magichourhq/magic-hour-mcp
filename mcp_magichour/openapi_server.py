@@ -284,7 +284,7 @@ async def _wait_for_project_result(
     max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
 ) -> ToolResult:
     project = await _wait_for_project(project_type, project_id, poll_interval_seconds, timeout_seconds)
-    analytics.capture_media_project_resolved(
+    await analytics.capture_media_project_resolved(
         project_type=project_type,
         status=str(project.get("status", "unknown")),
         download_count=len(_project_download_urls(project)),
@@ -359,7 +359,7 @@ async def _project_to_tool_result(
                     max_bytes=max_bytes_per_download,
                 )
             except Exception as exc:
-                analytics.capture(
+                await analytics.capture_mcp(
                     "media_inline_download_failed",
                     {
                         "project_type": project_type,
