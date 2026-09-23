@@ -40,7 +40,11 @@ class OpenApiPolicyTests(unittest.TestCase):
                         "requestBody": {
                             "content": {
                                 "application/json": {
-                                    "schema": {"properties": {"image_file_path": {"type": "string"}}}
+                                    "schema": {
+                                        "properties": {
+                                            "image_file_path": {"type": "string"}
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -73,7 +77,9 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertIn("write-operation", component.tags)
         self.assertIn("generation", component.tags)
 
-    def test_unknown_project_post_gets_group_policy_without_endpoint_specific_config(self):
+    def test_unknown_project_post_gets_group_policy_without_endpoint_specific_config(
+        self,
+    ):
         spec = {
             "paths": {
                 "/v1/new-video-tool": {
@@ -93,12 +99,28 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertIn("GET /v1/video-projects/{id}", description)
 
     def test_tool_names_are_snake_case_and_replace_generic_actions(self):
-        self.assertEqual(normalize_mcp_tool_name("faceDetection.getDetails"), "face_detection_retrieve_details")
-        self.assertEqual(normalize_mcp_tool_name("videoAssets.generatePresignedUrl"), "video_assets_generate_presigned_url")
+        self.assertEqual(
+            normalize_mcp_tool_name("faceDetection.getDetails"),
+            "face_detection_retrieve_details",
+        )
+        self.assertEqual(
+            normalize_mcp_tool_name("videoAssets.generatePresignedUrl"),
+            "video_assets_generate_presigned_url",
+        )
 
     def test_tool_names_must_have_at_least_four_characters(self):
         with self.assertRaisesRegex(ValueError, "at least 4 characters"):
             normalize_mcp_tool_name("id")
+
+    def test_unreviewed_operation_fails_closed(self):
+        from types import SimpleNamespace
+
+        for tags in ([], ["Video Projects"]):
+            with self.assertRaisesRegex(ValueError, "Review MCP side effects"):
+                customize_openapi_component(
+                    SimpleNamespace(method="POST", path="/v1/publish", tags=tags),
+                    SimpleNamespace(tags=set()),
+                )
 
 
 if __name__ == "__main__":
