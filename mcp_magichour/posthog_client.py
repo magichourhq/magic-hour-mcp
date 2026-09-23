@@ -30,14 +30,17 @@ DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com"
 logger = logging.getLogger(__name__)
 
 
+def api_key_distinct_id(token: str) -> str:
+    fingerprint = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return f"mcp_api_key_{fingerprint}"
+
+
 def _identify_request(_: object, extra: object) -> UserIdentity | None:
     headers = get_request_headers(extra) or {}
     scheme, _, token = headers.get("authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
         return None
-
-    fingerprint = hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
-    return UserIdentity(distinct_id=f"mcp_api_key_{fingerprint}")
+    return UserIdentity(distinct_id=api_key_distinct_id(token.strip()))
 
 
 def _is_debug() -> bool:
@@ -93,11 +96,12 @@ class Analytics:
             )
 
     async def capture_media_project_resolved(
-        self, *, project_type: ProjectType, status: str, download_count: int
+        self, *, distinct_id: str, project_type: ProjectType, status: str, download_count: int
     ) -> None:
         await self.capture_mcp(
             "media_project_resolved",
             {"project_type": project_type, "status": status, "download_count": download_count},
+            distinct_id=distinct_id,
         )
 
     def capture_exception(self, exception: BaseException) -> None:
@@ -117,12 +121,12 @@ class Analytics:
             )
 
     async def capture_mcp(
-        self, event: AnalyticsEvent, properties: Mapping[str, object] | None = None
+        self, event: AnalyticsEvent, properties: Mapping[str, object] | None = None, *, distinct_id: str
     ) -> None:
-        if self._mcp is not None:
-            await self._mcp.capture(event, dict(properties) if properties else None)
-        else:
-            self.capture(event, properties)
+        if self._client is not None:
+            self._client.capture(
+                event, distinct_id=distinct_id, properties=dict(properties) if properties else None
+            )
 
     async def flush_mcp(self) -> None:
         if self._mcp is not None:

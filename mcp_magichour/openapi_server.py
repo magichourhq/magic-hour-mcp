@@ -28,7 +28,7 @@ from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, cu
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
-from .posthog_client import PostHogFlushMiddleware, analytics
+from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
     MCP_APP_DIST_PATH,
@@ -283,8 +283,10 @@ async def _wait_for_project_result(
     max_inline_downloads: int = 0,
     max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
 ) -> ToolResult:
+    distinct_id = api_key_distinct_id(current_authorization_header().partition(" ")[2])
     project = await _wait_for_project(project_type, project_id, poll_interval_seconds, timeout_seconds)
     await analytics.capture_media_project_resolved(
+        distinct_id=distinct_id,
         project_type=project_type,
         status=str(project.get("status", "unknown")),
         download_count=len(_project_download_urls(project)),
@@ -295,6 +297,7 @@ async def _wait_for_project_result(
         include_inline_downloads=include_inline_downloads,
         max_inline_downloads=max_inline_downloads,
         max_bytes_per_download=max_bytes_per_download,
+        distinct_id=distinct_id,
     )
 
 
@@ -332,6 +335,7 @@ async def _project_to_tool_result(
     include_inline_downloads: bool,
     max_inline_downloads: int,
     max_bytes_per_download: int,
+    distinct_id: str | None = None,
 ) -> ToolResult:
     content: list[Any] = [
         TextContent(type="text", text=_project_status_text(project_type, project))
@@ -359,14 +363,16 @@ async def _project_to_tool_result(
                     max_bytes=max_bytes_per_download,
                 )
             except Exception as exc:
-                await analytics.capture_mcp(
-                    "media_inline_download_failed",
-                    {
-                        "project_type": project_type,
-                        "error_type": type(exc).__name__,
-                        "http_status": exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None,
-                    },
-                )
+                if distinct_id is not None:
+                    await analytics.capture_mcp(
+                        "media_inline_download_failed",
+                        {
+                            "project_type": project_type,
+                            "error_type": type(exc).__name__,
+                            "http_status": exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None,
+                        },
+                        distinct_id=distinct_id,
+                    )
                 content.append(
                     TextContent(
                         type="text",
