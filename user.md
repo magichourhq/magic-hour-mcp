@@ -24,8 +24,8 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 4. Sign in to Magic Hour if asked, then select **Allow** on the authorization page.
    This creates an API key named "Claude connector" in your Developer Hub; delete it
    there to disconnect.
-5. Return to Claude and verify the connector is enabled. Ask Claude to call the
-   Magic Hour `ping` tool; the expected result is `pong`.
+5. Return to Claude and verify the connector is enabled. Ask Claude to call
+   `account_retrieve`; a returned credit balance confirms real API authorization.
 
 ## Connect with Claude Code
 
@@ -33,7 +33,7 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 claude mcp add --scope user --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
-Start a new Claude Code session and ask it to call the Magic Hour `ping` tool.
+Start a new Claude Code session and ask it to call `account_retrieve`.
 
 If `--scope user` is not supported, use project scope:
 
@@ -63,14 +63,14 @@ Add the MCP server:
 codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var MAGIC_HOUR_API_KEY
 ```
 
-Start Codex from that same shell and ask it to call the Magic Hour `ping` tool.
+Start Codex from that same shell and ask it to call `account_retrieve`.
 
 ## Verify API access before generating
 
-After `ping`, ask the agent to call `account_retrieve` and confirm eligibility for
-the intended generation. Tool discovery can work without credentials, and an
-invalid API key can still receive `pong`; only the account read checks actual
-API authorization. `Authentication required` means the bearer token is missing;
+Use `account_retrieve` to confirm eligibility for the intended generation. Tool
+discovery can work without credentials, and an invalid API key can still receive
+`pong`; only the account read checks actual API authorization. `Authentication
+required` means the bearer token is missing;
 an account `401` means authorization failed. Check the key and the environment
 that launched the agent before reinstalling anything. Keep account details private.
 

@@ -1,6 +1,7 @@
 """Process-wide PostHog client for server-side analytics."""
 
 import atexit
+import hashlib
 import logging
 import os
 from collections.abc import Mapping
@@ -8,7 +9,13 @@ from typing import Literal
 
 from fastmcp import FastMCP
 from posthog import Posthog
-from posthog.mcp import MCPAnalyticsOptions, McpAnalytics, instrument
+from posthog.mcp import (
+    MCPAnalyticsOptions,
+    McpAnalytics,
+    UserIdentity,
+    get_request_headers,
+    instrument,
+)
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 
@@ -21,6 +28,19 @@ ProjectType = Literal["video", "image", "audio"]
 POSTHOG_TOKEN_PLACEHOLDER = "phc_your_project_token_here"
 DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com"
 logger = logging.getLogger(__name__)
+
+
+def api_key_distinct_id(token: str) -> str:
+    fingerprint = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return f"mcp_api_key_{fingerprint}"
+
+
+def _identify_request(_: object, extra: object) -> UserIdentity | None:
+    headers = get_request_headers(extra) or {}
+    scheme, _, token = headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return UserIdentity(distinct_id=api_key_distinct_id(token.strip()))
 
 
 def _is_debug() -> bool:
@@ -75,12 +95,13 @@ class Analytics:
                 event, properties=dict(properties) if properties else None
             )
 
-    def capture_media_project_resolved(
-        self, *, project_type: ProjectType, status: str, download_count: int
+    async def capture_media_project_resolved(
+        self, *, distinct_id: str, project_type: ProjectType, status: str, download_count: int
     ) -> None:
-        self.capture(
+        await self.capture_mcp(
             "media_project_resolved",
             {"project_type": project_type, "status": status, "download_count": download_count},
+            distinct_id=distinct_id,
         )
 
     def capture_exception(self, exception: BaseException) -> None:
@@ -92,7 +113,19 @@ class Analytics:
             self._mcp = instrument(
                 server,
                 self._client,
-                MCPAnalyticsOptions(logger=logger.info),
+                MCPAnalyticsOptions(
+                    context=False,
+                    identify=_identify_request,
+                    logger=logger.info,
+                ),
+            )
+
+    async def capture_mcp(
+        self, event: AnalyticsEvent, properties: Mapping[str, object] | None = None, *, distinct_id: str
+    ) -> None:
+        if self._client is not None:
+            self._client.capture(
+                event, distinct_id=distinct_id, properties=dict(properties) if properties else None
             )
 
     async def flush_mcp(self) -> None:
