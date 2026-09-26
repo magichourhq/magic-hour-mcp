@@ -81,6 +81,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | GET | `/v1/saved-items` | Files | List saved items |
 | POST | `/v1/ai-talking-photo` | Video Projects | AI Talking Photo |
 | POST | `/v1/ai-video-editor` | Video Projects | AI Video Editor |
+| POST | `/v1/ai-video-translator` | Video Projects | AI Video Translator |
 | POST | `/v1/animation` | Video Projects | Animation |
 | POST | `/v1/audio-to-video` | Video Projects | Audio-to-Video |
 | POST | `/v1/auto-subtitle-generator` | Video Projects | Auto Subtitle Generator |
@@ -242,6 +243,25 @@ AI Video Editor
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
+#### POST /v1/ai-video-translator
+`operationId: aiVideoTranslator.createVideo`
+
+AI Video Translator
+
+
+**Request Body:**
+- `name` (string, optional) default=Video Translator - dateTime: Give your video a custom name for easy identification.
+- `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
+- `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds. The clip must be 1-30 seconds long.
+- `target_language` (string, required) enum=[53 values, e.g. ['English', 'Chinese (Simplified)', 'Hindi', 'Spanish', 'Arabic', 'French'], ...]: Language to translate the video's speech into.
+- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output video resolution. Defaults to 480p. 720p and 1080p require a paid plan.
+- `assets` (object, required): Source video for the translation job.
+  - `video_file_path` (string, required): Source video containing the speech to translate. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+
+**Response 200:**
+- `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
+
 #### POST /v1/animation
 `operationId: animation.createVideo`
 
@@ -361,7 +381,7 @@ Face Swap Video
 - `style` (object, optional): Style of the face swap video.
   - `version` (string, optional) enum=['v1', 'v2', 'default']: * `v1` - May preserve skin detail and texture better, but weaker identity preservation. * `v2` - Faster, sharper, better handling of hair and glasses. stronger identity preservation. * `default` - Use the version we...
 - `assets` (object, required): Provide the assets for face swap. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: - **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) - **individual-faces** — specify exact mappings using `face_mappings`
   - `image_file_path` (string, optional): The path of the input image with the face to be swapped. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
@@ -384,7 +404,7 @@ Image-to-Video
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `model` (string, optional) enum=[22 values, e.g. ['default', 'ltx-2', 'ltx-2.5', 'minimax-h3', 'wan-3.0', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[22 values, e.g. ['default', 'kling-3.0', 'gemini-omni-1.1', 'seedance-2.0', 'ltx-2.5', 'minimax-h3'], ...] default=default: The AI model to use for video generation.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
@@ -431,7 +451,7 @@ Text-to-Video
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
 - `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
-- `model` (string, optional) enum=[22 values, e.g. ['default', 'ltx-2', 'ltx-2.5', 'minimax-h3', 'wan-3.0', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[22 values, e.g. ['default', 'kling-3.0', 'gemini-omni-1.1', 'seedance-2.0', 'ltx-2.5', 'minimax-h3'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required): 
   - `prompt` (string, required): The prompt used for the video.
@@ -711,7 +731,7 @@ Face Swap Photo
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for face swap photo
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: - **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) - **individual-faces** — specify exact mappings using `face_mappings`
   - `source_file_path` (string, optional): This is the image from which the face is extracted. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
