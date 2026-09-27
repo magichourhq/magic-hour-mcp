@@ -15,7 +15,7 @@ from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import BlobResourceContents, EmbeddedResource, TextContent
+from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, ToolAnnotations
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -142,6 +142,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="ping",
         description="Check that the Magic Hour MCP server is reachable.",
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     def ping() -> str:
         return "pong"
@@ -153,6 +154,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             f"{SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     async def wait_for_video_project(
         id: str,
@@ -178,6 +180,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     async def wait_for_image_project(
         id: str,
@@ -205,6 +208,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     async def wait_for_audio_project(
         id: str,
@@ -238,7 +242,11 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
         "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
     )
 
-    @mcp.tool(name=tool_name, description=description)
+    @mcp.tool(
+        name=tool_name,
+        description=description,
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+    )
     async def fetch_download(download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES):
         data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
         return _media_content(media_type, data, mime_type, source_uri=download_url)
