@@ -4,6 +4,9 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from fastmcp.tools.base import Tool
+from mcp.types import ToolAnnotations
+
 
 PROJECT_TAG_TO_ASSET = {
     "Video Projects": "video",
@@ -124,9 +127,30 @@ def customize_openapi_component(route: Any, component: Any) -> None:
     path = str(getattr(route, "path", ""))
     route_tags = set(getattr(route, "tags", []) or [])
 
+    if isinstance(component, Tool):
+        read_only = method == "GET"
+        component.annotations = ToolAnnotations(
+            readOnlyHint=read_only,
+            # Generation and face detection spend credits; deletion removes projects.
+            destructiveHint=method in {"DELETE", "PUT", "PATCH"} or (method == "POST" and path != "/v1/files/upload-urls"),
+            openWorldHint=not read_only and _accepts_external_media(component.parameters),
+        )
+
     if method == "POST":
         tags.add("write-operation")
     if path == "/v1/files/upload-urls":
         tags.add("upload")
     if route_tags.intersection(PROJECT_TAG_TO_ASSET):
         tags.add("generation")
+
+
+def _accepts_external_media(schema: Any) -> bool:
+    if isinstance(schema, dict):
+        return any(
+            key == "file_path" or key == "youtube_url" or key.endswith(("_file_path", "_file_paths"))
+            or _accepts_external_media(value)
+            for key, value in schema.items()
+        )
+    if isinstance(schema, list):
+        return any(_accepts_external_media(value) for value in schema)
+    return False
