@@ -54,6 +54,7 @@ API_RETRIES = 2
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
 MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_VERSION = "0.1.0"
+MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
 MCP_SERVER_INSTRUCTIONS = """
 Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
@@ -93,6 +94,7 @@ def build_api_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=os.getenv("MAGIC_HOUR_API_BASE_URL", DEFAULT_API_BASE_URL),
         auth=BearerPassthroughAuth(),
+        headers={"User-Agent": MCP_USER_AGENT},
         timeout=API_TIMEOUT,
         transport=httpx.AsyncHTTPTransport(retries=API_RETRIES, limits=API_LIMITS),
     )
@@ -316,7 +318,9 @@ async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes:
     if parsed_url.scheme != "https" or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname:
         raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
 
-    async with httpx.AsyncClient(timeout=API_TIMEOUT, follow_redirects=True) as client:
+    async with httpx.AsyncClient(
+        timeout=API_TIMEOUT, follow_redirects=True, headers={"User-Agent": MCP_USER_AGENT}
+    ) as client:
         async with client.stream("GET", download_url) as response:
             response.raise_for_status()
             mime_type = _resolve_media_mime_type(
