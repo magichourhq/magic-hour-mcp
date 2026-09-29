@@ -130,11 +130,13 @@ def register_custom_tools(mcp: FastMCP) -> None:
         MCP_APP_VIEW_URI,
         name="Magic Hour project result",
         description="Render completed or terminal Magic Hour project results in MCP Apps hosts.",
+        meta={"openai/widgetDomain": MCP_APP_ORIGIN},
         app=AppConfig(
             csp=ResourceCSP(
                 connect_domains=[MCP_APP_SERVER_ORIGIN, MCP_APP_ORIGIN],
                 resource_domains=[MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
             ),
+            domain=MCP_APP_ORIGIN,
             prefers_border=True,
         ),
     )
