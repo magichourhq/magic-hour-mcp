@@ -19,7 +19,7 @@ from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, ToolA
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
@@ -653,6 +653,7 @@ app = create_oauth_compatibility_app(
         Mount(MCP_APP_ASSET_PATH, app=mcp_app_assets),
         Route(MCP_SERVER_CARD_PATH, mcp_server_card, methods=["GET"]),
         Route(GLAMA_VERIFICATION_PATH, glama_verification, methods=["GET"]),
+        Route("/.well-known/openai-apps-challenge", lambda _: PlainTextResponse("DjJ2bzf2N6jgiX7RSHQitVfWJD6AMQL6-5B_QHKz0"), methods=["GET"]),
     ],
 )
 lifespan = app.router.lifespan_context
