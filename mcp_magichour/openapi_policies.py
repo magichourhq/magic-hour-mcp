@@ -129,7 +129,9 @@ def customize_openapi_component(route: Any, component: Any) -> None:
 
     if isinstance(component, Tool):
         read_only = method == "GET"
+        component.title = getattr(route, "summary", None) or component.name
         component.annotations = ToolAnnotations(
+            title=component.title,
             readOnlyHint=read_only,
             # Only project deletion removes data; generation creates new projects.
             destructiveHint=method == "DELETE",

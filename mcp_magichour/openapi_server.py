@@ -144,20 +144,22 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="ping",
+        title="Ping",
         description="Check that the Magic Hour MCP server is reachable.",
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=ToolAnnotations(title="Ping", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     def ping() -> str:
         return "pong"
 
     @mcp.tool(
         name="wait_for_video_project",
+        title="Wait for Video Project",
         description=(
             "Poll a video project until it completes, errors, is canceled, or times out. "
             f"{SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=ToolAnnotations(title="Wait for Video Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     async def wait_for_video_project(
         id: str,
@@ -177,13 +179,14 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="wait_for_image_project",
+        title="Wait for Image Project",
         description=(
             "Poll an image project until it completes, errors, is canceled, or times out. Returns the final "
             "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=ToolAnnotations(title="Wait for Image Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     async def wait_for_image_project(
         id: str,
@@ -205,13 +208,14 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="wait_for_audio_project",
+        title="Wait for Audio Project",
         description=(
             "Poll an audio project until it completes, errors, is canceled, or times out. Returns the final "
             "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=ToolAnnotations(title="Wait for Audio Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     async def wait_for_audio_project(
         id: str,
@@ -238,6 +242,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
 
 def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
     tool_name = f"fetch_{media_type}_download"
+    title = f"Fetch {media_type.title()} Download"
     content_kind = f"inline MCP {media_type} content" if media_type != "video" else "an embedded MCP binary resource"
     description = (
         f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as "
@@ -247,8 +252,9 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
 
     @mcp.tool(
         name=tool_name,
+        title=title,
         description=description,
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=ToolAnnotations(title=title, readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     async def fetch_download(download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES):
         data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
