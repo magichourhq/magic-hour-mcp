@@ -136,7 +136,6 @@ def register_custom_tools(mcp: FastMCP) -> None:
                 connect_domains=[MCP_APP_SERVER_ORIGIN, MCP_APP_ORIGIN],
                 resource_domains=[MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
             ),
-            domain=MCP_APP_ORIGIN,
             prefers_border=True,
         ),
     )
