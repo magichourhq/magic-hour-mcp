@@ -411,7 +411,7 @@ Content-Type: application/json
   "name": "My Funny Meme",
   "style": {
     "topic": "When the code finally works",
-    "template": "Drake Hotline Bling",
+    "template": "Random",
     "searchWeb": false
   }
 }
@@ -520,38 +520,6 @@ Content-Type: application/json
 
 
 ### ============ Audio Projects ============
-
-### AI Voice Cloner
-POST {{baseUrl}}/v1/ai-voice-cloner
-Authorization: Bearer {{apiKey}}
-Content-Type: application/json
-
-{
-  "name": "My Voice Cloner audio",
-  "assets": {
-    "audio_file_path": "api-assets/id/1234.mp3"
-  },
-  "style": {
-    "prompt": "Hello, this is my cloned voice."
-  }
-}
-
-
-### AI Voice Generator
-# Replace the placeholder with an exact approved voice_name from APPROVED_VOICE_NAMES.
-# No voice is approved until that allowlist is populated; this sample then fails closed.
-POST {{baseUrl}}/v1/ai-voice-generator
-Authorization: Bearer {{apiKey}}
-Content-Type: application/json
-
-{
-  "name": "My Voice Generator audio",
-  "style": {
-    "prompt": "Hello, how are you?",
-    "voice_name": "<approved voice_name>"
-  }
-}
-
 
 ### Get audio details
 GET {{baseUrl}}/v1/audio-projects/{{audioProjectId}}

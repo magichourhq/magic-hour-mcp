@@ -61,7 +61,8 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 
 - Select one of Magic Hour’s approved preset voices.
 - MCP accepts only exact `voice_name` strings in `APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`; the main product and public API are unchanged.
-- An empty allowlist keeps `ai_voice_generator_create_audio` discoverable but rejects all voice selections. Populate the allowlist with verified generic/non-celebrity API names before deployment.
+- An empty allowlist omits AI Voice Generator entirely from MCP. Adding verified generic/non-celebrity API names enables only those presets on the next deployment.
+- AI Voice Cloner is excluded from MCP discovery and calls.
 
 ## Magic Hour's documentation MCP
 
@@ -109,8 +110,6 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | GET | `/v1/image-projects/{id}` | Image Projects | Get image details |
 | DELETE | `/v1/image-projects/{id}` | Image Projects | Delete image |
 | POST | `/v1/photo-colorizer` | Image Projects | Photo Colorizer |
-| POST | `/v1/ai-voice-cloner` | Audio Projects | AI Voice Cloner |
-| POST | `/v1/ai-voice-generator` | Audio Projects | AI Voice Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
 | GET | `/v1/account` | Account | Get account details |
@@ -674,7 +673,7 @@ AI Image Upscaler
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-meme-generator
-`operationId: aiMemeGenerator.createImage`
+`operationId: ai_meme_generator_create_image`
 
 AI Meme Generator
 
@@ -683,7 +682,7 @@ AI Meme Generator
 - `name` (string, optional): The name of the meme.
 - `style` (object, required): 
   - `topic` (string, required): The topic of the meme.
-  - `template` (string, required) enum=[101 values, e.g. ['Random', 'Drake Hotline Bling', 'Galaxy Brain', 'Two Buttons', "Gru's Plan", 'Tuxedo Winnie The Pooh'], ...]: To use our templates, pass in one of the enum values.
+  - `template` (string, required) enum=['Random']: Select a random meme template.
   - `searchWeb` (boolean, optional) default=False: Whether to search the web for meme content.
 
 **Response 200:**
@@ -827,39 +826,6 @@ Photo Colorizer
 
 ### Audio projects
 
-
-#### POST /v1/ai-voice-cloner
-`operationId: aiVoiceCloner.createAudio`
-
-AI Voice Cloner
-
-
-**Request Body:**
-- `name` (string, optional) default=Voice Cloner - dateTime: Give your audio a custom name for easy identification.
-- `assets` (object, required): Provide the assets for voice cloning.
-  - `audio_file_path` (string, required): The audio used to clone the voice. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
-- `style` (object, required): 
-  - `prompt` (string, required): Text used to generate speech from the cloned voice. The character limit is 1000 characters.
-
-**Response 200:**
-- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
-
-#### POST /v1/ai-voice-generator
-`operationId: ai_voice_generator_create_audio`
-
-AI Voice Generator
-
-
-**Request Body:**
-- `name` (string, optional): Give your audio a custom name for easy identification.
-- `style` (object, required): The content used to generate speech.
-  - `prompt` (string, required): Text used to generate speech. The character limit is 1000 characters.
-  - `voice_name` (string, required): Select one of Magic Hour’s approved preset voices.
-
-**Response 200:**
-- `id` (string, required): Unique ID of the generated audio project.
-- `credits_charged` (integer, required): Credits charged for audio generation.
 
 #### GET /v1/audio-projects/{id}
 `operationId: audioProjects.getDetails`

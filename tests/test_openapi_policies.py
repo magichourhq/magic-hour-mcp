@@ -49,27 +49,26 @@ class OpenApiPolicyTests(unittest.TestCase):
         with self.assertRaises(jsonschema.ValidationError):
             jsonschema.validate({"style": {"prompt": "Hello", "voice_name": unapproved}}, safe_schema)
         for path in spec["paths"]:
-            if path != "/v1/ai-voice-generator":
+            if path not in {"/v1/ai-voice-generator", "/v1/ai-voice-cloner"}:
                 self.assertEqual(patched["paths"][path], baseline["paths"][path])
+        self.assertNotIn("/v1/ai-voice-cloner", patched["paths"])
 
-    def test_empty_voice_allowlist_rejects_every_upstream_voice(self):
+    def test_empty_voice_allowlist_removes_both_upstream_voice_paths(self):
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ()):
             patched = apply_magic_hour_policies(spec)
-        safe_schema = patched["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
-        jsonschema.Draft202012Validator.check_schema(safe_schema)
-        validator = jsonschema.Draft202012Validator(safe_schema)
-        upstream_schema = spec["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
-        for name in upstream_schema["properties"]["style"]["properties"]["voice_name"]["enum"]:
-            self.assertFalse(validator.is_valid({"style": {"prompt": "Hello", "voice_name": name}}))
-        self.assertEqual(safe_schema["properties"]["style"]["properties"]["voice_name"]["not"], {})
+        self.assertNotIn("/v1/ai-voice-generator", patched["paths"])
+        self.assertNotIn("/v1/ai-voice-cloner", patched["paths"])
+        self.assertIn("/v1/ai-voice-generator", spec["paths"])
+        self.assertIn("/v1/ai-voice-cloner", spec["paths"])
 
     def test_sync_cannot_make_voice_selection_optional(self):
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         schema = spec["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
         schema.pop("required")
         schema["properties"]["style"].pop("required")
-        safe = apply_magic_hour_policies(spec)["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ("Test approved preset",)):
+            safe = apply_magic_hour_policies(spec)["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
         for arguments in ({}, {"style": {"prompt": "Hello"}}):
             with self.assertRaises(jsonschema.ValidationError):
                 jsonschema.validate(arguments, safe)
@@ -78,7 +77,7 @@ class OpenApiPolicyTests(unittest.TestCase):
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
         operation["requestBody"]["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/NewVoiceInput"}
-        with self.assertRaises(KeyError):
+        with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ("Test approved preset",)), self.assertRaises(KeyError):
             apply_magic_hour_policies(spec)
 
     def test_generation_post_gets_polling_guidance(self):
