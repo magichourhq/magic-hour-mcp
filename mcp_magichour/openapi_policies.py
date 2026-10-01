@@ -24,6 +24,11 @@ HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()}
 GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
 
+# Populate only with verified generic/non-celebrity API voice_name strings.
+# Empty means no voice is approved; keep the tool visible but reject every voice.
+APPROVED_VOICE_NAMES: tuple[str, ...] = ()
+VOICE_PRESET_DESCRIPTION = "Select one of Magic Hour’s approved preset voices."
+
 
 def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
     """Return an OpenAPI copy with MCP-specific guidance added by group policy."""
@@ -33,11 +38,59 @@ def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
         for method, operation in path_item.items():
             if method.lower() not in HTTP_METHODS or not isinstance(operation, dict):
                 continue
+            if path == "/v1/ai-voice-generator" and method.lower() == "post":
+                _apply_voice_generator_policy(operation)
             if operation_id := operation.get("operationId"):
                 operation["operationId"] = normalize_mcp_tool_name(operation_id)
             _apply_operation_policy(path=path, method=method.upper(), operation=operation)
 
     return spec
+
+
+def _apply_voice_generator_policy(operation: dict[str, Any]) -> None:
+    # Synced descriptions, defaults and examples may recommend unapproved voices
+    # anywhere in this operation, including nested schemas and SDK snippets.
+    def remove_upstream_copy(value: Any) -> None:
+        if isinstance(value, dict):
+            if "description" in value:
+                value["description"] = ""
+            for key in ("example", "examples", "default", "title", "externalDocs", "x-codeSamples"):
+                value.pop(key, None)
+            for child in value.values():
+                remove_upstream_copy(child)
+        elif isinstance(value, list):
+            for child in value:
+                remove_upstream_copy(child)
+
+    remove_upstream_copy(operation)
+    operation["summary"] = "AI Voice Generator"
+    operation["description"] = (
+        f"Generate speech from text. {VOICE_PRESET_DESCRIPTION} "
+        "Each character costs 0.1 credits. The cost is rounded up to the nearest whole number."
+    )
+    if not APPROVED_VOICE_NAMES:
+        operation["description"] += " No approved presets are configured; voice generation is unavailable until presets are approved."
+    # Require the known input shape: fail startup rather than expose a changed
+    # upstream schema without this policy. Replace the whole voice schema so
+    # future enum/const/combinator changes cannot bypass the allowlist.
+    schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    properties = schema["properties"]
+    style = properties["style"]
+    if "voice_name" not in style["properties"]:
+        raise ValueError("Upstream Voice Generator schema is missing voice_name")
+    schema["required"] = list(dict.fromkeys([*schema.get("required", []), "style"]))
+    style["required"] = list(dict.fromkeys([*style.get("required", []), "voice_name"]))
+    properties["name"]["description"] = "Give your audio a custom name for easy identification."
+    style["description"] = "The content used to generate speech."
+    style["properties"]["prompt"]["description"] = "Text used to generate speech. The character limit is 1000 characters."
+    style["properties"]["voice_name"] = {
+        "type": "string",
+        **({"enum": list(APPROVED_VOICE_NAMES)} if APPROVED_VOICE_NAMES else {"not": {}}),
+        "description": VOICE_PRESET_DESCRIPTION,
+    }
+    output = operation["responses"]["200"]["content"]["application/json"]["schema"]["properties"]
+    output["id"]["description"] = "Unique ID of the generated audio project."
+    output["credits_charged"]["description"] = "Credits charged for audio generation."
 
 
 def normalize_mcp_tool_name(operation_id: str) -> str:
@@ -144,4 +197,3 @@ def customize_openapi_component(route: Any, component: Any) -> None:
         tags.add("upload")
     if route_tags.intersection(PROJECT_TAG_TO_ASSET):
         tags.add("generation")
-

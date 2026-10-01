@@ -1,6 +1,10 @@
 import json, re
 
+from mcp_magichour.openapi_policies import apply_magic_hour_policies
+
 d = json.load(open('docs/openapi.json', encoding='utf-8'))
+# Apply the voice policy without rewriting unrelated API-reference entries.
+d['paths']['/v1/ai-voice-generator'] = apply_magic_hour_policies(d)['paths']['/v1/ai-voice-generator']
 paths = d['paths']
 
 def short_desc(s, maxlen=300):
@@ -62,7 +66,7 @@ tag_order = ['Files', 'Video Projects', 'Image Projects', 'Audio Projects']
 
 out = []
 out.append("# Magic Hour API reference for MCP tool design\n")
-out.append("Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.\n")
+out.append("Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`), with MCP-specific policies applied. Regenerate this file with `python docs/build_reference.py` if the spec changes.\n")
 
 out.append("## Authentication\n")
 out.append("""- Every request requires `Authorization: Bearer <api_key>`.
@@ -120,9 +124,9 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 """)
 
 out.append("## Voice presets\n")
-out.append("""- The Magic Hour API accepts `voice_name` as a string for AI voice generation.
-- The runtime OpenAPI MCP server does not maintain a custom per-voice list tool.
-- Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `ai_voice_generator_create_audio`.
+out.append("""- Select one of Magic Hour’s approved preset voices.
+- MCP accepts only exact `voice_name` strings in `APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`; the main product and public API are unchanged.
+- An empty allowlist keeps `ai_voice_generator_create_audio` discoverable but rejects all voice selections. Populate the allowlist with verified generic/non-celebrity API names before deployment.
 """)
 
 out.append("## Magic Hour's documentation MCP\n")
