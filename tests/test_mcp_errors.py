@@ -7,12 +7,14 @@ from mcp_magichour.openapi_server import app
 
 
 class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
-    async def test_voice_allowlist_rejects_unapproved_selection_before_api_call(self):
-        payload = await self.call_tool("ai_voice_generator_create_audio", {
-            "style": {"prompt": "Hello", "voice_name": "Unapproved preset"},
-        })
-        self.assertEqual(payload["error"]["code"], -32602)
-        self.assertIn("Invalid arguments", payload["error"]["message"])
+    async def test_excluded_voice_tools_cannot_be_called(self):
+        for name in ("ai_voice_generator_create_audio", "ai_voice_cloner_create_audio"):
+            with self.subTest(name=name):
+                payload = await self.call_tool(name, {
+                    "style": {"prompt": "Hello", "voice_name": "Unapproved preset"},
+                })
+                self.assertEqual(payload["error"]["code"], -32602)
+                self.assertEqual(payload["error"]["message"], f"Unknown tool: {name!r}")
 
     async def call_tool(self, name: str, arguments: dict, *, authorized: bool = True) -> dict:
         headers = {"Accept": "application/json, text/event-stream"}

@@ -39,7 +39,6 @@ For video creation, unless the user requests otherwise:
 - Reuse reference images across scenes for visual consistency.
 - When the user asks for an image model recommendation, prefer nano-banana-2-lite only if account support is known; otherwise recommend default.
 - When the user asks for an Image-to-Video model recommendation, prefer ltx-2.5.
-- Add voiceovers using AI Voice Generator when a voiceover would suit the video. Choose the voice that would be the best narrator for this video.
 - Let the narration finish each sentence. Never cut it off.
 - Use Text-to-Video only when consistency is unimportant.
 - Keep character identity, visual style, color palette, lighting, and aspect ratio consistent across scenes.

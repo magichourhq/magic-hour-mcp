@@ -21,20 +21,24 @@ from mcp_magichour.openapi_server import (
     load_openapi_spec,
     mcp,
 )
-from mcp_magichour.openapi_policies import APPROVED_VOICE_NAMES, VOICE_PRESET_DESCRIPTION
+from mcp_magichour.openapi_policies import VOICE_PRESET_DESCRIPTION
 
 
 class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
-    async def test_runtime_voice_schema_exposes_only_approved_presets(self):
-        tool = await mcp.get_tool("ai_voice_generator_create_audio")
-        schema = tool.parameters["properties"]["style"]["properties"]["voice_name"]
-        self.assertEqual(schema.get("enum", []), list(APPROVED_VOICE_NAMES))
-        if not APPROVED_VOICE_NAMES:
-            self.assertEqual(schema["not"], {})
-        self.assertEqual(schema["description"], VOICE_PRESET_DESCRIPTION)
-        serialized = tool.to_mcp_tool().model_dump_json()
+    async def test_runtime_schema_excludes_unapproved_voice_tools_and_names(self):
+        async with httpx.AsyncClient() as client:
+            with patch("mcp_magichour.openapi_server.build_api_client", return_value=client), patch(
+                "mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ()
+            ):
+                empty_mcp = create_mcp()
+            async with Client(empty_mcp) as caller:
+                tools = await caller.list_tools()
+        names = {tool.name for tool in tools}
+        self.assertNotIn("ai_voice_generator_create_audio", names)
+        self.assertNotIn("ai_voice_cloner_create_audio", names)
+        serialized = "\n".join(tool.model_dump_json() for tool in tools)
         # Negative assertions only: these are never sample requests or approvals.
-        for name in ("Elon Musk", "Taylor Swift", "Donald Trump", "Barack Obama", "Joe Biden", "Morgan Freeman", "Kanye West"):
+        for name in ("Elon Musk", "Taylor Swift", "Donald Trump", "Barack Obama", "Joe Biden", "Morgan Freeman", "Kanye West", "Drake", "Leonardo DiCaprio"):
             self.assertNotIn(name, serialized)
 
     async def test_openapi_sync_cannot_expand_runtime_voice_schema(self):
@@ -62,18 +66,46 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
             tool = await synced_mcp.get_tool("ai_voice_generator_create_audio")
             self.assertEqual(tool.parameters["properties"]["style"]["properties"]["voice_name"]["enum"], list(approved))
             self.assertNotIn(unapproved, tool.to_mcp_tool().model_dump_json())
-            cloner = await synced_mcp.get_tool("ai_voice_cloner_create_audio")
-            original_cloner = await mcp.get_tool("ai_voice_cloner_create_audio")
-            self.assertEqual(cloner.to_mcp_tool(), original_cloner.to_mcp_tool())
+            self.assertEqual(tool.parameters["properties"]["style"]["properties"]["voice_name"]["description"], VOICE_PRESET_DESCRIPTION)
+            self.assertIsNone(await synced_mcp.get_tool("ai_voice_cloner_create_audio"))
             arguments = {"style": {"prompt": "Hello", "voice_name": approved[0]}}
             with patch("mcp_magichour.oauth_compat.current_authorization_header", return_value="Bearer test-token"):
                 async with Client(synced_mcp) as caller:
+                    tools = await caller.list_tools()
+                    listed_generator = next(t for t in tools if t.name == "ai_voice_generator_create_audio")
+                    self.assertEqual(listed_generator.inputSchema["properties"]["style"]["properties"]["voice_name"]["enum"], list(approved))
+                    self.assertNotIn("ai_voice_cloner_create_audio", {t.name for t in tools})
                     await caller.call_tool("ai_voice_generator_create_audio", arguments)
                     with self.assertRaises(McpError):
                         await caller.call_tool("ai_voice_generator_create_audio", {
                             "style": {"prompt": "Hello", "voice_name": unapproved},
                         })
             self.assertEqual(forwarded, [arguments])
+
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ), patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ()):
+                empty_mcp = create_mcp()
+            async with Client(empty_mcp) as caller:
+                self.assertFalse({"ai_voice_generator_create_audio", "ai_voice_cloner_create_audio"}.intersection(
+                    t.name for t in await caller.list_tools()
+                ))
+
+    async def test_synced_meme_templates_cannot_expose_public_figure_names(self):
+        spec = load_openapi_spec()
+        schema = spec["paths"]["/v1/ai-meme-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        template = schema["properties"]["style"]["properties"]["template"]
+        template["enum"].append("Taylor Swift")
+        template["example"] = "Elon Musk"
+        async with httpx.AsyncClient() as client:
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ):
+                synced_mcp = create_mcp()
+            tool = await synced_mcp.get_tool("ai_meme_generator_create_image")
+            self.assertEqual(tool.parameters["properties"]["style"]["properties"]["template"]["enum"], ["Random"])
+            for name in ("Taylor Swift", "Elon Musk", "Drake", "Leonardo DiCaprio"):
+                self.assertNotIn(name, tool.to_mcp_tool().model_dump_json())
 
     async def test_favicon_is_public_and_serves_packaged_asset(self):
         favicon_path = Path(__file__).parent.parent / "mcp_magichour" / "favicon.ico"

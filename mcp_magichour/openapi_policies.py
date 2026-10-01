@@ -25,7 +25,7 @@ PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_
 GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
 
 # Populate only with verified generic/non-celebrity API voice_name strings.
-# Empty means no voice is approved; keep the tool visible but reject every voice.
+# Empty means no voice is approved; omit Voice Generator entirely from MCP.
 APPROVED_VOICE_NAMES: tuple[str, ...] = ()
 VOICE_PRESET_DESCRIPTION = "Select one of Magic Hour’s approved preset voices."
 
@@ -33,13 +33,26 @@ VOICE_PRESET_DESCRIPTION = "Select one of Magic Hour’s approved preset voices.
 def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
     """Return an OpenAPI copy with MCP-specific guidance added by group policy."""
     spec = deepcopy(openapi_spec)
+    paths = spec.get("paths", {})
+    paths.pop("/v1/ai-voice-cloner", None)
+    if not APPROVED_VOICE_NAMES:
+        paths.pop("/v1/ai-voice-generator", None)
 
-    for path, path_item in spec.get("paths", {}).items():
+    for path, path_item in paths.items():
         for method, operation in path_item.items():
             if method.lower() not in HTTP_METHODS or not isinstance(operation, dict):
                 continue
             if path == "/v1/ai-voice-generator" and method.lower() == "post":
                 _apply_voice_generator_policy(operation)
+            if path == "/v1/ai-meme-generator" and method.lower() == "post":
+                # Keep public-figure template names out of the reviewer-facing
+                # schema. Random is the existing generic API template option.
+                properties = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
+                properties["style"]["properties"]["template"] = {
+                    "type": "string",
+                    "enum": ["Random"],
+                    "description": "Select a random meme template.",
+                }
             if operation_id := operation.get("operationId"):
                 operation["operationId"] = normalize_mcp_tool_name(operation_id)
             _apply_operation_policy(path=path, method=method.upper(), operation=operation)
@@ -68,8 +81,6 @@ def _apply_voice_generator_policy(operation: dict[str, Any]) -> None:
         f"Generate speech from text. {VOICE_PRESET_DESCRIPTION} "
         "Each character costs 0.1 credits. The cost is rounded up to the nearest whole number."
     )
-    if not APPROVED_VOICE_NAMES:
-        operation["description"] += " No approved presets are configured; voice generation is unavailable until presets are approved."
     # Require the known input shape: fail startup rather than expose a changed
     # upstream schema without this policy. Replace the whole voice schema so
     # future enum/const/combinator changes cannot bypass the allowlist.
@@ -85,7 +96,7 @@ def _apply_voice_generator_policy(operation: dict[str, Any]) -> None:
     style["properties"]["prompt"]["description"] = "Text used to generate speech. The character limit is 1000 characters."
     style["properties"]["voice_name"] = {
         "type": "string",
-        **({"enum": list(APPROVED_VOICE_NAMES)} if APPROVED_VOICE_NAMES else {"not": {}}),
+        "enum": list(APPROVED_VOICE_NAMES),
         "description": VOICE_PRESET_DESCRIPTION,
     }
     output = operation["responses"]["200"]["content"]["application/json"]["schema"]["properties"]

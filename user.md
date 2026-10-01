@@ -102,7 +102,6 @@ These examples cover the most-used Magic Hour endpoints. For inputs, use uploade
 | Background Remover | `Remove the background from my uploaded product photo.` | Image | Cutout image |
 | Face Editor | `Make this portrait smile slightly and look toward the camera.` | Face image, edit request | Edited portrait |
 | Head Swap | `Place the head from this photo onto the body in this other photo.` | Head image, body image | Head-swapped image |
-| Voice Generator | `Generate audio saying "Welcome to Magic Hour" with a warm narrator voice.` | Script, voice preference | Generated audio |
 
 Direct public media URLs can work, but uploaded Magic Hour `file_path` inputs are more reliable.
 
