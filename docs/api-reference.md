@@ -1,6 +1,6 @@
 # Magic Hour API reference for MCP tool design
 
-Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
+Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`), with MCP-specific policies applied. Regenerate this file with `python docs/build_reference.py` if the spec changes.
 
 ## Authentication
 
@@ -59,9 +59,9 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 
 ## Voice presets
 
-- The Magic Hour API accepts `voice_name` as a string for AI voice generation.
-- The runtime OpenAPI MCP server does not maintain a custom per-voice list tool.
-- Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `ai_voice_generator_create_audio`.
+- Select one of Magic Hour’s approved preset voices.
+- MCP accepts only exact `voice_name` strings in `APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`; the main product and public API are unchanged.
+- An empty allowlist keeps `ai_voice_generator_create_audio` discoverable but rejects all voice selections. Populate the allowlist with verified generic/non-celebrity API names before deployment.
 
 ## Magic Hour's documentation MCP
 
@@ -846,20 +846,20 @@ AI Voice Cloner
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
 
 #### POST /v1/ai-voice-generator
-`operationId: aiVoiceGenerator.createAudio`
+`operationId: ai_voice_generator_create_audio`
 
 AI Voice Generator
 
 
 **Request Body:**
-- `name` (string, optional) default=Voice Generator - dateTime: Give your audio a custom name for easy identification.
+- `name` (string, optional): Give your audio a custom name for easy identification.
 - `style` (object, required): The content used to generate speech.
   - `prompt` (string, required): Text used to generate speech. The character limit is 1000 characters.
-  - `voice_name` (string, required) enum=[1266 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Available voices: Elon Musk, Mark Zuckerberg, Joe Rogan, Barack Obama, Morgan Freeman, Kanye West, Donald Trump, Joe Biden, Kim Kardashian, Taylor Swift, James Earl Jones, Samuel L....
+  - `voice_name` (string, required): Select one of Magic Hour’s approved preset voices.
 
 **Response 200:**
-- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
+- `id` (string, required): Unique ID of the generated audio project.
+- `credits_charged` (integer, required): Credits charged for audio generation.
 
 #### GET /v1/audio-projects/{id}
 `operationId: audioProjects.getDetails`

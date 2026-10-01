@@ -538,6 +538,8 @@ Content-Type: application/json
 
 
 ### AI Voice Generator
+# Replace the placeholder with an exact approved voice_name from APPROVED_VOICE_NAMES.
+# No voice is approved until that allowlist is populated; this sample then fails closed.
 POST {{baseUrl}}/v1/ai-voice-generator
 Authorization: Bearer {{apiKey}}
 Content-Type: application/json
@@ -546,7 +548,7 @@ Content-Type: application/json
   "name": "My Voice Generator audio",
   "style": {
     "prompt": "Hello, how are you?",
-    "voice_name": "Elon Musk"
+    "voice_name": "<approved voice_name>"
   }
 }
 

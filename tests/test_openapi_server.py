@@ -1,3 +1,4 @@
+import json
 import re
 import unittest
 from base64 import b64encode
@@ -5,6 +6,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
+from fastmcp import Client
+from mcp.shared.exceptions import McpError
 
 from mcp_magichour.openapi_server import (
     _project_download_guidance_text,
@@ -14,11 +17,64 @@ from mcp_magichour.openapi_server import (
     _project_to_tool_result,
     _resolve_media_mime_type,
     app,
+    create_mcp,
+    load_openapi_spec,
     mcp,
 )
+from mcp_magichour.openapi_policies import APPROVED_VOICE_NAMES, VOICE_PRESET_DESCRIPTION
 
 
 class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_runtime_voice_schema_exposes_only_approved_presets(self):
+        tool = await mcp.get_tool("ai_voice_generator_create_audio")
+        schema = tool.parameters["properties"]["style"]["properties"]["voice_name"]
+        self.assertEqual(schema.get("enum", []), list(APPROVED_VOICE_NAMES))
+        if not APPROVED_VOICE_NAMES:
+            self.assertEqual(schema["not"], {})
+        self.assertEqual(schema["description"], VOICE_PRESET_DESCRIPTION)
+        serialized = tool.to_mcp_tool().model_dump_json()
+        # Negative assertions only: these are never sample requests or approvals.
+        for name in ("Elon Musk", "Taylor Swift", "Donald Trump", "Barack Obama", "Joe Biden", "Morgan Freeman", "Kanye West"):
+            self.assertNotIn(name, serialized)
+
+    async def test_openapi_sync_cannot_expand_runtime_voice_schema(self):
+        spec = load_openapi_spec()
+        operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
+        voice = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]["style"]["properties"]["voice_name"]
+        unapproved = "New unapproved upstream preset"
+        voice["enum"].append(unapproved)
+        voice["description"] = unapproved
+        voice["default"] = unapproved
+        operation["requestBody"]["content"]["application/json"]["example"] = {"style": {"voice_name": unapproved}}
+        approved = ("Test approved preset",)
+
+        forwarded = []
+
+        def upstream(request):
+            forwarded.append(json.loads(request.content))
+            return httpx.Response(200, json={"id": "test-audio", "credits_charged": 1})
+
+        async with httpx.AsyncClient(base_url="https://api.example.test", transport=httpx.MockTransport(upstream)) as client:
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ), patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", approved):
+                synced_mcp = create_mcp()
+            tool = await synced_mcp.get_tool("ai_voice_generator_create_audio")
+            self.assertEqual(tool.parameters["properties"]["style"]["properties"]["voice_name"]["enum"], list(approved))
+            self.assertNotIn(unapproved, tool.to_mcp_tool().model_dump_json())
+            cloner = await synced_mcp.get_tool("ai_voice_cloner_create_audio")
+            original_cloner = await mcp.get_tool("ai_voice_cloner_create_audio")
+            self.assertEqual(cloner.to_mcp_tool(), original_cloner.to_mcp_tool())
+            arguments = {"style": {"prompt": "Hello", "voice_name": approved[0]}}
+            with patch("mcp_magichour.oauth_compat.current_authorization_header", return_value="Bearer test-token"):
+                async with Client(synced_mcp) as caller:
+                    await caller.call_tool("ai_voice_generator_create_audio", arguments)
+                    with self.assertRaises(McpError):
+                        await caller.call_tool("ai_voice_generator_create_audio", {
+                            "style": {"prompt": "Hello", "voice_name": unapproved},
+                        })
+            self.assertEqual(forwarded, [arguments])
+
     async def test_favicon_is_public_and_serves_packaged_asset(self):
         favicon_path = Path(__file__).parent.parent / "mcp_magichour" / "favicon.ico"
 
