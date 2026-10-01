@@ -199,7 +199,7 @@ def customize_openapi_component(route: Any, component: Any) -> None:
             readOnlyHint=read_only,
             # Only project deletion removes data; generation creates new projects.
             destructiveHint=method == "DELETE",
-            openWorldHint=False,
+            openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL", repr(component.parameters))),
         )
 
     if method == "POST":
