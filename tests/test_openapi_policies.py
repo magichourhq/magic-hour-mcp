@@ -15,6 +15,37 @@ from mcp_magichour.openapi_policies import (
 
 
 class OpenApiPolicyTests(unittest.TestCase):
+    def test_likeness_guidance_only_appends_to_target_tool_descriptions(self):
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        original = deepcopy(spec)
+        expected_tools = {
+            "/v1/face-swap": "face_swap_create_video",
+            "/v1/face-swap-photo": "face_swap_photo_create_image",
+            "/v1/head-swap": "head_swap_create_image",
+            "/v1/body-swap": "body_swap_create_image",
+            "/v1/lip-sync": "lip_sync_create_video",
+            "/v1/ai-talking-photo": "ai_talking_photo_create_talking_photo",
+            "/v1/character-replace": "character_replace_create_video",
+            "/v1/ai-clothes-changer": "ai_clothes_changer_create_image",
+        }
+        suffix = (
+            "Use only with the user's own likeness or content they are authorized to use. "
+            "Do not use for impersonation, deception, sexual content, or content involving minors."
+        )
+        with patch("mcp_magichour.openapi_policies.LIKENESS_GENERATION_PATHS", set()):
+            baseline = apply_magic_hour_policies(spec)
+        patched = apply_magic_hour_policies(spec)
+        self.assertEqual(apply_magic_hour_policies(patched), patched)
+        descriptions_restored = deepcopy(patched)
+        for path, tool_name in expected_tools.items():
+            operation = patched["paths"][path]["post"]
+            description = baseline["paths"][path]["post"]["description"]
+            self.assertEqual(operation["operationId"], tool_name)
+            self.assertEqual(operation["description"], f"{description}\n\n{suffix}")
+            descriptions_restored["paths"][path]["post"]["description"] = description
+        self.assertEqual(descriptions_restored, baseline)
+        self.assertEqual(spec, original)
+
     def test_voice_policy_replaces_synced_enum_copy_and_examples(self):
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
