@@ -28,6 +28,14 @@ GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execu
 # Empty means no voice is approved; omit Voice Generator entirely from MCP.
 APPROVED_VOICE_NAMES: tuple[str, ...] = ()
 VOICE_PRESET_DESCRIPTION = "Select one of Magic Hour’s approved preset voices."
+LIKENESS_GENERATION_PATHS = {
+    "/v1/face-swap", "/v1/face-swap-photo", "/v1/head-swap", "/v1/body-swap",
+    "/v1/lip-sync", "/v1/ai-talking-photo", "/v1/character-replace", "/v1/ai-clothes-changer",
+}
+LIKENESS_USAGE_GUIDANCE = (
+    "Use only with the user's own likeness or content they are authorized to use. "
+    "Do not use for impersonation, deception, sexual content, or content involving minors."
+)
 
 
 def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
@@ -163,6 +171,10 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if additions:
         operation["description"] = _append_mcp_guidance(operation.get("description", ""), additions)
+    if method == "POST" and path in LIKENESS_GENERATION_PATHS:
+        description = operation.get("description", "").rstrip()
+        if not description.endswith(LIKENESS_USAGE_GUIDANCE):
+            operation["description"] = f"{description}\n\n{LIKENESS_USAGE_GUIDANCE}"
 
 
 def _operation_mentions_file_path(operation: dict[str, Any]) -> bool:
