@@ -6,8 +6,10 @@ Use this guide if Magic Hour has a hosted MCP endpoint at:
 https://mcp.magichour.ai/
 ```
 
-You do not need this repo. After setup, ask for an image, video, or audio result
-in plain English; the assistant handles the tool calls.
+You do not need this repo. After setup, ask for an image or video result in plain
+English; the assistant handles the tool calls. Audio inputs and existing audio
+project retrieval are supported; standalone speech generation and voice cloning
+are not exposed.
 
 ## What you need
 

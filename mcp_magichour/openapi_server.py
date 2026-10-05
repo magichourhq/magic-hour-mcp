@@ -75,7 +75,7 @@ For video creation, unless the user requests otherwise:
   """.strip()
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
-MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
+MCP_SERVER_DESCRIPTION = "Create and edit images/videos; upload audio and retrieve existing audio projects with Magic Hour."
 MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
