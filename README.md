@@ -14,6 +14,7 @@ Docs:
 - `integration-handoff.md` - FastAPI mount checklist
 - `docs/detailed-step-by-step-integration.md` - full backend integration guide
 - `docs/api-reference.md` - generated API reference
+- [Budgeted product video variations](docs/video-variations.md) - quote, authorize, execute, resume; actual MCP client demonstration
 
 ## Setup
 
@@ -60,6 +61,8 @@ MAGIC_HOUR_API_BASE_URL=https://api.magichour.ai
 MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
 MCP_OAUTH_ISSUER_URL=https://mcp.magichour.ai
 MCP_OAUTH_RESOURCE_URL=https://mcp.magichour.ai
+# Required for budgeted workflow quotes; server-only, at least 32 random bytes.
+MCP_WORKFLOW_SIGNING_SECRET=<server-only-secret>
 ```
 
 Override `MAGIC_HOUR_API_BASE_URL` to use a mock or another API base:

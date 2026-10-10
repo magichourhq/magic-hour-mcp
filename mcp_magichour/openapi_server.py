@@ -42,6 +42,7 @@ from .project_result_app import (
     read_mcp_app_html,
 )
 from .tool_logging import ToolCallLoggingMiddleware
+from .video_variations import register_video_variation_tools
 
 ProjectType = Literal["video", "image", "audio"]
 
@@ -62,6 +63,7 @@ Creation tools are asynchronous; use the matching wait_for_*_project tool after 
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
 Omit optional resolution and model unless the user explicitly requests them, allowing the API to choose plan-compatible defaults.
 After a subscription-tier restriction, retry at most once after omitting only unrequested optional fields; explain the restriction instead of changing an explicit requirement or guessing alternatives.
+For product-photo video variations under a credit budget, start with plan_video_variations, present its quote, execute_video_variations only with user authorization, then poll video_variations_status using the same plan_token. Never create a new plan to retry a lost submission.
 
 For video creation, unless the user requests otherwise:
 
@@ -117,6 +119,7 @@ def create_mcp() -> FastMCP:
     )
 
     register_custom_tools(mcp)
+    register_video_variation_tools(mcp, build_api_client)
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(MCPToolOAuthMiddleware())
     install_structured_tool_errors(mcp)
