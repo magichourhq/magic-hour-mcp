@@ -22,6 +22,14 @@ they cannot silently discard `dry_run` and charge. The MCP also refuses submissi
 until the capability is advertised. A PR or passing
 test alone does not prove this capability is deployed.
 
+For production rollout, update and verify the async completion worker and existing
+watchdog first, then the API, then configure the hosted MCP signing secret. All
+worker instances must honor the stored `approved_credits` ceiling before the API
+advertises readiness or accepts budgeted jobs. Do not enable the MCP against a
+mixed worker rollout. Verify the quote, repeated submission, terminal URLs, and
+net credit ledger through the real client after deployment; enabling configuration
+alone is not an end-to-end pass.
+
 ## Tools
 
 | Tool | Inputs and behavior |
