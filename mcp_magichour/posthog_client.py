@@ -20,6 +20,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 AnalyticsEvent = Literal[
+    "video_workflow_planned",
+    "video_workflow_observed",
     "media_project_resolved",
     "media_inline_download_failed",
     "mcp_app_error",

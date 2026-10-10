@@ -18,6 +18,9 @@ _SECRET_KEYS = {
     "prompt",
     "secret",
     "token",
+    "plantoken",
+    "creativeinstructions",
+    "variationprompts",
 }
 
 

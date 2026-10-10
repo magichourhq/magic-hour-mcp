@@ -127,6 +127,14 @@ class _OAuthListedTool(Tool):
         return tool
 
 
+def oauth_authentication_challenge() -> str:
+    issuer = (OAuthSettings.from_env().issuer_url or str(get_http_request().base_url)).rstrip("/")
+    return (
+        f'Bearer resource_metadata="{issuer}/.well-known/oauth-protected-resource", '
+        'error="invalid_token", error_description="Authentication required"'
+    )
+
+
 class MCPToolOAuthMiddleware(Middleware):
     """Advertise OAuth during discovery and challenge unauthenticated tool calls."""
 
@@ -141,16 +149,9 @@ class MCPToolOAuthMiddleware(Middleware):
         try:
             current_authorization_header()
         except AuthError:
-            issuer = (
-                OAuthSettings.from_env().issuer_url or str(get_http_request().base_url)
-            ).rstrip("/")
-            challenge = (
-                f'Bearer resource_metadata="{issuer}/.well-known/oauth-protected-resource", '
-                'error="invalid_token", error_description="Authentication required"'
-            )
             return ToolResult(
                 content=[TextContent(type="text", text="Authentication required.")],
-                meta={"mcp/www_authenticate": [challenge]},
+                meta={"mcp/www_authenticate": [oauth_authentication_challenge()]},
                 is_error=True,
             )
         return await call_next(context)
