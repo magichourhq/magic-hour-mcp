@@ -204,11 +204,21 @@ class VideoVariationsTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.requests, [])
 
     async def test_api_auth_failure_never_quotes_or_submits(self):
-        self.account_status = 401
-        async with self.caller() as caller:
-            result = await caller.call_tool("plan_video_variations", PLAN_ARGUMENTS, raise_on_error=False)
-        self.assertTrue(result.is_error)
-        self.assertEqual([method for method, _, _, _ in self.requests], ["GET"])
+        for status in (401, 403):
+            with self.subTest(status=status):
+                self.account_status = status
+                self.requests.clear()
+                async with self.caller() as caller:
+                    result = await caller.call_tool("plan_video_variations", PLAN_ARGUMENTS, raise_on_error=False)
+                self.assertTrue(result.is_error)
+                self.assertEqual(result.structured_content["code"], f"api_{status}")
+                self.assertEqual([method for method, _, _, _ in self.requests], ["GET"])
+                if status == 401:
+                    self.assertEqual(result.meta, {"mcp/www_authenticate": [
+                        'Bearer resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource", error="invalid_token", error_description="Authentication required"'
+                    ]})
+                else:
+                    self.assertNotIn("mcp/www_authenticate", result.meta or {})
 
     async def test_invalid_input_does_not_make_paid_calls(self):
         for overrides in ({"variations": 0}, {"max_credits": 0}, {"duration_seconds": 0}, {"variation_prompts": ["only one"]}):

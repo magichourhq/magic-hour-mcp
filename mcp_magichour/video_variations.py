@@ -19,6 +19,7 @@ from fastmcp.tools.base import ToolResult
 from mcp.types import TextContent, ToolAnnotations
 from pydantic import Field
 
+from .oauth_compat import oauth_authentication_challenge
 from .openapi_auth import current_authorization_header
 from .posthog_client import analytics, api_key_distinct_id
 
@@ -142,8 +143,11 @@ def _error_result(error: Exception, **context: Any) -> ToolResult:
     recovery = RESUME_GUIDANCE if context.get("workflow_id") else "Correct the input or account restriction, then request a quote. No generation was submitted by this call."
     if code in {"invalid_plan", "expired_plan"}:
         recovery = "Use the original account and saved project IDs to inspect existing jobs. Do not start a replacement generation until its spending is reconciled and approved."
-    return _result({**context, "status": "partial" if context.get("projects") else "error", "code": code,
-                    "message": message, "retry_after_seconds": retry_after, "recovery": recovery}, error=True)
+    result = _result({**context, "status": "partial" if context.get("projects") else "error", "code": code,
+                     "message": message, "retry_after_seconds": retry_after, "recovery": recovery}, error=True)
+    if code == "api_401":
+        result.meta = {"mcp/www_authenticate": [oauth_authentication_challenge()]}
+    return result
 
 
 async def _require_capability(client: httpx.AsyncClient) -> dict[str, Any]:
