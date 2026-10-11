@@ -60,14 +60,15 @@ Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
-Omit optional resolution and model unless the user explicitly requests them, allowing the API to choose plan-compatible defaults.
-After a subscription-tier restriction, retry at most once after omitting only unrequested optional fields; explain the restriction instead of changing an explicit requirement or guessing alternatives.
+Omit unrequested optional fields only when the endpoint defaults are compatible with the account. Defaults are not universally plan-aware: AI Image Editor with an omitted or default model selects nano-banana, which requires a paid tier.
+For a Free AI Image Editor request, explicitly use model=flux-2-klein, resolution=640px and image_count=1 only when these satisfy the user's requirements. A credit balance does not unlock paid-only models or resolutions.
+After a subscription-tier restriction, do not repeat an unchanged request or assume removing optional fields will fix it. Explain the restriction, preserve explicit model/resolution requirements, and ask before changing them.
 
 For video creation, unless the user requests otherwise:
 
 - Prefer AI Image Editor followed by Image-to-Video.
 - Reuse reference images across scenes for visual consistency.
-- When the user asks for an image model recommendation, prefer nano-banana-2-lite only if account support is known; otherwise recommend default.
+- When the user asks for an image model recommendation, prefer nano-banana-2-lite only if account support is known; otherwise check account access and tool metadata before recommending a model.
 - When the user asks for an Image-to-Video model recommendation, prefer ltx-2.5.
 - Let the narration finish each sentence. Never cut it off.
 - Use Text-to-Video only when consistency is unimportant.
