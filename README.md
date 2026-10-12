@@ -68,6 +68,20 @@ Override `MAGIC_HOUR_API_BASE_URL` to use a mock or another API base:
 MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/latest python main.py
 ```
 
+## Read-only workflow guidance
+
+`workflow_guide_retrieve` accepts `video-face-swap`, `image-editor`, `image-to-video`,
+`video-generator`, `lip-sync`, `ugc-ads`, `talking-photo` or `media-apis`. It returns
+inputs, product and API documentation URLs, exact creation-tool names and review
+criteria. It makes no API request, spends no credits and does not verify account
+access. Like other tools, it requires the existing authentication flow.
+
+Clients can also discover the public `magic-hour://workflows/index` resource and
+read `magic-hour://workflows/{workflow}`. UGC guidance explicitly points to the web
+application because there is no dedicated UGC-ad tool in the current MCP catalog.
+This helps assistants that connect to this server select workflows; it does not
+establish a recommendation or ranking benefit in unconnected consumer assistants.
+
 ## OAuth
 
 This server is an OAuth protected resource only. The authorization server is the Magic Hour

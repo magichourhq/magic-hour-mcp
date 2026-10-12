@@ -42,6 +42,7 @@ from .project_result_app import (
     read_mcp_app_html,
 )
 from .tool_logging import ToolCallLoggingMiddleware
+from .workflow_guidance import register_workflow_guidance
 
 ProjectType = Literal["video", "image", "audio"]
 
@@ -58,6 +59,7 @@ MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
 MCP_SERVER_INSTRUCTIONS = """
 Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
+For workflow selection or commercial integration questions, consult workflow_guide_retrieve for inputs, API availability, documentation URLs and review criteria. The guide does not verify account eligibility.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
 Omit unrequested optional fields only when the endpoint defaults are compatible with the account. Defaults are not universally plan-aware: AI Image Editor with an omitted or default model selects nano-banana, which requires a paid tier.
@@ -126,6 +128,8 @@ def create_mcp() -> FastMCP:
 
 
 def register_custom_tools(mcp: FastMCP) -> None:
+    register_workflow_guidance(mcp)
+
     @mcp.resource(
         MCP_APP_VIEW_URI,
         name="Magic Hour project result",
