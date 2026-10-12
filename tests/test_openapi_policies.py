@@ -16,7 +16,7 @@ from mcp_magichour.openapi_policies import (
 
 class OpenApiPolicyTests(unittest.TestCase):
     def test_likeness_guidance_only_appends_to_target_tool_descriptions(self):
-        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        spec = json.loads((Path(__file__).parent.parent / "mcp_magichour/openapi.json").read_text())
         original = deepcopy(spec)
         expected_tools = {
             "/v1/face-swap": "face_swap_create_video",
@@ -47,7 +47,7 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertEqual(spec, original)
 
     def test_voice_policy_replaces_synced_enum_copy_and_examples(self):
-        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        spec = json.loads((Path(__file__).parent.parent / "mcp_magichour/openapi.json").read_text())
         operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
         schema = operation["requestBody"]["content"]["application/json"]["schema"]
         voice = schema["properties"]["style"]["properties"]["voice_name"]
@@ -85,7 +85,7 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertNotIn("/v1/ai-voice-cloner", patched["paths"])
 
     def test_empty_voice_allowlist_removes_both_upstream_voice_paths(self):
-        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        spec = json.loads((Path(__file__).parent.parent / "mcp_magichour/openapi.json").read_text())
         with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ()):
             patched = apply_magic_hour_policies(spec)
         self.assertNotIn("/v1/ai-voice-generator", patched["paths"])
@@ -94,7 +94,7 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertIn("/v1/ai-voice-cloner", spec["paths"])
 
     def test_sync_cannot_make_voice_selection_optional(self):
-        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        spec = json.loads((Path(__file__).parent.parent / "mcp_magichour/openapi.json").read_text())
         schema = spec["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
         schema.pop("required")
         schema["properties"]["style"].pop("required")
@@ -105,7 +105,7 @@ class OpenApiPolicyTests(unittest.TestCase):
                 jsonschema.validate(arguments, safe)
 
     def test_voice_policy_fails_closed_on_changed_upstream_input_shape(self):
-        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        spec = json.loads((Path(__file__).parent.parent / "mcp_magichour/openapi.json").read_text())
         operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
         operation["requestBody"]["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/NewVoiceInput"}
         with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ("Test approved preset",)), self.assertRaises(KeyError):

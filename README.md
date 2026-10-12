@@ -125,7 +125,7 @@ excluded from MCP.
 
 The MCP policy removes upstream voice descriptions, defaults, examples and SDK
 snippets at startup and when regenerating `docs/api-reference.md`. Daily OpenAPI
-syncs cannot expand the allowlist. Do not edit `docs/openapi.json` to set MCP
+syncs cannot expand the allowlist. Do not edit `mcp_magichour/openapi.json` to set MCP
 voices: it remains the unmodified upstream API snapshot. The main Magic Hour
 product and the public API are unchanged.
 
