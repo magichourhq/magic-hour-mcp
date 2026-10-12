@@ -455,7 +455,7 @@ Text-to-Video
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required): 
   - `prompt` (string, required): The prompt used for the video.
-- `references` (array, optional): 
+- `references` (array, optional): Reference media for video generation. Name references without @ and refer to them as @name in style.prompt. Maximum 10 references total.
   items:
     - `name` (string, required): 
     - `file_path` (string, required): 
