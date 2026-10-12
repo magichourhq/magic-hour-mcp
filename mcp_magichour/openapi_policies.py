@@ -4,6 +4,9 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from fastmcp.tools.base import Tool
+from mcp.types import ToolAnnotations
+
 
 PROJECT_TAG_TO_ASSET = {
     "Video Projects": "video",
@@ -21,20 +24,92 @@ HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()}
 GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
 
+# Populate only with verified generic/non-celebrity API voice_name strings.
+# Empty means no voice is approved; omit Voice Generator entirely from MCP.
+APPROVED_VOICE_NAMES: tuple[str, ...] = ()
+VOICE_PRESET_DESCRIPTION = "Select one of Magic Hour’s approved preset voices."
+LIKENESS_GENERATION_PATHS = {
+    "/v1/face-swap", "/v1/face-swap-photo", "/v1/head-swap", "/v1/body-swap",
+    "/v1/lip-sync", "/v1/ai-talking-photo", "/v1/character-replace", "/v1/ai-clothes-changer",
+}
+LIKENESS_USAGE_GUIDANCE = (
+    "Use only with the user's own likeness or content they are authorized to use. "
+    "Do not use for impersonation, deception, sexual content, or content involving minors."
+)
+
 
 def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
     """Return an OpenAPI copy with MCP-specific guidance added by group policy."""
     spec = deepcopy(openapi_spec)
+    paths = spec.get("paths", {})
+    paths.pop("/v1/ai-voice-cloner", None)
+    if not APPROVED_VOICE_NAMES:
+        paths.pop("/v1/ai-voice-generator", None)
 
-    for path, path_item in spec.get("paths", {}).items():
+    for path, path_item in paths.items():
         for method, operation in path_item.items():
             if method.lower() not in HTTP_METHODS or not isinstance(operation, dict):
                 continue
+            if path == "/v1/ai-voice-generator" and method.lower() == "post":
+                _apply_voice_generator_policy(operation)
+            if path == "/v1/ai-meme-generator" and method.lower() == "post":
+                # Keep public-figure template names out of the reviewer-facing
+                # schema. Random is the existing generic API template option.
+                properties = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
+                properties["style"]["properties"]["template"] = {
+                    "type": "string",
+                    "enum": ["Random"],
+                    "description": "Select a random meme template.",
+                }
             if operation_id := operation.get("operationId"):
                 operation["operationId"] = normalize_mcp_tool_name(operation_id)
             _apply_operation_policy(path=path, method=method.upper(), operation=operation)
 
     return spec
+
+
+def _apply_voice_generator_policy(operation: dict[str, Any]) -> None:
+    # Synced descriptions, defaults and examples may recommend unapproved voices
+    # anywhere in this operation, including nested schemas and SDK snippets.
+    def remove_upstream_copy(value: Any) -> None:
+        if isinstance(value, dict):
+            if "description" in value:
+                value["description"] = ""
+            for key in ("example", "examples", "default", "title", "externalDocs", "x-codeSamples"):
+                value.pop(key, None)
+            for child in value.values():
+                remove_upstream_copy(child)
+        elif isinstance(value, list):
+            for child in value:
+                remove_upstream_copy(child)
+
+    remove_upstream_copy(operation)
+    operation["summary"] = "AI Voice Generator"
+    operation["description"] = (
+        f"Generate speech from text. {VOICE_PRESET_DESCRIPTION} "
+        "Each character costs 0.1 credits. The cost is rounded up to the nearest whole number."
+    )
+    # Require the known input shape: fail startup rather than expose a changed
+    # upstream schema without this policy. Replace the whole voice schema so
+    # future enum/const/combinator changes cannot bypass the allowlist.
+    schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    properties = schema["properties"]
+    style = properties["style"]
+    if "voice_name" not in style["properties"]:
+        raise ValueError("Upstream Voice Generator schema is missing voice_name")
+    schema["required"] = list(dict.fromkeys([*schema.get("required", []), "style"]))
+    style["required"] = list(dict.fromkeys([*style.get("required", []), "voice_name"]))
+    properties["name"]["description"] = "Give your audio a custom name for easy identification."
+    style["description"] = "The content used to generate speech."
+    style["properties"]["prompt"]["description"] = "Text used to generate speech. The character limit is 1000 characters."
+    style["properties"]["voice_name"] = {
+        "type": "string",
+        "enum": list(APPROVED_VOICE_NAMES),
+        "description": VOICE_PRESET_DESCRIPTION,
+    }
+    output = operation["responses"]["200"]["content"]["application/json"]["schema"]["properties"]
+    output["id"]["description"] = "Unique ID of the generated audio project."
+    output["credits_charged"]["description"] = "Credits charged for audio generation."
 
 
 def normalize_mcp_tool_name(operation_id: str) -> str:
@@ -96,6 +171,10 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if additions:
         operation["description"] = _append_mcp_guidance(operation.get("description", ""), additions)
+    if method == "POST" and path in LIKENESS_GENERATION_PATHS:
+        description = operation.get("description", "").rstrip()
+        if not description.endswith(LIKENESS_USAGE_GUIDANCE):
+            operation["description"] = f"{description}\n\n{LIKENESS_USAGE_GUIDANCE}"
 
 
 def _operation_mentions_file_path(operation: dict[str, Any]) -> bool:
@@ -123,6 +202,17 @@ def customize_openapi_component(route: Any, component: Any) -> None:
     method = str(getattr(route, "method", "")).upper()
     path = str(getattr(route, "path", ""))
     route_tags = set(getattr(route, "tags", []) or [])
+
+    if isinstance(component, Tool):
+        read_only = method == "GET"
+        component.title = getattr(route, "summary", None) or component.name
+        component.annotations = ToolAnnotations(
+            title=component.title,
+            readOnlyHint=read_only,
+            # Only project deletion removes data; generation creates new projects.
+            destructiveHint=method == "DELETE",
+            openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL|searchWeb\b", repr(component.parameters))),
+        )
 
     if method == "POST":
         tags.add("write-operation")
