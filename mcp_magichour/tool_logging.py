@@ -28,7 +28,8 @@ def _safe_tool_arguments(value: Any) -> Any:
             normalized_key = re.sub(r"[^a-z0-9]", "", str(key).lower())
             if (
                 normalized_key in _SECRET_KEYS
-                or normalized_key.endswith(("url", "urls", "filepath", "filepaths"))
+                or normalized_key.endswith("url")
+                or normalized_key.endswith("filepath")
             ):
                 safe[str(key)] = "[redacted]"
             else:
