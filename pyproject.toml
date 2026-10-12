@@ -5,7 +5,6 @@ description = "OpenAPI-backed MCP server wrapping the Magic Hour API"
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=3.4.0,<4.0",
-    "anyio>=4.14.2",
     "httpx>=0.28.1",
     "jsonschema>=4.20.0",
     "python-dotenv>=1.0.0",
@@ -22,7 +21,7 @@ build-backend = "setuptools.build_meta"
 include = ["mcp_magichour*"]
 
 [tool.setuptools.package-data]
-mcp_magichour = ["favicon.ico", "static/project-result/index.html", "static/project-result/assets/*"]
+mcp_magichour = ["openapi.json", "favicon.ico", "static/project-result/index.html", "static/project-result/assets/*"]
 
 [tool.vercel.scripts]
 build = "npm --prefix web ci && npm --prefix web run build"

@@ -35,7 +35,7 @@ jobs:
             https://docs.magichour.ai/api-reference/openapi.json \
             --output /tmp/magic-hour-openapi.json
           python -m json.tool /tmp/magic-hour-openapi.json >/dev/null
-          mv /tmp/magic-hour-openapi.json docs/openapi.json
+          mv /tmp/magic-hour-openapi.json mcp_magichour/openapi.json
 
       - name: Regenerate API reference
         run: python docs/build_reference.py
@@ -50,14 +50,14 @@ jobs:
           REVIEWER: davidhu2000
           SYNC_BRANCH: automation/openapi-sync
         run: |
-          if git diff --quiet -- docs/openapi.json docs/api-reference.md; then
+          if git diff --quiet -- mcp_magichour/openapi.json docs/api-reference.md; then
             echo "OpenAPI spec already current."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$SYNC_BRANCH"
-          git add docs/openapi.json docs/api-reference.md
+          git add mcp_magichour/openapi.json docs/api-reference.md
           git commit -m "chore: sync OpenAPI spec"
           if git ls-remote --exit-code --heads origin "$SYNC_BRANCH" >/dev/null; then
             git fetch origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"

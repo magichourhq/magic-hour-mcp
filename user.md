@@ -20,12 +20,14 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 
 1. In Claude, open **Settings > Connectors** and add a custom connector.
 2. Enter `https://mcp.magichour.ai/` as the connector URL.
-3. Add the connector, then select **Connect**.
-4. Sign in to Magic Hour if asked, then select **Allow** on the authorization page.
-   This creates an API key named "Claude connector" in your Developer Hub; delete it
-   there to disconnect.
-5. Return to Claude and verify the connector is enabled. Ask Claude to call
-   `account_retrieve`; a returned credit balance confirms real API authorization.
+3. Open **Advanced settings** and set **OAuth Client ID** to
+   `magic-hour-mcp`. This is required because the server does not support dynamic
+   client registration.
+4. Add the connector, then select **Connect**.
+5. On the Magic Hour authorization page, paste your Magic Hour API key and select
+   **Connect**.
+6. Return to Claude and verify the connector is enabled. Ask Claude to call the
+   Magic Hour `ping` tool; the expected result is `pong`.
 
 ## Connect with Claude Code
 
@@ -33,7 +35,7 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 claude mcp add --scope user --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
-Start a new Claude Code session and ask it to call `account_retrieve`.
+Start a new Claude Code session and ask it to call the Magic Hour `ping` tool.
 
 If `--scope user` is not supported, use project scope:
 
@@ -63,14 +65,14 @@ Add the MCP server:
 codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var MAGIC_HOUR_API_KEY
 ```
 
-Start Codex from that same shell and ask it to call `account_retrieve`.
+Start Codex from that same shell and ask it to call the Magic Hour `ping` tool.
 
 ## Verify API access before generating
 
-Use `account_retrieve` to confirm eligibility for the intended generation. Tool
-discovery can work without credentials, and an invalid API key can still receive
-`pong`; only the account read checks actual API authorization. `Authentication
-required` means the bearer token is missing;
+After `ping`, ask the agent to call `account_retrieve` and confirm eligibility for
+the intended generation. Tool discovery can work without credentials, and an
+invalid API key can still receive `pong`; only the account read checks actual
+API authorization. `Authentication required` means the bearer token is missing;
 an account `401` means authorization failed. Check the key and the environment
 that launched the agent before reinstalling anything. Keep account details private.
 
@@ -102,6 +104,7 @@ These examples cover the most-used Magic Hour endpoints. For inputs, use uploade
 | Background Remover | `Remove the background from my uploaded product photo.` | Image | Cutout image |
 | Face Editor | `Make this portrait smile slightly and look toward the camera.` | Face image, edit request | Edited portrait |
 | Head Swap | `Place the head from this photo onto the body in this other photo.` | Head image, body image | Head-swapped image |
+| Voice Generator | `Generate audio saying "Welcome to Magic Hour" with a warm narrator voice.` | Script, voice preference | Generated audio |
 
 Direct public media URLs can work, but uploaded Magic Hour `file_path` inputs are more reliable.
 

@@ -15,7 +15,7 @@ The internal FastMCP app is intentionally configured for `/`, not `/mcp`.
 
 ## What this server generates
 
-At startup, the server reads `docs/openapi.json` and builds tools with `FastMCP.from_openapi()`.
+At startup, the server reads `mcp_magichour/openapi.json` and builds tools with `FastMCP.from_openapi()`.
 
 OpenAPI `operationId` values are normalized to descriptive snake_case tool names. Examples:
 
@@ -27,7 +27,7 @@ OpenAPI `operationId` values are normalized to descriptive snake_case tool names
 `video_assets_generate_presigned_url` is the shared `/v1/files/upload-urls` endpoint. It accepts `video`, `audio`, and `image` asset items.
 
 Do not hand-register Magic Hour endpoints in the host backend. Update
-`docs/openapi.json` and restart the MCP server to pick up new endpoints.
+`mcp_magichour/openapi.json` and restart the MCP server to pick up new endpoints.
 
 The repo adds these custom helpers:
 
@@ -104,7 +104,7 @@ MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/0.66
 Optional:
 
 ```text
-MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
+MAGIC_HOUR_OPENAPI_PATH=mcp_magichour/openapi.json
 ```
 
 ## Validation

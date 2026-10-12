@@ -4,10 +4,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
-import { captureUiError } from "./analytics";
-
-window.addEventListener("error", () => captureUiError("runtime_error"));
-window.addEventListener("unhandledrejection", () => captureUiError("unhandled_rejection"));
 
 const observabilityBasePath = `${new URL(import.meta.env.BASE_URL).origin}/app/observability`;
 injectAnalytics({ basePath: observabilityBasePath });
@@ -16,16 +12,7 @@ injectSpeedInsights({ basePath: observabilityBasePath });
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing root element");
 
-createRoot(root, {
-  onUncaughtError: (error) => {
-    captureUiError("render_error");
-    console.error(error);
-  },
-  onRecoverableError: (error) => {
-    captureUiError("render_error");
-    console.error(error);
-  },
-}).render(
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>,
