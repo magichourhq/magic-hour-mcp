@@ -81,6 +81,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/files/upload-urls` | Files | Generate asset upload urls |
 | GET | `/v1/saved-items` | Files | List saved items |
 | POST | `/v1/ai-talking-photo` | Video Projects | AI Talking Photo |
+| POST | `/v1/ai-ugc-ad` | Video Projects | AI UGC Ad Generator |
 | POST | `/v1/ai-video-editor` | Video Projects | AI Video Editor |
 | POST | `/v1/ai-video-translator` | Video Projects | AI Video Translator |
 | POST | `/v1/animation` | Video Projects | Animation |
@@ -182,12 +183,12 @@ List saved items
 - `cursor` (query, optional): Opaque pagination cursor from the previous response's next_cursor.
 
 **Response 200:**
-- `items` (array, required): 
+- `items` (array, required):
   items:
     - `id` (string, required): Unique ID of the saved item.
     - `type` (string, required) enum=['character', 'reference', 'voice', 'moodboard', 'brand_kit']: Saved item type.
     - `name` (string, required): User-provided name of the saved item.
-    - `assets` (array, required): 
+    - `assets` (array, required):
       items:
         - `file_path` (string, required): Durable asset path. Pass it to a compatible API asset field without uploading it again.
         - `media_kind` (string, required) enum=['IMAGE', 'VIDEO', 'AUDIO']: Media type of the asset.
@@ -221,6 +222,25 @@ AI Talking Photo
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
+#### POST /v1/ai-ugc-ad
+`operationId: aiUgcAd.createVideo`
+
+AI UGC Ad Generator
+
+
+**Request Body:**
+- `assets` (object, required):
+  - `image_file_path` (string, required): Prepared image to animate. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
+- `script` (string, required): The words the actor should speak. Character limits apply after trimming: * kling-3.0: 2500 characters. * ltx-2.5: 1981 characters. * veo3.1: 2500 characters. LTX's dialogue wrapper counts toward its model prompt limit.
+- `end_seconds` (number, required) range=[1,None]: Video duration in seconds. Supported values by model: * kling-3.0: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 seconds. * ltx-2.5: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 seconds. * veo3.1:...
+- `model` (string, optional) enum=['kling-3.0', 'ltx-2.5', 'veo3.1']: Defaults to kling-3.0 on paid plans and ltx-2.5 on free plans.
+- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Defaults to 720p on paid plans and 480p on free plans. Unsupported model/resolution combinations and resolutions unavailable for your plan are rejected.
+
+**Response 200:**
+- `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
+- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
+
 #### POST /v1/ai-video-editor
 `operationId: aiVideoEditor.createVideo`
 
@@ -233,7 +253,7 @@ AI Video Editor
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip in seconds. Must be greater than `start_seconds`. Minimum duration depends on model: `gemini-omni-1.1`: 3s, LTX 2.5: 0.5s. Maximum duration depends on model: `gemini-omni-1.1`: 10s, LTX 2.5: 20s.
 - `model` (string, optional) enum=['gemini-omni-1.1', 'gemini-omni', 'ltx-2.5', 'ltx-2.3']: Editing model. Defaults to LTX 2.5 for free tier and `gemini-omni-1.1` for paid. `gemini-omni` is deprecated; use `gemini-omni-1.1` instead.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output resolution. Defaults to `480p` for free tier and `720p` for paid. `gemini-omni-1.1` and deprecated `gemini-omni` support 720p and 1080p; LTX 2.5 supports 480p, 720p, and 1080p.
-- `style` (object, required): 
+- `style` (object, required):
   - `prompt` (string, required): The prompt used to edit the video.
 - `assets` (object, required): Provide the assets for video editing.
   - `video_file_path` (string, required): The video to edit. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
@@ -453,12 +473,12 @@ Text-to-Video
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `model` (string, optional) enum=[22 values, e.g. ['default', 'kling-3.0', 'ltx-2.5', 'seedance-2.0-mini', 'wan-3.0', 'seedance-2.5'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
-- `style` (object, required): 
+- `style` (object, required):
   - `prompt` (string, required): The prompt used for the video.
 - `references` (array, optional): Reference media for video generation. Name references without @ and refer to them as @name in style.prompt. Maximum 10 references total.
   items:
-    - `name` (string, required): 
-    - `file_path` (string, required): 
+    - `name` (string, required):
+    - `file_path` (string, required):
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -477,7 +497,7 @@ Get video details
 - `name` (string, required): The name of the video.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the video.
 - `type` (string, required): The type of the video project. Possible values are ANIMATION, AUTO_SUBTITLE, VIDEO_TO_VIDEO, FACE_SWAP, TEXT_TO_VIDEO, IMAGE_TO_VIDEO, LIP_SYNC, TALKING_PHOTO, AVATAR, VIDEO_UPSCALER, VIDEO_EDITOR, CHARACTER_REPLACE,...
-- `created_at` (string, required): 
+- `created_at` (string, required):
 - `width` (integer, required): The width of the final output video. A value of -1 indicates the width can be ignored.
 - `height` (integer, required): The height of the final output video. A value of -1 indicates the height can be ignored.
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
@@ -488,10 +508,10 @@ Get video details
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
   - `message` (string, required): Details on the reason why a failure happened.
   - `code` (string, required): An error code to indicate why a failure happened.
-- `downloads` (array, required): 
+- `downloads` (array, required):
   items:
-    - `url` (string, required): 
-    - `expires_at` (string, required): 
+    - `url` (string, required):
+    - `expires_at` (string, required):
 
 #### DELETE /v1/video-projects/{id}
 `operationId: videoProjects.delete`
@@ -512,8 +532,8 @@ Video-to-Video
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
 - `fps_resolution` (string, optional) enum=['FULL', 'HALF'] default=HALF: Determines whether the resulting video will have the same frame per second as the original video, or half. * `FULL` - the result video will have the same FPS as the input video * `HALF` - the result video will have half...
-- `style` (object, required): 
-  - `art_style` (string, required) enum=[75 values, e.g. ['Minecraft', 'Watercolor', 'Pixel', 'Retro Sci-Fi', 'Lego', 'Origami'], ...]: 
+- `style` (object, required):
+  - `art_style` (string, required) enum=[75 values, e.g. ['Minecraft', 'Watercolor', 'Pixel', 'Retro Sci-Fi', 'Lego', 'Origami'], ...]:
   - `version` (string, optional) enum=['v1', 'v2', 'default'] default=default: * `v1` - more detail, closer prompt adherence, and frame-by-frame previews. * `v2` - faster, more consistent, and less noisy. * `default` - use the selected art style's default version. Some art styles default to v3,...
   - `prompt_type` (string, optional) enum=['default', 'custom', 'append_default'] default=default: * `default` - Use the default recommended prompt for the art style. * `custom` - Only use the prompt passed in the API. Note: for v1, lora prompt will still be auto added to apply the art style properly. *...
   - `prompt` (string, optional): The prompt used for the video. Prompt is required if `prompt_type` is `custom` or `append_default`. If `prompt_type` is `default`, then the `prompt` value passed will be ignored.
@@ -586,7 +606,7 @@ AI GIF Generator
 
 **Request Body:**
 - `name` (string, optional) default=Ai Gif - dateTime: Give your gif a custom name for easy identification.
-- `style` (object, required): 
+- `style` (object, required):
   - `prompt` (string, required): The prompt used for the GIF.
 - `output_format` (string, optional) enum=['gif', 'mp4', 'webm'] default=gif: The output file format for the generated animation.
 
@@ -602,7 +622,7 @@ AI Headshot Generator
 
 **Request Body:**
 - `name` (string, optional) default=Ai Headshot - dateTime: Give your image a custom name for easy identification.
-- `style` (object, optional): 
+- `style` (object, optional):
   - `prompt` (string, optional): Prompt used to guide the style of your headshot. We recommend omitting the prompt unless you want to customize your headshot. You can visit [AI headshot generator](https://magichour.ai/create/ai-headshot-generator) to...
 - `assets` (object, required): Provide the assets for headshot photo
   - `image_file_path` (string, required): The image used to generate the headshot. This image must contain one detectable face. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
@@ -623,7 +643,7 @@ AI Image Editor
 - `model` (string, optional) enum=[15 values, e.g. ['default', 'qwen-image-2.1', 'qwen-edit', 'flux-2-klein', 'nano-banana-2-lite', 'nano-banana-2'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
-- `style` (object, required): 
+- `style` (object, required):
   - `prompt` (string, required): The prompt used to edit the image.
 - `assets` (object, required): Provide the assets for image edit
   - `image_file_paths` (array, optional): The image(s) used in the edit, maximum of 10 images. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
@@ -680,7 +700,7 @@ AI Meme Generator
 
 **Request Body:**
 - `name` (string, optional): The name of the meme.
-- `style` (object, required): 
+- `style` (object, required):
   - `topic` (string, required): The topic of the meme.
   - `template` (string, required) enum=['Random']: Select a random meme template.
   - `searchWeb` (boolean, optional) default=False: Whether to search the web for meme content.
@@ -698,7 +718,7 @@ AI QR Code Generator
 **Request Body:**
 - `name` (string, optional) default=Qr Code - dateTime: Give your image a custom name for easy identification.
 - `content` (string, required): The content of the QR code.
-- `style` (object, required): 
+- `style` (object, required):
   - `art_style` (string, required): To use our templates, pass in one of Watercolor, Cyberpunk City, Ink Landscape, Interior Painting, Japanese Street, Mech, Minecraft, Picasso Painting, Game Map, Spaceship, Chinese Painting, Winter Village, or pass any...
 
 **Response 200:**
@@ -790,13 +810,13 @@ Get image details
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the image.
 - `image_count` (integer, required): Number of images generated
 - `type` (string, required): The type of the image project. Possible values are FACE_EDITOR, AI_IMAGE_EDITOR, GENERATIVE_FILL, AI_SELFIE, AI_HEADSHOT, AI_INFLUENCER, AI_IMAGE, AI_MEME, CLOTHES_CHANGER, BACKGROUND_REMOVER, FACE_SWAP, IMAGE_UPSCALER,...
-- `created_at` (string, required): 
+- `created_at` (string, required):
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
-- `downloads` (array, required): 
+- `downloads` (array, required):
   items:
-    - `url` (string, required): 
-    - `expires_at` (string, required): 
+    - `url` (string, required):
+    - `expires_at` (string, required):
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
   - `message` (string, required): Details on the reason why a failure happened.
   - `code` (string, required): An error code to indicate why a failure happened.
@@ -840,13 +860,13 @@ Get audio details
 - `name` (string, required): The name of the audio.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the audio.
 - `type` (string, required): The type of the audio project. Possible values are AUDIO_TRANSLATOR, VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR, SOUND_EFFECT_GENERATOR
-- `created_at` (string, required): 
+- `created_at` (string, required):
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
-- `downloads` (array, required): 
+- `downloads` (array, required):
   items:
-    - `url` (string, required): 
-    - `expires_at` (string, required): 
+    - `url` (string, required):
+    - `expires_at` (string, required):
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
   - `message` (string, required): Details on the reason why a failure happened.
   - `code` (string, required): An error code to indicate why a failure happened.

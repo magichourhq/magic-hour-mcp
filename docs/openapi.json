@@ -1822,6 +1822,237 @@
         ]
       }
     },
+    "/v1/ai-ugc-ad": {
+      "post": {
+        "description": "Create a spoken UGC video from a prepared image and script. Returns a project ID; poll GET /v1/video-projects/{id} for status and downloads. To compose an image, generate the image separately with the Image Editor API and supply its download URL.",
+        "summary": "AI UGC Ad Generator",
+        "tags": ["Video Projects"],
+        "parameters": [],
+        "operationId": "aiUgcAd.createVideo",
+        "requestBody": {
+          "required": true,
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assets": {
+                    "type": "object",
+                    "properties": {
+                      "image_file_path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Prepared image to animate. This value is either\n- a direct URL to the video file\n- `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).\n\nSee the [file upload guide](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls#input-file) for details.\n",
+                        "example": "api-assets/id/image.jpg"
+                      }
+                    },
+                    "required": ["image_file_path"],
+                    "additionalProperties": false
+                  },
+                  "script": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The words the actor should speak. Character limits apply after trimming:\n* kling-3.0: 2500 characters.\n* ltx-2.5: 1981 characters.\n* veo3.1: 2500 characters.\nLTX's dialogue wrapper counts toward its model prompt limit.",
+                    "example": "Meet your new everyday essential."
+                  },
+                  "end_seconds": {
+                    "type": "number",
+                    "minimum": 1,
+                    "description": "Video duration in seconds. Supported values by model:\n* kling-3.0: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 seconds.\n* ltx-2.5: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 seconds.\n* veo3.1: 4, 6, 8, 15, 22, 29, 36, 43, 50, 57, 64, 71, 78, 85, 92, 99, 106, 113, 120, 127, 134, 141 seconds.\nFree plans are limited to 5 seconds unless a credit pack has been purchased.",
+                    "example": 4
+                  },
+                  "model": {
+                    "type": "string",
+                    "enum": ["kling-3.0", "ltx-2.5", "veo3.1"],
+                    "description": "Defaults to kling-3.0 on paid plans and ltx-2.5 on free plans."
+                  },
+                  "resolution": {
+                    "type": "string",
+                    "enum": ["480p", "720p", "1080p"],
+                    "description": "Defaults to 720p on paid plans and 480p on free plans. Unsupported model/resolution combinations and resolutions unavailable for your plan are rejected."
+                  }
+                },
+                "required": ["assets", "script", "end_seconds"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "cuid-example",
+                      "description": "Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads."
+                    },
+                    "estimated_frame_cost": {
+                      "type": "integer",
+                      "description": "Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.\n\nThe amount of frames used to generate the video. If the status is not 'complete', the cost is an estimate and will be adjusted when the video completes.",
+                      "deprecated": true
+                    },
+                    "credits_charged": {
+                      "type": "integer",
+                      "description": "The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video. \n\nIf video generation fails, credits will be refunded, and this field will be updated to include the refund.",
+                      "example": 450
+                    }
+                  },
+                  "required": ["id", "estimated_frame_cost", "credits_charged"],
+                  "description": "Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["invalid_request"],
+                      "description": "Machine-readable error code.\n\n- `invalid_request`: Fix request syntax or validation errors before retrying."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["unauthorized"],
+                      "description": "Machine-readable error code.\n\n- `unauthorized`: Provide a valid API key before retrying."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "insufficient_credits",
+                        "subscription_required",
+                        "plan_upgrade_required"
+                      ],
+                      "description": "Machine-readable error code.\n\n- `insufficient_credits`: Purchase credits before retrying.\n\n- `subscription_required`: Start a subscription before retrying.\n\n- `plan_upgrade_required`: Upgrade the subscription plan before retrying."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["not_found"],
+                      "description": "Machine-readable error code.\n\n- `not_found`: Check the route or resource identifier."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["unprocessable_entity"],
+                      "description": "Machine-readable error code.\n\n- `unprocessable_entity`: Change the request values before retrying."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["internal_server_error"],
+                      "description": "Machine-readable error code.\n\n- `internal_server_error`: Retry later or contact support if the error continues."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/v1/ai-video-editor": {
       "post": {
         "description": "**What this API does**\n\nCreate the same Video Editor you can make in the browser, but programmatically, so you can automate it, run it at scale, or connect it to your own app or workflow.\n    \n**Good for**\n- Automation and batch processing  \n- Adding video editor into apps, pipelines, or tools  \n\n**How it works (3 steps)**\n1) Upload your inputs (video, image, or audio) with [Generate Upload URLs](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls) and copy the `file_path`.  \n2) Send a request to create a video editor job with the basic fields.  \n3) Check the job status until it's `complete`, then download the result from `downloads`.\n\n**Key options**\n- Inputs: usually a file, sometimes a YouTube link, depending on project type  \n- Resolution: free users are limited to 576px; higher plans unlock HD and larger sizes  \n- Extra fields: e.g. `face_swap_mode`, `start_seconds`/`end_seconds`, or a text prompt  \n\n**Cost**  \nCredits are only charged for the frames that actually render. You'll see an estimate when the job is queued, and the final total after it's done.\n\nFor detailed examples, see the [product page](https://magichour.ai/products/ai-video-editor).",

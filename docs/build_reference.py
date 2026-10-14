@@ -40,7 +40,7 @@ def fmt_prop(name, schema, required_set, indent=0):
     if schema.get("minimum") is not None or schema.get("maximum") is not None:
         extra.append(f"range=[{schema.get('minimum')},{schema.get('maximum')}]")
     extra_s = (" " + " ".join(extra)) if extra else ""
-    lines.append(f"{pad}- `{name}` ({typ}, {req}){extra_s}: {desc}")
+    lines.append(f"{pad}- `{name}` ({typ}, {req}){extra_s}: {desc}".rstrip())
     if typ == "object" and "properties" in schema:
         sub_req = set(schema.get("required", []))
         for sk, sv in schema["properties"].items():

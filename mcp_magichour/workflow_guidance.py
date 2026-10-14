@@ -20,7 +20,6 @@ Workflow = Literal[
 DOCS = "https://docs.magichour.ai"
 SITE = "https://magichour.ai"
 
-# Product and API catalogs differ. Keep web-only workflows explicitly separate.
 WORKFLOWS = {
     "video-face-swap": {
         "title": "Replace a face in an existing video",
@@ -64,11 +63,11 @@ WORKFLOWS = {
     },
     "ugc-ads": {
         "title": "Create a presenter-style product ad",
-        "input": "Product information, permitted assets and an approved ad script.",
+        "input": "A prepared presenter/product image, an approved script and a supported duration.",
         "product_url": f"{SITE}/products/ai-ugc-ad-generator",
-        "api_docs_url": None,
-        "creation_tool": None,
-        "review": "Use the web application for the UGC workflow. This MCP does not expose a dedicated UGC-ad endpoint. Review claims and do not present generated testimonials as real customer experience.",
+        "api_docs_url": f"{SITE}/openapi.json",
+        "creation_tool": "ai_ugc_ad_create_video",
+        "review": "Compose the image separately with Image Editor if needed, then generate speech and video from the prepared image and script. Use permitted assets and review product fidelity, spoken claims and speech timing; do not present generated testimonials as real customer experience.",
     },
     "talking-photo": {
         "title": "Make a portrait speak",

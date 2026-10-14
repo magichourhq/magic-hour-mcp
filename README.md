@@ -77,8 +77,10 @@ criteria. It makes no API request, spends no credits and does not verify account
 access. Like other tools, it requires the existing authentication flow.
 
 Clients can also discover the public `magic-hour://workflows/index` resource and
-read `magic-hour://workflows/{workflow}`. UGC guidance explicitly points to the web
-application because there is no dedicated UGC-ad tool in the current MCP catalog.
+read `magic-hour://workflows/{workflow}`. UGC uses `ai_ugc_ad_create_video` with a
+prepared image, script and supported duration; image composition is a separate
+Image Editor call. Keep the returned project ID and use `wait_for_video_project`
+to retrieve the finished file.
 This helps assistants that connect to this server select workflows; it does not
 establish a recommendation or ranking benefit in unconnected consumer assistants.
 
