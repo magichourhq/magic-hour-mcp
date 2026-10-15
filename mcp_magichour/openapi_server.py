@@ -134,8 +134,16 @@ def register_custom_tools(mcp: FastMCP) -> None:
         MCP_APP_VIEW_URI,
         name="Magic Hour project result",
         description="Render completed or terminal Magic Hour project results in MCP Apps hosts.",
-        meta={"openai/widgetDomain": MCP_APP_ORIGIN},
+        mime_type=MCP_APP_MIME_TYPE,
+        meta={
+            "openai/widgetDomain": MCP_APP_ORIGIN,
+            "openai/widgetDescription": (
+                "Displays Magic Hour project status, generated image, video, or audio previews, "
+                "and download links, including errors or canceled projects."
+            ),
+        },
         app=AppConfig(
+            domain=MCP_APP_ORIGIN,
             csp=ResourceCSP(
                 connect_domains=[MCP_APP_SERVER_ORIGIN, MCP_APP_ORIGIN],
                 resource_domains=[MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
@@ -162,6 +170,15 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "Poll a video project until it completes, errors, is canceled, or times out. "
             f"{SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        meta={
+            # Nested form for compatibility checks; flat keys for ChatGPT status labels.
+            "openai/toolInvocation": {
+                "invoking": "Checking video project…",
+                "invoked": "Video project status retrieved",
+            },
+            "openai/toolInvocation/invoking": "Checking video project…",
+            "openai/toolInvocation/invoked": "Video project status retrieved",
+        },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
         annotations=ToolAnnotations(title="Wait for Video Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
@@ -189,6 +206,15 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        meta={
+            # Nested form for compatibility checks; flat keys for ChatGPT status labels.
+            "openai/toolInvocation": {
+                "invoking": "Checking image project…",
+                "invoked": "Image project status retrieved",
+            },
+            "openai/toolInvocation/invoking": "Checking image project…",
+            "openai/toolInvocation/invoked": "Image project status retrieved",
+        },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
         annotations=ToolAnnotations(title="Wait for Image Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
@@ -218,6 +244,15 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
+        meta={
+            # Nested form for compatibility checks; flat keys for ChatGPT status labels.
+            "openai/toolInvocation": {
+                "invoking": "Checking audio project…",
+                "invoked": "Audio project status retrieved",
+            },
+            "openai/toolInvocation/invoking": "Checking audio project…",
+            "openai/toolInvocation/invoked": "Audio project status retrieved",
+        },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
         annotations=ToolAnnotations(title="Wait for Audio Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )

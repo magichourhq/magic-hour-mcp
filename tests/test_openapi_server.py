@@ -25,6 +25,42 @@ from mcp_magichour.openapi_policies import VOICE_PRESET_DESCRIPTION
 
 
 class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_ui_metadata_is_exposed_to_clients(self):
+        from mcp_magichour.project_result_app import (
+            MCP_APP_MIME_TYPE, MCP_APP_ORIGIN, MCP_APP_VIEW_URI,
+        )
+
+        async with Client(mcp) as caller:
+            tools = {tool.name: tool for tool in await caller.list_tools()}
+            resources = await caller.list_resources()
+            contents = await caller.read_resource(MCP_APP_VIEW_URI)
+        for asset in ("video", "image", "audio"):
+            meta = tools[f"wait_for_{asset}_project"].meta
+            self.assertEqual(meta["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+            for state in ("invoking", "invoked"):
+                label = meta["openai/toolInvocation"][state]
+                self.assertIsInstance(label, str)
+                self.assertTrue(label.strip())
+                self.assertLessEqual(len(label), 64)
+                self.assertEqual(label, meta[f"openai/toolInvocation/{state}"])
+        resource = next(r for r in resources if str(r.uri) == MCP_APP_VIEW_URI)
+        self.assertEqual(resource.mimeType, MCP_APP_MIME_TYPE)
+        self.assertTrue(resource.description)
+        self.assertEqual(len(contents), 1)
+        content = contents[0]
+        self.assertEqual(content.mimeType, MCP_APP_MIME_TYPE)
+        self.assertTrue(content.meta["openai/widgetDescription"])
+        self.assertEqual(content.meta["ui"]["domain"], MCP_APP_ORIGIN)
+        self.assertIn("csp", content.meta["ui"])
+
+    async def test_metadata_fits_claude_code_utf8_budget(self):
+        from mcp_magichour.openapi_server import MCP_SERVER_INSTRUCTIONS
+
+        self.assertLessEqual(len(MCP_SERVER_INSTRUCTIONS.encode("utf-8")), 2048)
+        for tool in await mcp.list_tools():
+            with self.subTest(tool=tool.name):
+                self.assertLessEqual(len((tool.description or "").encode("utf-8")), 2048)
+
     async def test_runtime_schema_excludes_unapproved_voice_tools_and_names(self):
         async with httpx.AsyncClient() as client:
             with patch("mcp_magichour.openapi_server.build_api_client", return_value=client), patch(
