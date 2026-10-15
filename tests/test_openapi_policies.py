@@ -41,7 +41,7 @@ class OpenApiPolicyTests(unittest.TestCase):
             operation = patched["paths"][path]["post"]
             description = baseline["paths"][path]["post"]["description"]
             self.assertEqual(operation["operationId"], tool_name)
-            self.assertEqual(operation["description"], f"{description}\n\n{suffix}")
+            self.assertEqual(operation["description"], f"{suffix}\n\n{description}")
             descriptions_restored["paths"][path]["post"]["description"] = description
         self.assertEqual(descriptions_restored, baseline)
         self.assertEqual(spec, original)

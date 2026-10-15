@@ -144,11 +144,11 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if method == "POST" and asset_type:
         wait_tool = PROJECT_WAIT_TOOL_BY_ASSET[asset_type]
         additions.append(
-            f"This starts an async {asset_type} generation job and returns `id` plus `credits_charged` immediately. "
-            f"If the user wants the finished result, call the `{wait_tool}` helper with the returned id, or poll "
-            f"the matching `GET /v1/{asset_type}-projects/{{id}}` endpoint until status is `complete`, `error`, "
-            "or `canceled`. Completed projects include `downloads` with direct URLs. The custom wait helper also "
-            "returns `exact_download_urls` separately from expiration metadata."
+            f"Starts an async {asset_type} job; returns `id` and `credits_charged`. "
+            f"For finished results, call `{wait_tool}` with that id or poll "
+            f"`GET /v1/{asset_type}-projects/{{id}}` until `complete`, `error`, or `canceled`. "
+            "Results include `downloads`; wait helpers add `exact_download_urls`. "
+            "Preserve signed URLs and query parameters; never append expiration metadata."
         )
 
     if method == "GET" and path in PROJECT_DETAIL_PATHS:
@@ -163,18 +163,17 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if _operation_mentions_file_path(operation):
         additions.append(
-            "For `*_file_path` values, prefer an existing Magic Hour file path or a `file_path` returned by "
-            "the upload-URL endpoint after the file bytes are uploaded. Direct public media URLs may work when "
-            "they are stable, fetchable, and return raw file bytes, but hotlinked URLs can fail; when in doubt, "
-            "use the presigned upload flow first and pass the returned `file_path`."
+            "For `*_file_path`, use an existing Magic Hour path or the upload-URL endpoint's `file_path` "
+            "after uploading raw bytes to its presigned URL. Direct public media URLs may work if stable "
+            "and fetchable as raw bytes; hotlinked URLs can fail. Prefer the upload-URL endpoint when unsure."
         )
 
     if additions:
         operation["description"] = _append_mcp_guidance(operation.get("description", ""), additions)
     if method == "POST" and path in LIKENESS_GENERATION_PATHS:
         description = operation.get("description", "").rstrip()
-        if not description.endswith(LIKENESS_USAGE_GUIDANCE):
-            operation["description"] = f"{description}\n\n{LIKENESS_USAGE_GUIDANCE}"
+        if not description.startswith(LIKENESS_USAGE_GUIDANCE):
+            operation["description"] = f"{LIKENESS_USAGE_GUIDANCE}\n\n{description}"
 
 
 def _operation_mentions_file_path(operation: dict[str, Any]) -> bool:
@@ -188,7 +187,7 @@ def _append_mcp_guidance(description: str, additions: list[str]) -> str:
         return guidance
     if "MCP guidance:" in existing:
         return existing
-    return f"{existing}\n\n{guidance}"
+    return f"{guidance}\n\n{existing}"
 
 
 def customize_openapi_component(route: Any, component: Any) -> None:
