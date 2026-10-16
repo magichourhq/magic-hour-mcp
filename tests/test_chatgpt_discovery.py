@@ -278,8 +278,10 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
                 "params": {"name": "ping", "arguments": {}},
             },
         )
-        self.assertEqual(called.status_code, 401)
-        self.assertIn("resource_metadata=", called.headers["www-authenticate"])
+        result = self.result(called)
+        self.assertTrue(result["isError"])
+        self.assertIn("mcp/www_authenticate", result["_meta"])
+        self.assertIn("resource_metadata=", result["_meta"]["mcp/www_authenticate"][0])
 
         authorized = await client.post(
             "/",
