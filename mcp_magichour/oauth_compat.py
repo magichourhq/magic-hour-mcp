@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -17,7 +18,6 @@ from starlette.routing import BaseRoute, Mount, Route
 
 from .openapi_auth import AuthError, current_authorization_header
 
-
 # The Magic Hour web app is the OAuth authorization server: users sign in and consent there, and
 # it returns a Magic Hour API key as the access token. This app is only the protected resource.
 AUTHORIZATION_SERVER_URL = "https://magichour.ai"
@@ -30,7 +30,7 @@ class OAuthSettings:
     resource_url: str | None = None
 
     @classmethod
-    def from_env(cls) -> "OAuthSettings":
+    def from_env(cls) -> OAuthSettings:
         return cls(
             issuer_url=os.getenv("MCP_OAUTH_ISSUER_URL"),
             resource_url=os.getenv("MCP_OAUTH_RESOURCE_URL"),
@@ -83,7 +83,7 @@ class MCPBearerChallengeMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if scope.get("method") in {"OPTIONS", "POST"}:
+        if scope.get("method") == "OPTIONS":
             await self.app(scope, receive, send)
             return
 
@@ -93,6 +93,33 @@ class MCPBearerChallengeMiddleware:
         )
         header = authorization or ""
         scheme, _, token = header.partition(" ")
+        if scope.get("method") == "POST":
+            if scheme.lower() == "bearer" and token.strip():
+                await self.app(scope, receive, send)
+                return
+
+            # Discovery stays public, but protected calls need an HTTP challenge:
+            # a tool-level error alone does not start OAuth in standard MCP clients.
+            request = Request(scope, receive)
+            body = await request.body()
+            try:
+                message = json.loads(body)
+            except (ValueError, UnicodeDecodeError):
+                message = None
+
+            body_replayed = False
+
+            async def replay_body():
+                nonlocal body_replayed
+                if body_replayed:
+                    return await receive()
+                body_replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            if not isinstance(message, dict) or message.get("method") != "tools/call":
+                await self.app(scope, replay_body, send)
+                return
+
         if scheme.lower() != "bearer" or not token.strip():
             if (
                 authorization is None
