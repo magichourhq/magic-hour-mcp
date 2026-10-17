@@ -84,8 +84,7 @@ MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
     "Returns sanitized download fields. Use `exact_download_urls[n]` or `downloads[n].url` exactly as returned; "
-    "do not shorten it, remove query parameters, or append expiration metadata. "
-    "A timeout is not a failed generation: resume this wait with the same project id; do not create another job."
+    "do not shorten it, remove query parameters, or append expiration metadata."
 )
 
 
@@ -170,6 +169,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         title="Wait for Video Project",
         description=(
             "Poll a video project until it completes, errors, is canceled, or times out. "
+            "After a timeout, resume with the same id; do not create another generation. "
             f"{SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         meta={
@@ -204,7 +204,8 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="wait_for_image_project",
         title="Wait for Image Project",
         description=(
-            "Poll an image project until it completes, errors, is canceled, or times out. Returns the final "
+            "Poll an image project until it completes, errors, is canceled, or times out. "
+            "After a timeout, resume with the same id; do not create another generation. Returns the final "
             "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
@@ -242,7 +243,8 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="wait_for_audio_project",
         title="Wait for Audio Project",
         description=(
-            "Poll an audio project until it completes, errors, is canceled, or times out. Returns the final "
+            "Poll an audio project until it completes, errors, is canceled, or times out. "
+            "After a timeout, resume with the same id; do not create another generation. Returns the final "
             "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
