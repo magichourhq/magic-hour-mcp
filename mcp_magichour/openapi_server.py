@@ -52,7 +52,8 @@ FAVICON_PATH = Path(__file__).with_name("favicon.ico")
 API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0)
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
-DEFAULT_MEDIA_FETCH_MAX_BYTES = 15 * 1024 * 1024
+# Leave room for base64 expansion and metadata below client response limits.
+DEFAULT_MEDIA_FETCH_MAX_BYTES = 8 * 1024 * 1024
 MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_VERSION = "0.1.0"
 MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
@@ -83,7 +84,8 @@ MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
     "Returns sanitized download fields. Use `exact_download_urls[n]` or `downloads[n].url` exactly as returned; "
-    "do not shorten it, remove query parameters, or append expiration metadata."
+    "do not shorten it, remove query parameters, or append expiration metadata. "
+    "Inline previews share an 8 MiB limit; all download URLs remain available."
 )
 
 
@@ -286,7 +288,8 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
     description = (
         f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as "
         f"{content_kind} for compatible clients. Pass the exact full signed URL from "
-        "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL."
+        "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL. "
+        "Inline media is capped at 8 MiB; use the signed URL directly for larger downloads."
     )
 
     @mcp.tool(
@@ -360,6 +363,7 @@ async def _wait_for_project_result(
 async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:
     if max_bytes <= 0:
         raise ValueError("max_bytes must be greater than 0.")
+    max_bytes = min(max_bytes, DEFAULT_MEDIA_FETCH_MAX_BYTES)
     parsed_url = urlparse(download_url)
     if parsed_url.scheme != "https" or parsed_url.hostname != urlparse(MCP_APP_MEDIA_ORIGIN).hostname:
         raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
@@ -413,12 +417,19 @@ async def _project_to_tool_result(
     if status == "complete" and _can_inline_media(project_type, include_inline_downloads, max_inline_downloads):
         media_project_type = project_type
         assert media_project_type in {"image", "audio"}
+        remaining_inline_bytes = DEFAULT_MEDIA_FETCH_MAX_BYTES
         for index, download_url in enumerate(download_urls[:max_inline_downloads], start=1):
+            if remaining_inline_bytes <= 0:
+                content.append(TextContent(
+                    type="text",
+                    text="Inline preview limit reached. Use exact_download_urls for the remaining outputs.",
+                ))
+                break
             try:
                 data, mime_type = await _fetch_media_bytes(
                     download_url,
                     expected_prefix=f"{media_project_type}/",
-                    max_bytes=max_bytes_per_download,
+                    max_bytes=min(max_bytes_per_download, remaining_inline_bytes),
                 )
             except Exception as exc:
                 if distinct_id is not None:
@@ -439,6 +450,7 @@ async def _project_to_tool_result(
                 )
                 continue
 
+            remaining_inline_bytes -= len(data)
             if media_project_type == "image":
                 content.append(_media_content("image", data, mime_type))
             else:
@@ -591,14 +603,17 @@ def _project_download_guidance_text(
 
 
 def _resolve_media_mime_type(download_url: str, header_value: str | None, expected_prefix: str) -> str:
-    if header_value:
-        mime_type = header_value.partition(";")[0].strip().lower()
-        if mime_type.startswith(expected_prefix):
-            return mime_type
-
+    header_type = header_value.partition(";")[0].strip().lower() if header_value else None
     guessed_type, _ = mimetypes.guess_type(urlparse(download_url).path)
-    if guessed_type and guessed_type.startswith(expected_prefix):
-        return guessed_type
+    for mime_type in (header_type, guessed_type):
+        if mime_type and mime_type.startswith(("image/", "audio/", "video/")):
+            if not mime_type.startswith(expected_prefix):
+                actual_type = mime_type.partition("/")[0]
+                raise ValueError(
+                    f"Download is {mime_type}, not {expected_prefix} media. "
+                    f"Use fetch_{actual_type}_download with the same signed URL."
+                )
+            return mime_type
 
     if expected_prefix == "image/":
         return "image/png"
