@@ -84,7 +84,8 @@ MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
     "Returns sanitized download fields. Use `exact_download_urls[n]` or `downloads[n].url` exactly as returned; "
-    "do not shorten it, remove query parameters, or append expiration metadata."
+    "do not shorten it, remove query parameters, or append expiration metadata. "
+    "A timeout is not a failed generation: resume this wait with the same project id; do not create another job."
 )
 
 
@@ -330,8 +331,12 @@ async def _wait_for_project(
         return await asyncio.wait_for(poll(), timeout=timeout_seconds)
     except asyncio.TimeoutError:
         result: dict[str, Any] = {
+            "id": project_id,
             "status": "timeout",
-            "message": f"Timed out waiting for {project_type} project {project_id}.",
+            "message": (
+                f"Timed out waiting for {project_type} project {project_id}. "
+                "Resume waiting with this same id; do not create another generation."
+            ),
         }
         if last_project is not None:
             result["last_project"] = last_project
