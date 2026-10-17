@@ -135,6 +135,12 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
             "`upload_url` outside the generation call, then pass the matching `file_path` into the create tool."
         )
 
+    if method == "POST" and path == "/v1/ai-image-editor":
+        additions.append(
+            "Requires one or more source images in `assets.image_file_paths`. "
+            "For prompt-only creation, use `ai_image_generator_create_image` instead."
+        )
+
     if method == "POST" and path == "/v1/face-detection":
         additions.append(
             "This starts an async face-detection task and returns an `id`. Use the face-detection details "
