@@ -28,16 +28,19 @@ from mcp_magichour.openapi_server import (
 EXPECTED_MCP_SERVER_INSTRUCTIONS = """
 Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
+For workflow selection or commercial integration questions, consult workflow_guide_retrieve for inputs, API availability, documentation URLs and review criteria. The guide does not verify account eligibility.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
+Omit unrequested optional fields only when the endpoint defaults are compatible with the account. Defaults are not universally plan-aware: AI Image Editor with an omitted or default model selects nano-banana, which requires a paid tier.
+For a Free AI Image Editor request, explicitly use model=flux-2-klein, resolution=640px and image_count=1 only when these satisfy the user's requirements. A credit balance does not unlock paid-only models or resolutions.
+After a subscription-tier restriction, do not repeat an unchanged request or assume removing optional fields will fix it. Explain the restriction, preserve explicit model/resolution requirements, and ask before changing them.
 
 For video creation, unless the user requests otherwise:
 
 - Prefer AI Image Editor followed by Image-to-Video.
 - Reuse reference images across scenes for visual consistency.
-- Prefer nano-banana-2-lite for image creation and editing.
-- Prefer ltx-2.3 for Image-to-Video.
-- Add voiceovers using AI Voice Generator when a voiceover would suit the video. Choose the voice that would be the best narrator for this video.
+- When the user asks for an image model recommendation, prefer nano-banana-2-lite only if account support is known; otherwise check account access and tool metadata before recommending a model.
+- When the user asks for an Image-to-Video model recommendation, prefer ltx-2.5.
 - Let the narration finish each sentence. Never cut it off.
 - Use Text-to-Video only when consistency is unimportant.
 - Keep character identity, visual style, color palette, lighting, and aspect ratio consistent across scenes.

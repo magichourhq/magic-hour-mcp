@@ -1,13 +1,116 @@
+import json
 import unittest
+from copy import deepcopy
+from pathlib import Path
+from unittest.mock import patch
+
+import jsonschema
 
 from mcp_magichour.openapi_policies import (
     apply_magic_hour_policies,
     customize_openapi_component,
     normalize_mcp_tool_name,
+    VOICE_PRESET_DESCRIPTION,
 )
 
 
 class OpenApiPolicyTests(unittest.TestCase):
+    def test_likeness_guidance_only_appends_to_target_tool_descriptions(self):
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        original = deepcopy(spec)
+        expected_tools = {
+            "/v1/face-swap": "face_swap_create_video",
+            "/v1/face-swap-photo": "face_swap_photo_create_image",
+            "/v1/head-swap": "head_swap_create_image",
+            "/v1/body-swap": "body_swap_create_image",
+            "/v1/lip-sync": "lip_sync_create_video",
+            "/v1/ai-talking-photo": "ai_talking_photo_create_talking_photo",
+            "/v1/character-replace": "character_replace_create_video",
+            "/v1/ai-clothes-changer": "ai_clothes_changer_create_image",
+        }
+        suffix = (
+            "Use only with the user's own likeness or content they are authorized to use. "
+            "Do not use for impersonation, deception, sexual content, or content involving minors."
+        )
+        with patch("mcp_magichour.openapi_policies.LIKENESS_GENERATION_PATHS", set()):
+            baseline = apply_magic_hour_policies(spec)
+        patched = apply_magic_hour_policies(spec)
+        self.assertEqual(apply_magic_hour_policies(patched), patched)
+        descriptions_restored = deepcopy(patched)
+        for path, tool_name in expected_tools.items():
+            operation = patched["paths"][path]["post"]
+            description = baseline["paths"][path]["post"]["description"]
+            self.assertEqual(operation["operationId"], tool_name)
+            self.assertEqual(operation["description"], f"{suffix}\n\n{description}")
+            descriptions_restored["paths"][path]["post"]["description"] = description
+        self.assertEqual(descriptions_restored, baseline)
+        self.assertEqual(spec, original)
+
+    def test_voice_policy_replaces_synced_enum_copy_and_examples(self):
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
+        schema = operation["requestBody"]["content"]["application/json"]["schema"]
+        voice = schema["properties"]["style"]["properties"]["voice_name"]
+        # Synthetic approvals exercise policy plumbing, not real preset recommendations.
+        approved = ("Test approved preset A", "Test approved preset B")
+        unapproved = "Unapproved upstream preset"
+        voice["enum"].extend([*approved, unapproved])
+        voice["oneOf"] = [{"const": unapproved}]
+        operation["description"] = unapproved
+        operation["summary"] = unapproved
+        operation["x-codeSamples"] = [{"source": unapproved}]
+        schema["examples"] = [{"style": {"voice_name": unapproved}}]
+        schema["properties"]["name"]["default"] = unapproved
+        original = deepcopy(spec)
+        baseline = apply_magic_hour_policies(original)
+
+        with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", approved):
+            patched = apply_magic_hour_policies(spec)
+
+        safe_operation = patched["paths"]["/v1/ai-voice-generator"]["post"]
+        safe_schema = safe_operation["requestBody"]["content"]["application/json"]["schema"]
+        safe_voice = safe_schema["properties"]["style"]["properties"]["voice_name"]
+        self.assertEqual(safe_voice, {
+            "type": "string", "enum": list(approved), "description": VOICE_PRESET_DESCRIPTION,
+        })
+        self.assertNotIn(unapproved, json.dumps(safe_operation))
+        self.assertEqual(spec, original)
+        for name in approved:
+            jsonschema.validate({"style": {"prompt": "Hello", "voice_name": name}}, safe_schema)
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate({"style": {"prompt": "Hello", "voice_name": unapproved}}, safe_schema)
+        for path in spec["paths"]:
+            if path not in {"/v1/ai-voice-generator", "/v1/ai-voice-cloner"}:
+                self.assertEqual(patched["paths"][path], baseline["paths"][path])
+        self.assertNotIn("/v1/ai-voice-cloner", patched["paths"])
+
+    def test_empty_voice_allowlist_removes_both_upstream_voice_paths(self):
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ()):
+            patched = apply_magic_hour_policies(spec)
+        self.assertNotIn("/v1/ai-voice-generator", patched["paths"])
+        self.assertNotIn("/v1/ai-voice-cloner", patched["paths"])
+        self.assertIn("/v1/ai-voice-generator", spec["paths"])
+        self.assertIn("/v1/ai-voice-cloner", spec["paths"])
+
+    def test_sync_cannot_make_voice_selection_optional(self):
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        schema = spec["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        schema.pop("required")
+        schema["properties"]["style"].pop("required")
+        with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ("Test approved preset",)):
+            safe = apply_magic_hour_policies(spec)["paths"]["/v1/ai-voice-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        for arguments in ({}, {"style": {"prompt": "Hello"}}):
+            with self.assertRaises(jsonschema.ValidationError):
+                jsonschema.validate(arguments, safe)
+
+    def test_voice_policy_fails_closed_on_changed_upstream_input_shape(self):
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
+        operation["requestBody"]["content"]["application/json"]["schema"] = {"$ref": "#/components/schemas/NewVoiceInput"}
+        with patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ("Test approved preset",)), self.assertRaises(KeyError):
+            apply_magic_hour_policies(spec)
+
     def test_generation_post_gets_polling_guidance(self):
         spec = {
             "paths": {
