@@ -42,13 +42,13 @@ function safeMediaUrl(value: unknown): string | null {
 }
 
 function projectType(result: Record<string, unknown>, url: string | null): MediaType {
-  if (["image", "video", "audio"].includes(String(result.project_type))) {
-    return result.project_type as MediaType;
-  }
   const path = url ? new URL(url).pathname.toLowerCase() : "";
   if (/\.(png|jpe?g|webp|gif|avif|heic|tiff?)$/.test(path)) return "image";
   if (/\.(mp3|wav|aac|flac|m4a|ogg|opus|weba?)$/.test(path)) return "audio";
   if (/\.(mp4|m4v|mov|webm)$/.test(path)) return "video";
+  if (["image", "video", "audio"].includes(String(result.project_type))) {
+    return result.project_type as MediaType;
+  }
   return "media";
 }
 
