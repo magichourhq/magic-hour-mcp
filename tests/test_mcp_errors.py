@@ -36,6 +36,11 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
                 },
             )
 
+        if not authorized:
+            self.assertEqual(response.status_code, 401)
+            self.assertIn("resource_metadata=", response.headers["www-authenticate"])
+            return response.json()
+
         payload = next(
             line.removeprefix("data: ")
             for line in response.text.splitlines()
@@ -49,17 +54,16 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["error"]["code"], -32602)
         self.assertEqual(payload["error"]["message"], "Unknown tool: 'tool_that_does_not_exist'")
 
-    async def test_unauthenticated_invalid_calls_return_structured_json_rpc_errors(self):
+    async def test_unauthenticated_invalid_calls_require_authentication(self):
         cases = [
             ("tool_that_does_not_exist", {}, "Unknown tool"),
             ("ping", {"unexpected": True}, "Invalid arguments"),
         ]
 
-        for tool, arguments, expected_message in cases:
+        for tool, arguments, _ in cases:
             with self.subTest(tool):
                 payload = await self.call_tool(tool, arguments, authorized=False)
-                self.assertEqual(payload["error"]["code"], -32602)
-                self.assertIn(expected_message, payload["error"]["message"])
+                self.assertEqual(payload, {"error": "unauthorized"})
 
     async def test_bad_arguments_return_structured_json_rpc_errors(self):
         cases = [
