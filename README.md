@@ -1,11 +1,29 @@
 # Magic Hour MCP Server
 
-OpenAPI-backed MCP server for Magic Hour image, video, and audio generation.
+OpenAPI-backed MCP server for Magic Hour image and video generation, with uploads,
+completion waiting and retrieval of existing audio projects.
 
 At startup, this server reads `docs/openapi.json` and builds MCP tools with
 `FastMCP.from_openapi()`. The OpenAPI spec supplies endpoint coverage, while
 Magic Hour MCP policies add agent-facing guidance for async polling, uploads,
 and project downloads.
+
+## Connect an agent
+
+Hosted creation endpoint: **https://mcp.magichour.ai/**
+
+Follow the [client setup guide](https://docs.magichour.ai/integration/model-context-protocol)
+for Claude, Claude Code, Codex CLI or ChatGPT. After connecting, call
+`account_retrieve` to verify API access and inspect the account before generation;
+`ping` alone does not validate the API key.
+
+Try: “Use my portrait to create a cinematic space-pilot still, then animate it
+with a slow camera push. Keep my face consistent, wait for the render and show
+the finished video. Check account eligibility and cost before spending credits.”
+
+Use `workflow_guide_retrieve` for the ordered tool steps and output review.
+For documentation search while coding, use the separate
+[API Docs MCP](https://docs.magichour.ai/integration/api-docs-mcp).
 
 Docs:
 
@@ -72,15 +90,21 @@ MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/late
 
 `workflow_guide_retrieve` accepts `video-face-swap`, `image-editor`, `image-to-video`,
 `video-generator`, `lip-sync`, `ugc-ads`, `talking-photo` or `media-apis`. It returns
-inputs, product and API documentation URLs, exact creation-tool names and review
-criteria. It makes no API request, spends no credits and does not verify account
-access. Like other tools, it requires the existing authentication flow.
+inputs, product and API documentation URLs, exact creation-tool names, ordered
+steps, example requests, follow-up edits and review criteria. It makes no API
+request, spends no credits and does not verify account access. Like other tools, it requires the existing authentication flow.
 
 Clients can also discover the public `magic-hour://workflows/index` resource and
 read `magic-hour://workflows/{workflow}`. UGC uses `ai_ugc_ad_create_video` with a
 prepared image, script and supported duration; image composition is a separate
 Image Editor call. Keep the returned project ID and use `wait_for_video_project`
 to retrieve the finished file.
+
+For example, ask for `image-to-video` to prepare a consistent keyframe, animate it,
+review the finished clip and reuse it for a later edit. The `talking-photo` guide
+requires a portrait and an existing audio file; text alone cannot start that tool.
+Guides describe workflows, not prevalidated generated outputs or account eligibility.
+
 This helps assistants that connect to this server select workflows; it does not
 establish a recommendation or ranking benefit in unconnected consumer assistants.
 
