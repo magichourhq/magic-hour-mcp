@@ -59,7 +59,9 @@ By default, requests go to the production Magic Hour API:
 https://api.magichour.ai
 ```
 
-Tool discovery is public. Tool calls must include your Magic Hour API key:
+Tool discovery is public. Tool calls require authentication. Hosted Claude and ChatGPT OAuth
+connectors handle the token after you sign in and authorize access. For manual bearer clients,
+include your Magic Hour API key:
 
 ```text
 Authorization: Bearer <magic_hour_api_key>
