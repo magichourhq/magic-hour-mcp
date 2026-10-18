@@ -6,15 +6,20 @@ Use this guide if Magic Hour has a hosted MCP endpoint at:
 https://mcp.magichour.ai/
 ```
 
-You do not need this repo. After setup, ask for an image, video, or audio result
-in plain English; the assistant handles the tool calls.
+You do not need this repo. After setup, ask for an image or video result in plain
+English; the assistant handles the tool calls. The hosted server accepts audio
+inputs and retrieves existing audio projects, but does not expose voice generation
+or voice cloning.
 
 ## What you need
 
-- A Magic Hour API key
+- A Magic Hour account for the Claude OAuth connector sign-in flow
+- For the Claude Code and Codex CLI bearer-token setup below, a Magic Hour API key
 - Claude, Claude Code, or Codex CLI
+- Enough credits for the generation you request
 
-Keep your API key private. Real generations can spend Magic Hour credits.
+Claude OAuth users sign in and select **Allow**; no manual key entry is needed.
+Keep API keys private. Real generations spend Magic Hour credits.
 
 ## Connect with Claude
 
