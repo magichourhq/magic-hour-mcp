@@ -62,6 +62,7 @@ MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
 MCP_SERVER_INSTRUCTIONS = """
 Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
+Use a matching exposed estimate tool with the exact planned create body before generating. Resolve blocked/unavailable. Estimates do not authorize spending; honor agreed budgets.
 For workflow selection or commercial integration questions, consult workflow_guide_retrieve for inputs, API availability, documentation URLs and review criteria. The guide does not verify account eligibility.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
