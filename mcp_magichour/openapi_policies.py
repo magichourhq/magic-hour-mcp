@@ -21,6 +21,11 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
 }
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
+GENERATION_ESTIMATE_PATHS = (
+    "/v1/ai-image-generator/estimate",
+    "/v1/ai-image-editor/estimate",
+    "/v1/image-to-video/estimate",
+)
 PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()}
 GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
 
@@ -147,7 +152,15 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
             "endpoint with that id to retrieve detected faces before doing individual face swaps."
         )
 
-    if method == "POST" and asset_type:
+    is_estimate = method == "POST" and path in GENERATION_ESTIMATE_PATHS
+    if is_estimate:
+        additions.append(
+            "Read-only preflight: returns cost and eligibility, not generated media. "
+            "Does not create a project or spend credits. A ready result is a snapshot, not a reservation; "
+            "blocked or unavailable does not authorize generation. No wait or polling tool is needed."
+        )
+
+    if method == "POST" and asset_type and not is_estimate:
         wait_tool = PROJECT_WAIT_TOOL_BY_ASSET[asset_type]
         additions.append(
             f"Starts an async {asset_type} job; returns `id` and `credits_charged`. "
@@ -170,8 +183,13 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if _operation_mentions_file_path(operation):
         additions.append(
             "For `*_file_path`, use an existing Magic Hour path or the upload-URL endpoint's `file_path` "
-            "after uploading raw bytes to its presigned URL. Direct public media URLs may work if stable "
-            "and fetchable as raw bytes; hotlinked URLs can fail. Prefer the upload-URL endpoint when unsure."
+            "after uploading raw bytes to its presigned URL. "
+            + (
+                "An unavailable input check is not approval to generate."
+                if is_estimate
+                else "Direct public media URLs may work if stable and fetchable as raw bytes; "
+                "hotlinked URLs can fail. Prefer the upload-URL endpoint when unsure."
+            )
         )
 
     if additions:
@@ -207,21 +225,25 @@ def customize_openapi_component(route: Any, component: Any) -> None:
     method = str(getattr(route, "method", "")).upper()
     path = str(getattr(route, "path", ""))
     route_tags = set(getattr(route, "tags", []) or [])
+    is_estimate = method == "POST" and path in GENERATION_ESTIMATE_PATHS
 
     if isinstance(component, Tool):
-        read_only = method == "GET"
+        read_only = method == "GET" or is_estimate
         component.title = getattr(route, "summary", None) or component.name
         component.annotations = ToolAnnotations(
             title=component.title,
             readOnlyHint=read_only,
+            idempotentHint=True if is_estimate else None,
             # Only project deletion removes data; generation creates new projects.
             destructiveHint=method == "DELETE",
             openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL|searchWeb\b", repr(component.parameters))),
         )
 
-    if method == "POST":
+    if is_estimate:
+        tags.add("read-operation")
+    elif method == "POST":
         tags.add("write-operation")
     if path == "/v1/files/upload-urls":
         tags.add("upload")
-    if route_tags.intersection(PROJECT_TAG_TO_ASSET):
+    if route_tags.intersection(PROJECT_TAG_TO_ASSET) and not is_estimate:
         tags.add("generation")

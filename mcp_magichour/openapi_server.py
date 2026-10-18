@@ -5,6 +5,7 @@ import json
 import math
 import mimetypes
 import os
+import re
 from base64 import b64encode
 from pathlib import Path
 from typing import Any, Literal
@@ -28,7 +29,7 @@ from .app_events import app_events
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
-from .openapi_policies import apply_magic_hour_policies, customize_openapi_component
+from .openapi_policies import GENERATION_ESTIMATE_PATHS, apply_magic_hour_policies, customize_openapi_component
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
@@ -61,6 +62,7 @@ MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
 MCP_SERVER_INSTRUCTIONS = """
 Create and edit images, video, and audio with Magic Hour.
 Tool calls require authentication.
+Use a matching exposed estimate tool with the exact planned create body before generating. Resolve blocked/unavailable. Estimates do not authorize spending; honor agreed budgets.
 For workflow selection or commercial integration questions, consult workflow_guide_retrieve for inputs, API availability, documentation URLs and review criteria. The guide does not verify account eligibility.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
@@ -116,6 +118,10 @@ def create_mcp() -> FastMCP:
         version=MCP_SERVER_VERSION,
         instructions=MCP_SERVER_INSTRUCTIONS,
         route_maps=[
+            *[
+                RouteMap(methods=["POST"], pattern=f"^{re.escape(path)}$", mcp_type=MCPType.TOOL, mcp_tags={"read-operation"})
+                for path in GENERATION_ESTIMATE_PATHS
+            ],
             RouteMap(methods=["POST"], pattern=r".*", mcp_type=MCPType.TOOL, mcp_tags={"write-operation"}),
             RouteMap(pattern=r".*", mcp_type=MCPType.TOOL),
         ],
