@@ -25,6 +25,7 @@ GENERATION_ESTIMATE_PATHS = (
     "/v1/ai-image-generator/estimate",
     "/v1/ai-image-editor/estimate",
     "/v1/image-to-video/estimate",
+    "/v1/text-to-video/estimate",
 )
 PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()}
 GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
