@@ -60,10 +60,10 @@ MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_VERSION = "0.1.0"
 MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
 MCP_SERVER_INSTRUCTIONS = """
-Create and edit images, video, and audio with Magic Hour.
+Create and edit images and video; retrieve existing audio projects. Audio generation is unavailable.
 Tool calls require authentication.
-Use a matching exposed estimate tool with the exact planned create body before generating. Resolve blocked/unavailable. Estimates do not authorize spending; honor agreed budgets.
-For workflow selection or commercial integration questions, consult workflow_guide_retrieve for inputs, API availability, documentation URLs and review criteria. The guide does not verify account eligibility.
+When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. Without one, report the unavailable quote and obtain an explicit credit budget before generating. Estimates never authorize spending.
+Use workflow_guide_retrieve for inputs, API availability, docs and review; it does not check account eligibility.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
 Omit unrequested optional fields only when the endpoint defaults are compatible with the account. Defaults are not universally plan-aware: AI Image Editor with an omitted or default model selects nano-banana, which requires a paid tier.
@@ -82,7 +82,7 @@ For video creation, unless the user requests otherwise:
   """.strip()
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
-MCP_SERVER_DESCRIPTION = "Create and edit images, video, and audio with Magic Hour."
+MCP_SERVER_DESCRIPTION = "Create and edit images and video; retrieve existing audio projects. Audio generation is unavailable."
 MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 SIGNED_DOWNLOAD_GUIDANCE = (
