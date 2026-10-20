@@ -26,9 +26,10 @@ from mcp_magichour.openapi_server import (
 )
 
 EXPECTED_MCP_SERVER_INSTRUCTIONS = """
-Create and edit images, video, and audio with Magic Hour.
+Create and edit images and video; retrieve existing audio projects. Audio generation is unavailable.
 Tool calls require authentication.
-For workflow selection or commercial integration questions, consult workflow_guide_retrieve for inputs, API availability, documentation URLs and review criteria. The guide does not verify account eligibility.
+When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. Without one, report the unavailable quote and obtain an explicit credit budget before generating. Estimates never authorize spending.
+Use workflow_guide_retrieve for inputs, API availability, docs and review; it does not check account eligibility.
 Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
 Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
 Omit unrequested optional fields only when the endpoint defaults are compatible with the account. Defaults are not universally plan-aware: AI Image Editor with an omitted or default model selects nano-banana, which requires a paid tier.
@@ -64,6 +65,36 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             headers={"Accept": "application/json, text/event-stream"},
         ) as client:
             await self.assert_discovery_and_auth(client)
+
+    async def test_initialize_reports_unavailable_audio_and_quotes(self):
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example",
+            headers={"Accept": "application/json, text/event-stream"},
+        ) as client:
+            initialized = await client.post("/", json={
+                "jsonrpc": "2.0", "id": 1, "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18", "capabilities": {},
+                    "clientInfo": {"name": "capability-regression", "version": "1"},
+                },
+            })
+            listed = await client.post("/", json={
+                "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {},
+            })
+            card = await client.get(MCP_SERVER_CARD_PATH)
+
+        names = {tool["name"] for tool in self.result(listed)["tools"]}
+        self.assertNotIn("ai_voice_generator_create_audio", names)
+        self.assertNotIn("ai_voice_cloner_create_audio", names)
+        instructions = self.result(initialized)["instructions"]
+        for copy in (instructions, card.json()["description"]):
+            self.assertIn("Audio generation is unavailable", copy)
+            self.assertIn("retrieve existing audio projects", copy)
+        self.assertIn("When exposed, use a matching estimate with the exact create body", instructions)
+        self.assertIn("resolve blocked/unavailable", instructions)
+        self.assertIn("Without one, report the unavailable quote and obtain an explicit credit budget before generating", instructions)
+        self.assertIn("Estimates never authorize spending", instructions)
 
     async def test_mcp_app_http_view_is_public_with_scoped_csp(self):
         async with app.router.lifespan_context(app), httpx.AsyncClient(
