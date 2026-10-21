@@ -63,22 +63,24 @@ MCP_SERVER_INSTRUCTIONS = """
 Create and edit images and video; retrieve existing audio projects. Audio generation is unavailable.
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. Without one, report the unavailable quote and obtain an explicit credit budget before generating. Estimates never authorize spending.
-Use workflow_guide_retrieve for inputs, API availability, docs and review; it does not check account eligibility.
-Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
-Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
-Omit unrequested optional fields only when the endpoint defaults are compatible with the account. Defaults are not universally plan-aware: AI Image Editor with an omitted or default model selects nano-banana, which requires a paid tier.
-For a Free AI Image Editor request, explicitly use model=flux-2-klein, resolution=640px and image_count=1 only when these satisfy the user's requirements. A credit balance does not unlock paid-only models or resolutions.
-After a subscription-tier restriction, do not repeat an unchanged request or assume removing optional fields will fix it. Explain the restriction, preserve explicit model/resolution requirements, and ask before changing them.
+workflow_guide_retrieve gives static inputs/docs/review, not account eligibility.
+After creation, use matching wait_for_*_project with the returned id.
+Upload local bytes before using file_path; preserve exact signed download URLs.
+Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
+On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
+On tier restrictions, explain the block; never retry unchanged or blindly remove fields. Ask before changing explicit model/resolution requirements.
 
-For video creation, unless the user requests otherwise:
+Choose video from inputs:
 
-- Prefer AI Image Editor followed by Image-to-Video.
-- Reuse reference images across scenes for visual consistency.
-- When the user asks for an image model recommendation, prefer nano-banana-2-lite only if account support is known; otherwise check account access and tool metadata before recommending a model.
-- When the user asks for an Image-to-Video model recommendation, prefer ltx-2.5.
-- Let the narration finish each sentence. Never cut it off.
-- Use Text-to-Video only when consistency is unimportant.
-- Keep character identity, visual style, color palette, lighting, and aspect ratio consistent across scenes.
+- Approved image -> image_to_video_create_video directly; edit only for a requested visual change or a source problem that prevents the shot.
+- Still portrait + audio -> ai_talking_photo_create_talking_photo; text alone is not audio.
+- Existing video + replacement audio -> lip_sync_create_video.
+- Preserve an explicitly requested alternative provider.
+- For image model recommendations, prefer nano-banana-2-lite only with verified account support; otherwise check eligibility.
+- For Image-to-Video model recommendations, prefer ltx-2.5 when compatible with the task and account.
+- Include complete spoken sentences.
+- Use Text-to-Video when no supplied starting image is required.
+- Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
   """.strip()
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
