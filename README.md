@@ -102,8 +102,9 @@ prepared image, script and supported duration; image composition is a separate
 Image Editor call. Keep the returned project ID and use `wait_for_video_project`
 to retrieve the finished file.
 
-For example, ask for `image-to-video` to prepare a consistent keyframe, animate it,
-review the finished clip and reuse it for a later edit. The `talking-photo` guide
+For example, ask for `image-to-video` to animate an approved product photo directly,
+review the finished clip and reuse it for a later edit. Edit the still only when
+the requested appearance must change or a source problem prevents the shot. The `talking-photo` guide
 requires a portrait and an existing audio file; text alone cannot start that tool.
 Guides describe workflows, not prevalidated generated outputs or account eligibility.
 

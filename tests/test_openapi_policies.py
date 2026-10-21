@@ -15,6 +15,28 @@ from mcp_magichour.openapi_policies import (
 
 
 class OpenApiPolicyTests(unittest.TestCase):
+    def test_task_metadata_preserves_tool_names_and_api_contracts(self):
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        with patch("mcp_magichour.openapi_policies.GENERATION_TOOL_METADATA", {}):
+            baseline = apply_magic_hour_policies(spec)
+        updated = apply_magic_hour_policies(spec)
+        # Metadata must not alter input/output schemas, tool identifiers, API
+        # parameters, or any unrelated operation as the upstream spec evolves.
+        for path in baseline["paths"]:
+            for method, operation in baseline["paths"][path].items():
+                actual = deepcopy(updated["paths"][path][method])
+                if method == "post" and path in {
+                    "/v1/image-to-video", "/v1/text-to-video", "/v1/ai-image-editor",
+                    "/v1/ai-talking-photo", "/v1/lip-sync",
+                }:
+                    for field in ("summary", "description"):
+                        if field in operation:
+                            actual[field] = operation[field]
+                        else:
+                            actual.pop(field, None)
+                self.assertEqual(actual, operation, f"{method} {path}")
+        self.assertEqual(apply_magic_hour_policies(updated), updated)
+
     def test_likeness_guidance_only_appends_to_target_tool_descriptions(self):
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         original = deepcopy(spec)

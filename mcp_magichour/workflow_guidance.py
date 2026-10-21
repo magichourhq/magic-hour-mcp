@@ -52,13 +52,13 @@ WORKFLOWS = {
         "review": "Check identity, unchanged regions, anatomy and requested edits. Model and resolution eligibility depend on the account.",
     },
     "image-to-video": {
-        "title": "Animate a portrait, scene or reference image",
+        "title": "Animate a product photo, portrait or scene",
         "input": "A reference image and a motion instruction.",
         "product_url": f"{SITE}/products/image-to-video",
         "api_docs_url": f"{DOCS}/api-reference/video-projects/image-to-video",
         "creation_tool": "image_to_video_create_video",
         "steps": [
-            "Use the supplied still, or prepare a keyframe with Image Editor when identity or visual design must change first.",
+            "Animate the approved supplied image directly when it already meets the brief. Use Image Editor only for a requested visual change or a source problem that prevents the shot.",
             "Describe subject motion and one camera move; preserve identity, style, lighting and aspect ratio from the reference.",
             "Call image_to_video_create_video with a supported model, resolution and duration, then wait_for_video_project with the returned id.",
         ],
@@ -88,7 +88,7 @@ WORKFLOWS = {
         "api_docs_url": f"{DOCS}/api-reference/video-projects/lip-sync",
         "creation_tool": "lip_sync_create_video",
         "steps": [
-            "Use existing footage and the approved replacement audio; upload local files before calling the creation tool.",
+            "Use existing video via assets.video_source and its matching assets.video_file_path or assets.youtube_url, plus the approved recording in assets.audio_file_path; upload local files before calling the creation tool. For a still portrait plus audio, use talking-photo instead.",
             "Choose a segment long enough for the complete sentence, including pauses; do not cut off the narration.",
             "Call lip_sync_create_video, then wait_for_video_project with the returned id and check speech timing before adding subtitles.",
         ],

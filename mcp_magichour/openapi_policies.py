@@ -20,6 +20,48 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
     "audio": "wait_for_audio_project",
 }
 
+# Synced boilerplate can mix inputs/options from different endpoints. Keep the
+# task descriptions specific while preserving upstream schemas and tool names.
+GENERATION_TOOL_METADATA = {
+    "/v1/image-to-video": (
+        "Animate a supplied image into video",
+        "Animate a supplied product photo, portrait or scene. Requires `assets.image_file_path` "
+        "and `end_seconds`. Use the approved image directly; edit only for a requested visual "
+        "change or a source problem that prevents the shot. Prompt for motion while preserving "
+        "the supplied appearance. Model, duration, resolution and audio support vary. Generation "
+        "consumes credits; the queued video charge is an estimate, with the final charge available "
+        "on the completed project.",
+    ),
+    "/v1/text-to-video": (
+        "Generate video from text",
+        "Generate a new scene from `style.prompt` and `end_seconds` when no supplied starting image is required. "
+        "To animate an approved product photo or portrait, use `image_to_video_create_video` instead.",
+    ),
+    "/v1/ai-talking-photo": (
+        "Make a still portrait speak from audio",
+        "Requires a still portrait in `assets.image_file_path` and an existing recording in "
+        "`assets.audio_file_path`, plus `start_seconds` and `end_seconds`. Text alone is not "
+        "accepted; this tool does not synthesize speech. For existing video plus replacement "
+        "audio, use `lip_sync_create_video` instead.",
+    ),
+    "/v1/lip-sync": (
+        "Lip-sync existing video to replacement audio",
+        "Match existing video to replacement audio. Requires `assets.audio_file_path`, "
+        "`assets.video_source` and its matching `assets.video_file_path` or `assets.youtube_url`, "
+        "plus `start_seconds` and `end_seconds`. For a still portrait plus audio, use "
+        "`ai_talking_photo_create_talking_photo`. Text alone is not an audio input. Generation "
+        "consumes credits; the queued video charge is an estimate, with the final charge available "
+        "on the completed project.",
+    ),
+    "/v1/ai-image-editor": (
+        "Edit supplied images",
+        "Edit supplied images using `assets.image_file_paths` and `style.prompt`. For prompt-only "
+        "creation use `ai_image_generator_create_image`. Editing is not a required preparation "
+        "step before image-to-video when the approved source already meets the brief. Check model "
+        "eligibility: the omitted/default model is not universally available on Free.",
+    ),
+}
+
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 GENERATION_ESTIMATE_PATHS = (
     "/v1/ai-image-generator/estimate",
@@ -132,6 +174,9 @@ def normalize_mcp_tool_name(operation_id: str) -> str:
 def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]) -> None:
     tags = set(operation.get("tags") or [])
     additions: list[str] = []
+
+    if method == "POST" and path in GENERATION_TOOL_METADATA:
+        operation["summary"], operation["description"] = GENERATION_TOOL_METADATA[path]
 
     asset_type = next((asset for tag, asset in PROJECT_TAG_TO_ASSET.items() if tag in tags), None)
 
