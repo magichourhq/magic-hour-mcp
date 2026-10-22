@@ -32,6 +32,18 @@ GENERATION_TOOL_METADATA = {
         "consumes credits; the queued video charge is an estimate, with the final charge available "
         "on the completed project.",
     ),
+    "/v1/video-to-video": (
+        "Restyle an existing video segment",
+        (
+            "Restyle an existing video segment with an art-style preset or a custom prompt. "
+            "Requires `assets.video_source` with its matching `assets.video_file_path` or "
+            "`assets.youtube_url`, `start_seconds`, `end_seconds` and `style.art_style`. "
+            "For a custom prompt, set `style.prompt_type` to `custom` or `append_default` "
+            "and provide `style.prompt`; with `default`, the supplied prompt is ignored. "
+            "This API supports v1/v2 presets, not v3. Generation consumes credits; the queued "
+            "video charge is an estimate, with the final charge available on the completed project."
+        ),
+    ),
     "/v1/text-to-video": (
         "Generate video from text",
         "Generate a new scene from `style.prompt` and `end_seconds` when no supplied starting image is required. "
