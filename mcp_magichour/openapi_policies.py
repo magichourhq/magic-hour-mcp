@@ -60,6 +60,22 @@ GENERATION_TOOL_METADATA = {
         "step before image-to-video when the approved source already meets the brief. Check model "
         "eligibility: the omitted/default model is not universally available on Free.",
     ),
+    "/v1/face-swap": (
+        "Swap faces in an existing video",
+        "Requires `start_seconds`, `end_seconds` and `assets.video_source` with its matching "
+        "`assets.video_file_path` or `assets.youtube_url`. Use `assets.image_file_path` for "
+        "all-faces mode, or `assets.face_mappings` for individual-faces mode after face detection. "
+        "Generation consumes credits; the queued video charge is an estimate, with the final "
+        "charge available on the completed project.",
+    ),
+    "/v1/character-replace": (
+        "Replace or animate a character using video and a reference image",
+        "Replace a video subject or transfer video motion onto a reference character image. "
+        "Requires `assets.video_file_path`, `assets.image_file_path` and `end_seconds`. "
+        "Model support controls duration, resolution and subject selection; see parameter schemas. "
+        "Generation consumes credits; the queued video charge is an estimate, with the final "
+        "charge available on the completed project.",
+    ),
 }
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
