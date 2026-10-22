@@ -84,6 +84,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/ai-ugc-ad` | Video Projects | AI UGC Ad Generator |
 | POST | `/v1/ai-video-editor` | Video Projects | AI Video Editor |
 | POST | `/v1/ai-video-translator` | Video Projects | AI Video Translator |
+| POST | `/v1/ai-video-upscaler` | Video Projects | AI Video Upscaler |
 | POST | `/v1/animation` | Video Projects | Animation |
 | POST | `/v1/audio-to-video` | Video Projects | Audio-to-Video |
 | POST | `/v1/auto-subtitle-generator` | Video Projects | Auto Subtitle Generator |
@@ -111,6 +112,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | GET | `/v1/image-projects/{id}` | Image Projects | Get image details |
 | DELETE | `/v1/image-projects/{id}` | Image Projects | Delete image |
 | POST | `/v1/photo-colorizer` | Image Projects | Photo Colorizer |
+| POST | `/v1/ai-music-generator` | Audio Projects | AI Music Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
 | GET | `/v1/account` | Account | Get account details |
@@ -216,7 +218,7 @@ AI Talking Photo
 - `style` (object, optional): Attributes used to dictate the style of the output
   - `generation_mode` (string, optional) enum=['realistic', 'prompted', 'pro', 'standard', 'stable', 'expressive'] default=realistic: Controls overall motion style. * `realistic` - Maintains likeness well, high quality, and reliable. * `prompted` - Slightly lower likeness; allows option to prompt scene.
   - `prompt` (string, optional): A text prompt to guide the generation. Only applicable when generation_mode is `prompted`. This field is ignored for other modes.
-- `max_resolution` (integer, optional): Constrains the larger dimension (height or width) of the output video. Allows you to set a lower resolution than your plan's maximum if desired. The value is capped by your plan's max resolution.
+- `resolution` (string, optional) enum=['480p', '720p']: Output preset. Overrides `max_resolution`. Defaults to 480p in prompted mode; realistic mode uses the mapped plan maximum.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -231,14 +233,13 @@ AI UGC Ad Generator
 **Request Body:**
 - `assets` (object, required):
   - `image_file_path` (string, required): Prepared image to animate. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
-- `script` (string, required): The words the actor should speak. Character limits apply after trimming: * kling-3.0: 2500 characters. * ltx-2.5: 1981 characters. * veo3.1: 2500 characters. LTX's dialogue wrapper counts toward its model prompt limit.
+- `script` (string, required): The words the actor should speak. Character limits apply after trimming: * kling-3.0: 2500 characters. * ltx-2.5: 1804 characters. * veo3.1: 2500 characters. LTX's dialogue wrapper counts toward its model prompt limit.
 - `end_seconds` (number, required) range=[1,None]: Video duration in seconds. Supported values by model: * kling-3.0: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 seconds. * ltx-2.5: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 seconds. * veo3.1:...
 - `model` (string, optional) enum=['kling-3.0', 'ltx-2.5', 'veo3.1']: Defaults to kling-3.0 on paid plans and ltx-2.5 on free plans.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p']: Defaults to 720p on paid plans and 480p on free plans. Unsupported model/resolution combinations and resolutions unavailable for your plan are rejected.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
-- `estimated_frame_cost` (integer, required): Deprecated: Previously represented the number of frames (original name of our credit system) used for video generation. Use 'credits_charged' instead.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
 
 #### POST /v1/ai-video-editor
@@ -276,6 +277,24 @@ AI Video Translator
 - `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output video resolution. Defaults to 480p. 720p and 1080p require a paid plan.
 - `assets` (object, required): Source video for the translation job.
   - `video_file_path` (string, required): Source video containing the speech to translate. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+
+**Response 200:**
+- `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
+
+#### POST /v1/ai-video-upscaler
+`operationId: aiVideoUpscaler.createVideo`
+
+AI Video Upscaler
+
+
+**Request Body:**
+- `name` (string, optional) default=Video Upscaler - dateTime: Give your video a custom name for easy identification.
+- `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
+- `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
+- `resolution` (string, required) enum=['720p', '1080p', '2k', '4k']: Output resolution. `720p` and `1080p` set the output's short side, `2k` and `4k` its long side; the aspect ratio is kept. Requires a paid plan.
+- `assets` (object, required): Source video for the upscale job.
+  - `video_file_path` (string, required): Video to upscale. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -424,7 +443,7 @@ Image-to-Video
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `model` (string, optional) enum=[22 values, e.g. ['default', 'kling-3.0', 'ltx-2.5', 'seedance-2.0-mini', 'wan-3.0', 'seedance-2.5'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[23 values, e.g. ['default', 'minimax-h3', 'kling-3.0', 'ltx-2.5', 'wan-2.2', 'seedance-2.5'], ...] default=default: The AI model to use for video generation.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
@@ -469,9 +488,9 @@ Text-to-Video
 **Request Body:**
 - `name` (string, optional) default=Text To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
+- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Provide `aspect_ratio` to set the video’s aspect ratio. Determines the aspect ratio of the output video.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
-- `model` (string, optional) enum=[22 values, e.g. ['default', 'kling-3.0', 'ltx-2.5', 'seedance-2.0-mini', 'wan-3.0', 'seedance-2.5'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[23 values, e.g. ['default', 'minimax-h3', 'kling-3.0', 'ltx-2.5', 'wan-2.2', 'seedance-2.5'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required):
   - `prompt` (string, required): The prompt used for the video.
@@ -640,7 +659,7 @@ AI Image Editor
 **Request Body:**
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
-- `model` (string, optional) enum=[15 values, e.g. ['default', 'qwen-image-2.1', 'qwen-edit', 'flux-2-klein', 'nano-banana-2-lite', 'nano-banana-2'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[15 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'nano-banana-2', 'flux-2-klein', 'nano-banana-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required):
@@ -662,7 +681,7 @@ AI Image Generator
 **Request Body:**
 - `name` (string, optional) default=Ai Image - dateTime: Give your image a custom name for easy identification.
 - `image_count` (integer, required) range=[1,16]: Number of images to generate. Maximum varies by model.
-- `model` (string, optional) enum=[16 values, e.g. ['default', 'z-image-turbo', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2-lite', 'nano-banana-2'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[16 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): The art style to use for image generation.
@@ -846,6 +865,24 @@ Photo Colorizer
 
 ### Audio projects
 
+
+#### POST /v1/ai-music-generator
+`operationId: aiMusicGenerator.createAudio`
+
+AI Music Generator
+
+
+**Request Body:**
+- `name` (string, optional) default=AI Music Generator: Give your audio a custom name for easy identification.
+- `duration` (integer, required) range=[15,300]: Requested track duration in seconds, from 15 to 300. Determines credits charged.
+- `style` (object, required):
+  - `prompt` (string, required): Describe the song, including genre, mood, and instruments.
+  - `instrumental` (boolean, optional) default=False: Generate music without vocals. When true, lyrics is ignored.
+  - `lyrics` (string, optional): Custom lyrics. Omit or leave blank for AI-generated lyrics when instrumental is false.
+
+**Response 200:**
+- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
 
 #### GET /v1/audio-projects/{id}
 `operationId: audioProjects.getDetails`
