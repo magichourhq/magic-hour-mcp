@@ -26,8 +26,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Install project
         run: python -m pip install -e .
+
+      - name: Build MCP App frontend
+        run: npm --prefix web ci && npm --prefix web run build
 
       - name: Fetch OpenAPI spec
         run: |

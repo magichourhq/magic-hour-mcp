@@ -61,6 +61,33 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(tool=tool.name):
                 self.assertLessEqual(len((tool.description or "").encode("utf-8")), 2048)
 
+    async def test_synced_likeness_descriptions_fit_client_budget(self):
+        from mcp_magichour.openapi_policies import LIKENESS_USAGE_GUIDANCE
+
+        spec = load_openapi_spec()
+        paths = ("/v1/face-swap", "/v1/character-replace")
+        for path in paths:
+            spec["paths"][path]["post"]["description"] = "Upstream boilerplate. " * 200
+
+        async with httpx.AsyncClient() as client:
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ):
+                synced_mcp = create_mcp()
+            async with Client(synced_mcp) as caller:
+                tools = {tool.name: tool for tool in await caller.list_tools()}
+
+        for name in ("face_swap_create_video", "character_replace_create_video"):
+            with self.subTest(tool=name):
+                description = tools[name].description
+                self.assertLessEqual(len(description.encode("utf-8")), 2048)
+                self.assertIn(LIKENESS_USAGE_GUIDANCE, description)
+                self.assertIn("wait_for_video_project", description)
+                self.assertIn("upload-URL endpoint", description)
+                self.assertIn("exact_download_urls", description)
+                self.assertIn("estimate", description)
+                self.assertIn("final charge", description)
+
     async def test_runtime_schema_excludes_unapproved_voice_tools_and_names(self):
         async with httpx.AsyncClient() as client:
             with patch("mcp_magichour.openapi_server.build_api_client", return_value=client), patch(
