@@ -42,7 +42,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(label, str)
                 self.assertTrue(label.strip())
                 self.assertLessEqual(len(label), 64)
-                self.assertEqual(label, meta[f"openai/toolInvocation/{state}"])
+                self.assertNotIn(f"openai/toolInvocation/{state}", meta)
         resource = next(r for r in resources if str(r.uri) == MCP_APP_VIEW_URI)
         self.assertEqual(resource.mimeType, MCP_APP_MIME_TYPE)
         self.assertTrue(resource.description)
