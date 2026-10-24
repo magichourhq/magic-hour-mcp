@@ -89,7 +89,7 @@ Install the cookbook and choose your agent:
 npx skills add magichourhq/skills --skill '*'
 ```
 
-For controlled product or character animation, create or edit the still image first, fix composition and identity issues there, then use that approved image as the image-to-video start frame. Prompt the video step mainly for motion, camera movement, timing, and what must stay fixed.
+For product or character animation, use an approved supplied still directly as the image-to-video start frame. Create or edit a still first only when its appearance must change or a source problem prevents the requested shot. Prompt the video step for motion, camera movement, timing, and what must stay fixed.
 
 ## Prompt cookbook
 

@@ -33,6 +33,14 @@ Docs:
 - `docs/detailed-step-by-step-integration.md` - full backend integration guide
 - `docs/api-reference.md` - generated API reference
 
+## Credits and data
+
+MCP generations use Magic Hour account credits. You can buy a [one-time credit pack](https://magichour.ai/pricing) without a subscription; unused credits never expire. Packs include applicable watermark-free exports and commercial use, subject to the [Terms](https://magichour.ai/terms-of-service) and rights in your source content. They do not unlock subscription-only model or resolution access.
+
+Technical failures generally return credits after processing; completed but unsatisfactory results do not automatically return credits. A wait timeout is not proof of project failure—resume with the existing project ID. Payment refunds follow the separate [refund policy](https://magichour.ai/refund-policy).
+
+[Trust & Data Use](https://magichour.ai/trust) explains Magic Hour's no-training policy for customer prompts, uploads and outputs, and feature-dependent retention.
+
 ## Setup
 
 ```sh
