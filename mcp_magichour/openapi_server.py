@@ -183,13 +183,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
             f"{SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         meta={
-            # Nested form for compatibility checks; flat keys for ChatGPT status labels.
             "openai/toolInvocation": {
                 "invoking": "Checking video project…",
                 "invoked": "Video project status retrieved",
             },
-            "openai/toolInvocation/invoking": "Checking video project…",
-            "openai/toolInvocation/invoked": "Video project status retrieved",
         },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
         annotations=ToolAnnotations(title="Wait for Video Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
@@ -220,13 +217,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         meta={
-            # Nested form for compatibility checks; flat keys for ChatGPT status labels.
             "openai/toolInvocation": {
                 "invoking": "Checking image project…",
                 "invoked": "Image project status retrieved",
             },
-            "openai/toolInvocation/invoking": "Checking image project…",
-            "openai/toolInvocation/invoked": "Image project status retrieved",
         },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
         annotations=ToolAnnotations(title="Wait for Image Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
@@ -259,13 +253,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
             f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
         ),
         meta={
-            # Nested form for compatibility checks; flat keys for ChatGPT status labels.
             "openai/toolInvocation": {
                 "invoking": "Checking audio project…",
                 "invoked": "Audio project status retrieved",
             },
-            "openai/toolInvocation/invoking": "Checking audio project…",
-            "openai/toolInvocation/invoked": "Audio project status retrieved",
         },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
         annotations=ToolAnnotations(title="Wait for Audio Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
