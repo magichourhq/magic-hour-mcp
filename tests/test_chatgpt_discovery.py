@@ -26,7 +26,7 @@ from mcp_magichour.openapi_server import (
 )
 
 EXPECTED_MCP_SERVER_INSTRUCTIONS = """
-Create and edit images and video; retrieve existing audio projects. Audio generation is unavailable.
+Create and edit images and video, generate music, and retrieve existing audio projects.
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. Without one, report the unavailable quote and obtain an explicit credit budget before generating. Estimates never authorize spending.
 workflow_guide_retrieve gives static inputs/docs/review, not account eligibility.
@@ -91,7 +91,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("ai_voice_cloner_create_audio", names)
         instructions = self.result(initialized)["instructions"]
         for copy in (instructions, card.json()["description"]):
-            self.assertIn("Audio generation is unavailable", copy)
+            self.assertIn("generate music", copy)
             self.assertIn("retrieve existing audio projects", copy)
         self.assertIn("When exposed, use a matching estimate with the exact create body", instructions)
         self.assertIn("resolve blocked/unavailable", instructions)

@@ -26,7 +26,7 @@ class OpenApiPolicyTests(unittest.TestCase):
             for method, operation in baseline["paths"][path].items():
                 actual = deepcopy(updated["paths"][path][method])
                 if method == "post" and path in {
-                    "/v1/image-to-video", "/v1/text-to-video", "/v1/ai-image-editor",
+                    "/v1/image-to-video", "/v1/text-to-video", "/v1/video-to-video", "/v1/ai-image-editor",
                     "/v1/ai-talking-photo", "/v1/lip-sync",
                     "/v1/face-swap", "/v1/character-replace",
                 }:

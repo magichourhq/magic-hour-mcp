@@ -1,7 +1,7 @@
 # Magic Hour MCP Server
 
-OpenAPI-backed MCP server for Magic Hour image and video generation, with uploads,
-completion waiting and retrieval of existing audio projects.
+OpenAPI-backed MCP server for Magic Hour image and video generation and editing,
+music generation, uploads, completion waiting and retrieval of existing audio projects.
 
 At startup, this server reads `docs/openapi.json` and builds MCP tools with
 `FastMCP.from_openapi()`. The OpenAPI spec supplies endpoint coverage, while
