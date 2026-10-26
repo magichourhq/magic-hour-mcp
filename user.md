@@ -83,7 +83,7 @@ that launched the agent before reinstalling anything. Keep account details priva
 
 Before a paid request, choose the model, duration, resolution and audio settings
 using the [model directory](https://docs.magichour.ai/api-reference/models) and
-[billing guide](https://docs.magichour.ai/api-reference/billing). The
+[billing guide](https://docs.magichour.ai/billing/overview). The
 [workload evaluation guide](https://docs.magichour.ai/integration/evaluating-media-apis)
 shows what to record when comparing cost, usable outputs and integration work.
 If the available information does not establish the request's cost or access,
