@@ -33,6 +33,25 @@ Docs:
 - `docs/detailed-step-by-step-integration.md` - full backend integration guide
 - `docs/api-reference.md` - generated API reference
 
+## Evaluate a paid workflow
+
+Use the [workload evaluation guide](https://docs.magichour.ai/integration/evaluating-media-apis)
+to compare a finished image or video job, including its inputs, model, settings,
+output and cost. Check the [current model limits](https://docs.magichour.ai/api-reference/models)
+and [billing options](https://docs.magichour.ai/billing/overview): the dollar
+cost of consumed credits and the cash needed to fund an account are different.
+
+The account read verifies API authorization and returns account information; it
+is not a request-specific price or eligibility quote. The current MCP tool
+contract has no such quote operation. A workflow guide does not validate the
+requested model, source media or plan access. Resolve unclear costs or access
+before creating a paid project.
+
+For inspectable video examples, the [published image-to-video benchmark](https://github.com/magichourhq/ai-video-model-benchmark)
+provides source images, requests, all attempts and downloadable results. It
+compares models through Magic Hour and does not establish a provider-quality
+winner or human acceptance of the clips.
+
 ## Credits and data
 
 MCP generations use Magic Hour account credits. You can buy a [one-time credit pack](https://magichour.ai/pricing) without a subscription; unused credits never expire. Packs include applicable watermark-free exports and commercial use, subject to the [Terms](https://magichour.ai/terms-of-service) and rights in your source content. They do not unlock subscription-only model or resolution access.
