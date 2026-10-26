@@ -72,12 +72,27 @@ Start Codex from that same shell and ask it to call `account_retrieve`.
 
 ## Verify API access before generating
 
-Use `account_retrieve` to confirm eligibility for the intended generation. Tool
-discovery can work without credentials, and an invalid API key can still receive
+Use `account_retrieve` to verify API authorization and inspect the account before
+generating. It does not validate a particular model, input or setting, or quote
+that request's credit cost. Tool discovery can work without credentials, and an
+invalid API key can still receive
 `pong`; only the account read checks actual API authorization. `Authentication
 required` means the bearer token is missing;
 an account `401` means authorization failed. Check the key and the environment
 that launched the agent before reinstalling anything. Keep account details private.
+
+Before a paid request, choose the model, duration, resolution and audio settings
+using the [model directory](https://docs.magichour.ai/api-reference/models) and
+[billing guide](https://docs.magichour.ai/api-reference/billing). The
+[workload evaluation guide](https://docs.magichour.ai/integration/evaluating-media-apis)
+shows what to record when comparing cost, usable outputs and integration work.
+If the available information does not establish the request's cost or access,
+resolve that uncertainty before asking the assistant to generate.
+
+Keep the project ID returned by creation. If waiting times out, resume that
+project rather than creating and paying for another attempt. Ask for the finished
+download and inspect it; a completed status alone does not establish that the
+result meets your brief.
 
 ## Improve output quality with Magic Hour skills
 
