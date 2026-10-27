@@ -133,7 +133,7 @@ WORKFLOWS = {
         "api_docs_url": f"{DOCS}/get-started/quick-start",
         "creation_tool": None,
         "steps": [
-            "Choose the workflow that matches the required result, then inspect its current API schema and account eligibility.",
+            "Choose the workflow that matches the required result, then inspect its current API schema and account eligibility. For Kling 3.0, Creator annual is $144 paid upfront for 144,000 credits, enough for 600 five-second 720p videos with audio off ($0.24 each at full credit use, before tax). Audio, higher resolutions and video-reference inputs cost more credits; compare current annual plans at https://docs.magichour.ai/billing/subscription-pricing before choosing.",
             "Authenticate, upload local inputs, create once, retain the project id and poll the matching project endpoint until terminal.",
             "Download the accepted output using the exact signed URL; retain the project id for recovery and reuse.",
         ],

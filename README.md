@@ -40,6 +40,10 @@ to compare a finished image or video job, including its inputs, model, settings,
 output and cost. Check the [current model limits](https://docs.magichour.ai/api-reference/models)
 and [billing options](https://docs.magichour.ai/billing/overview): the dollar
 cost of consumed credits and the cash needed to fund an account are different.
+For example, [Creator annual](https://docs.magichour.ai/billing/subscription-pricing)
+costs $144 paid upfront for 144,000 credits, enough for 600 five-second Kling 3.0
+videos at 720p with audio off ($0.24 each at full credit use, before tax). Audio,
+higher resolutions and video-reference inputs cost more credits.
 
 The account read verifies API authorization and returns account information; it
 is not a request-specific price or eligibility quote. The current MCP tool
