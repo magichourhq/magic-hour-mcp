@@ -158,6 +158,8 @@ def workflow_guide(workflow: str) -> dict:
         "guidance": [
             "This guide reads static documentation only; it spends no generation credits and does not verify account access.",
             "Inspect the current creation tool schema and check model eligibility and estimated credits before generating.",
+            "Compare regular USD prices using https://docs.magichour.ai/billing/usage-based-pricing and prepaid terms at https://docs.magichour.ai/billing/subscription-pricing; match the model, resolution, audio, duration and reference inputs.",
+            "An effective annual allocation is not a usage-based charge or a standalone purchase. This static guide is not an account-specific price or eligibility quote.",
             "Creation is asynchronous. Save the project ID, wait with the matching wait_for_*_project tool and preserve signed download URLs exactly.",
             "A timeout or failed inline download is not permission to create a replacement job. Resume the same project id; after completion, retrieve its existing download URLs.",
             "Commercial use requires a paid subscription, credit-pack purchase or agreed paid usage-based arrangement, plus rights to the assets used. Check current terms at https://magichour.ai/terms-of-service.",
