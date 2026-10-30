@@ -254,21 +254,26 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if method == "POST" and path in GENERATION_TOOL_METADATA:
         operation["summary"], operation["description"] = GENERATION_TOOL_METADATA[path]
 
+    properties = (
+        operation.get("requestBody", {}).get("content", {}).get("application/json", {})
+        .get("schema", {}).get("properties", {})
+    )
     if method == "POST" and path in GENERATION_PARAMETER_DESCRIPTIONS:
-        properties = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
         for property_path, description in GENERATION_PARAMETER_DESCRIPTIONS[path].items():
-            parameter = properties[property_path[0]]
+            parameter = properties.get(property_path[0], {})
             for name in property_path[1:]:
-                parameter = parameter["properties"][name]
-            parameter["description"] = description
+                parameter = parameter.get("properties", {}).get(name, {})
+            if parameter:
+                parameter["description"] = description
 
     if method == "POST" and path in {"/v1/ai-image-editor", "/v1/ai-image-generator"}:
-        model = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]["model"]
-        model["description"] = model["description"].replace(
-            "Use the model we recommend, which will change over time. This is recommended unless you need "
-            "a specific model. This is the default behavior.",
-            "Uses the server-selected default model, which may change over time.",
-        )
+        model = properties.get("model", {})
+        if isinstance(model.get("description"), str):
+            model["description"] = model["description"].replace(
+                "Use the model we recommend, which will change over time. This is recommended unless you need "
+                "a specific model. This is the default behavior.",
+                "Uses the server-selected default model, which may change over time.",
+            )
 
     asset_type = next((asset for tag, asset in PROJECT_TAG_TO_ASSET.items() if tag in tags), None)
 
