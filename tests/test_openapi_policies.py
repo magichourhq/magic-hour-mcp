@@ -7,6 +7,7 @@ from unittest.mock import patch
 import jsonschema
 
 from mcp_magichour.openapi_policies import (
+    API_TOOL_METADATA,
     apply_magic_hour_policies,
     customize_openapi_component,
     normalize_mcp_tool_name,
@@ -15,22 +16,18 @@ from mcp_magichour.openapi_policies import (
 
 
 class OpenApiPolicyTests(unittest.TestCase):
-    def test_task_metadata_preserves_tool_names_and_api_contracts(self):
+    def test_task_metadata_preserves_api_contracts(self):
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
-        with patch("mcp_magichour.openapi_policies.GENERATION_TOOL_METADATA", {}):
+        with patch("mcp_magichour.openapi_policies.API_TOOL_METADATA", {}):
             baseline = apply_magic_hour_policies(spec)
         updated = apply_magic_hour_policies(spec)
-        # Metadata must not alter input/output schemas, tool identifiers, API
-        # parameters, or any unrelated operation as the upstream spec evolves.
+        # Tool metadata may change names and copy, while input/output schemas,
+        # API parameters and unrelated operations remain unchanged.
         for path in baseline["paths"]:
             for method, operation in baseline["paths"][path].items():
                 actual = deepcopy(updated["paths"][path][method])
-                if method == "post" and path in {
-                    "/v1/image-to-video", "/v1/text-to-video", "/v1/video-to-video", "/v1/ai-image-editor",
-                    "/v1/ai-talking-photo", "/v1/lip-sync",
-                    "/v1/face-swap", "/v1/character-replace",
-                }:
-                    for field in ("summary", "description"):
+                if (method.upper(), path) in API_TOOL_METADATA:
+                    for field in ("operationId", "summary", "description"):
                         if field in operation:
                             actual[field] = operation[field]
                         else:
@@ -42,14 +39,14 @@ class OpenApiPolicyTests(unittest.TestCase):
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         original = deepcopy(spec)
         expected_tools = {
-            "/v1/face-swap": "face_swap_create_video",
-            "/v1/face-swap-photo": "face_swap_photo_create_image",
-            "/v1/head-swap": "head_swap_create_image",
-            "/v1/body-swap": "body_swap_create_image",
-            "/v1/lip-sync": "lip_sync_create_video",
-            "/v1/ai-talking-photo": "ai_talking_photo_create_talking_photo",
-            "/v1/character-replace": "character_replace_create_video",
-            "/v1/ai-clothes-changer": "ai_clothes_changer_create_image",
+            "/v1/face-swap": "swap_face_in_video",
+            "/v1/face-swap-photo": "swap_face_in_photo",
+            "/v1/head-swap": "swap_head_in_photo",
+            "/v1/body-swap": "place_person_in_scene",
+            "/v1/lip-sync": "create_lip_sync_video",
+            "/v1/ai-talking-photo": "create_talking_photo",
+            "/v1/character-replace": "replace_character_in_video",
+            "/v1/ai-clothes-changer": "change_clothes_in_photo",
         }
         suffix = (
             "Use only with the user's own likeness or content they are authorized to use. "
@@ -151,15 +148,13 @@ class OpenApiPolicyTests(unittest.TestCase):
         operation_id = patched["paths"]["/v1/ai-image-generator"]["post"]["operationId"]
         description = patched["paths"]["/v1/ai-image-generator"]["post"]["description"]
 
-        self.assertEqual(operation_id, "ai_image_generator_create_image")
-        self.assertIn("MCP guidance", description)
+        self.assertEqual(operation_id, "generate_image")
         self.assertIn("wait_for_image_project", description)
-        self.assertIn("complete", description)
 
     def test_file_path_inputs_get_upload_guidance(self):
         spec = {
             "paths": {
-                "/v1/image-to-video": {
+                "/v1/new-video-tool": {
                     "post": {
                         "tags": ["Video Projects"],
                         "description": "Animate an image.",
@@ -176,7 +171,7 @@ class OpenApiPolicyTests(unittest.TestCase):
         }
 
         patched = apply_magic_hour_policies(spec)
-        description = patched["paths"]["/v1/image-to-video"]["post"]["description"]
+        description = patched["paths"]["/v1/new-video-tool"]["post"]["description"]
 
         self.assertIn("upload-URL endpoint", description)
         self.assertIn("file_path", description)

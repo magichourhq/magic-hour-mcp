@@ -91,7 +91,7 @@ class AuthenticatedMCPTests(unittest.IsolatedAsyncioTestCase):
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "tools/call",
-                "params": {"name": "account_retrieve", "arguments": {}},
+                "params": {"name": "get_account_info", "arguments": {}},
             },
         )
 

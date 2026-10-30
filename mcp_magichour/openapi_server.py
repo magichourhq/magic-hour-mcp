@@ -65,18 +65,18 @@ MCP_SERVER_INSTRUCTIONS = """
 Create and edit images and video, generate music, and retrieve existing audio projects.
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. Without one, report the unavailable quote and obtain an explicit credit budget before generating. Estimates never authorize spending.
-workflow_guide_retrieve gives static inputs/docs/review, not account eligibility.
+get_workflow_guide gives static inputs/docs/review, not account eligibility.
 After creation, use matching wait_for_*_project with the returned id.
-Upload local bytes before using file_path; preserve exact signed download URLs.
+For *_file_path inputs, upload local bytes with get_upload_urls before using file_path. Direct public media URLs must be stable and fetchable as raw bytes; hotlinked URLs can fail. Preserve exact signed download URLs, including query parameters; never append expiration metadata.
 Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
 On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
 On tier restrictions, explain the block; never retry unchanged or blindly remove fields. Ask before changing explicit model/resolution requirements.
 
 Choose video from inputs:
 
-- Approved image -> image_to_video_create_video directly; edit only for a requested visual change or a source problem that prevents the shot.
-- Still portrait + audio -> ai_talking_photo_create_talking_photo; text alone is not audio.
-- Existing video + replacement audio -> lip_sync_create_video.
+- Approved image -> create_video_from_image directly; edit only for a requested visual change or a source problem that prevents the shot.
+- Still portrait + audio -> create_talking_photo; text alone is not audio.
+- Existing video + replacement audio -> create_lip_sync_video.
 - Preserve an explicitly requested alternative provider.
 - Choose models from the current schema to match the requested inputs and settings, with verified account eligibility.
 - Preserve an explicitly requested model; explain unsupported settings before proposing a change.
@@ -89,11 +89,6 @@ GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images and video, generate music, and retrieve existing audio projects."
 MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
-SIGNED_DOWNLOAD_GUIDANCE = (
-    "Returns sanitized download fields. Use `exact_download_urls[n]` or `downloads[n].url` exactly as returned; "
-    "do not shorten it, remove query parameters, or append expiration metadata. "
-    "Inline previews share an 8 MiB limit; all download URLs remain available."
-)
 
 
 def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
@@ -180,7 +175,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="ping",
         title="Ping",
-        description="Check that the Magic Hour MCP server is reachable.",
+        description='Checks that the Magic Hour server is reachable. Use for connectivity troubleshooting; it does not validate API credentials or account access. Makes no media or project changes.',
         annotations=ToolAnnotations(title="Ping", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
     def ping() -> str:
@@ -190,9 +185,11 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="wait_for_video_project",
         title="Wait for Video Project",
         description=(
-            "Poll a video project until it completes, errors, is canceled, or times out. "
-            "After a timeout, resume with the same id; do not create another generation. "
-            f"{SIGNED_DOWNLOAD_GUIDANCE}"
+            'Polls a video project until it completes, errors, is canceled or times out. Use with '
+            'the id returned by a video create tool. Read-only; returns download URLs when '
+            'complete. After a timeout, resume with the same id rather than creating another '
+            'generation. Use signed download URLs exactly as returned. Does not inline video '
+            'content.'
         ),
         meta={
             "openai/toolInvocation": {
@@ -223,10 +220,11 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="wait_for_image_project",
         title="Wait for Image Project",
         description=(
-            "Poll an image project until it completes, errors, is canceled, or times out. "
-            "After a timeout, resume with the same id; do not create another generation. Returns the final "
-            "project JSON and, when complete, attempts to inline image downloads for Inspector or compatible "
-            f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
+            'Polls an image project until it completes, errors, is canceled or times out. Use with '
+            'the id returned by an image create tool. Read-only; returns the project and download '
+            'URLs, with optional inline image previews sharing an 8 MiB total limit. After a '
+            'timeout, resume with the same id rather than creating another generation. Use signed '
+            'download URLs exactly as returned.'
         ),
         meta={
             "openai/toolInvocation": {
@@ -259,10 +257,11 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="wait_for_audio_project",
         title="Wait for Audio Project",
         description=(
-            "Poll an audio project until it completes, errors, is canceled, or times out. "
-            "After a timeout, resume with the same id; do not create another generation. Returns the final "
-            "project JSON and, when complete, attempts to inline audio downloads for Inspector or compatible "
-            f"clients. {SIGNED_DOWNLOAD_GUIDANCE}"
+            'Polls an audio project until it completes, errors, is canceled or times out. Use with '
+            'the id returned by an audio create tool. Read-only; returns the project and download '
+            'URLs, with optional inline audio previews sharing an 8 MiB total limit. After a '
+            'timeout, resume with the same id rather than creating another generation. Use signed '
+            'download URLs exactly as returned.'
         ),
         meta={
             "openai/toolInvocation": {
@@ -301,10 +300,10 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
     title = f"Fetch {media_type.title()} Download"
     content_kind = f"inline MCP {media_type} content" if media_type != "video" else "an embedded MCP binary resource"
     description = (
-        f"Fetch a {media_type} `downloads[n].url` from a completed {media_type} project and return it as "
-        f"{content_kind} for compatible clients. Pass the exact full signed URL from "
-        "`downloads[n].url` without trimming query parameters; `expires_at` is separate metadata, not part of the URL. "
-        "Inline media is capped at 8 MiB; use the signed URL directly for larger downloads."
+        f"Fetch a completed project's {media_type} as {content_kind} for compatible clients. "
+        "Use the exact signed download URL, including query parameters. Requires HTTPS at the "
+        "configured Magic Hour media host. Read-only; limited to 8 MiB, or a smaller requested "
+        "max_bytes. Use the signed URL directly for larger files."
     )
 
     @mcp.tool(

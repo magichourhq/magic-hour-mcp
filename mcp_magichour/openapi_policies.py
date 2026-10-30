@@ -20,73 +20,276 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
     "audio": "wait_for_audio_project",
 }
 
-# Synced boilerplate can mix inputs/options from different endpoints. Keep the
-# task descriptions specific while preserving upstream schemas and tool names.
-GENERATION_TOOL_METADATA = {
-    "/v1/image-to-video": (
-        "Animate a supplied image into video",
-        "Animate a supplied product photo, portrait or scene. Requires `assets.image_file_path` "
-        "and `end_seconds`. Use the approved image directly; edit only for a requested visual "
-        "change or a source problem that prevents the shot. Prompt for motion while preserving "
-        "the supplied appearance. Model, duration, resolution and audio support vary. Generation "
-        "consumes credits; the queued video charge is an estimate, with the final charge available "
-        "on the completed project.",
+# MCP-facing metadata is keyed by the canonical API route. The HTTP contract
+# and synced OpenAPI source remain unchanged.
+API_TOOL_METADATA = {
+    ("GET", "/v1/account"): (
+        "get_account_info",
+        "Get account info",
+        "Returns credit balance and subscription details for the connected account. Use to inspect "
+        "account information before generation. Read-only; this is not a request-specific cost "
+        "quote or model-eligibility check.",
     ),
-    "/v1/video-to-video": (
-        "Restyle an existing video segment",
-        (
-            "Restyle an existing video segment with an art-style preset or a custom prompt. "
-            "Requires `assets.video_source` with its matching `assets.video_file_path` or "
-            "`assets.youtube_url`, `start_seconds`, `end_seconds` and `style.art_style`. "
-            "For a custom prompt, set `style.prompt_type` to `custom` or `append_default` "
-            "and provide `style.prompt`; with `default`, the supplied prompt is ignored. "
-            "This API supports v1/v2 presets, not v3. Generation consumes credits; the queued "
-            "video charge is an estimate, with the final charge available on the completed project."
-        ),
+    ("GET", "/v1/saved-items"): (
+        "list_saved_items",
+        "List saved items",
+        "Lists the account's active saved characters, references, voice recordings, moodboards and "
+        "brand kits, newest first. Reusable paths are in each item's assets[].file_path; temporary "
+        "signed URLs support preview/download. Read-only; pass next_cursor as cursor for the next "
+        "page.",
     ),
-    "/v1/text-to-video": (
-        "Generate video from text",
-        "Generate a new scene from `style.prompt` and `end_seconds` when no supplied starting image is required. "
-        "To animate an approved product photo or portrait, use `image_to_video_create_video` instead.",
+    ("POST", "/v1/files/upload-urls"): (
+        "get_upload_urls",
+        "Get upload URLs",
+        "Creates presigned upload URL and file-path pairs for local media. Use when a generation "
+        "needs a file the user has locally: upload raw bytes to the returned upload_url, then pass "
+        "its file_path to the create tool. Does not upload file bytes or start a generation.",
     ),
-    "/v1/ai-talking-photo": (
-        "Make a still portrait speak from audio",
-        "Requires a still portrait in `assets.image_file_path` and an existing recording in "
-        "`assets.audio_file_path`, plus `start_seconds` and `end_seconds`. Text alone is not "
-        "accepted; this tool does not synthesize speech. For existing video plus replacement "
-        "audio, use `lip_sync_create_video` instead.",
+    ("GET", "/v1/face-detection/{id}"): (
+        "get_face_detection_results",
+        "Get face detection results",
+        "Returns a face-detection job's status and detected faces. Use with the id from "
+        "detect_faces to inspect progress and choose face mappings before a selected-face swap. "
+        "Read-only; faces may populate while processing.",
     ),
-    "/v1/lip-sync": (
-        "Lip-sync existing video to replacement audio",
-        "Match existing video to replacement audio. Requires `assets.audio_file_path`, "
-        "`assets.video_source` and its matching `assets.video_file_path` or `assets.youtube_url`, "
-        "plus `start_seconds` and `end_seconds`. For a still portrait plus audio, use "
-        "`ai_talking_photo_create_talking_photo`. Text alone is not an audio input. Generation "
-        "consumes credits; the queued video charge is an estimate, with the final charge available "
-        "on the completed project.",
+    ("POST", "/v1/face-detection"): (
+        "detect_faces",
+        "Detect faces",
+        "Starts an asynchronous face-detection task for a supplied image or video and returns its "
+        "id and charge information. Use before a selected-face swap, then retrieve its status and "
+        "detected faces with get_face_detection_results. Current API documentation describes "
+        "detection as free; pricing may change.",
     ),
-    "/v1/ai-image-editor": (
-        "Edit supplied images",
-        "Edit supplied images using `assets.image_file_paths` and `style.prompt`. For prompt-only "
-        "creation use `ai_image_generator_create_image`. Editing is not a required preparation "
-        "step before image-to-video when the approved source already meets the brief. Check model "
-        "eligibility: the omitted/default model is not universally available on Free.",
+    ("GET", "/v1/video-projects/{id}"): (
+        "get_video_project",
+        "Get video project",
+        "Returns a video project's status and, once complete, its download URLs. Use to check "
+        "progress with the id from a video create tool. Read-only.",
     ),
-    "/v1/face-swap": (
-        "Swap faces in an existing video",
-        "Requires `start_seconds`, `end_seconds` and `assets.video_source` with its matching "
-        "`assets.video_file_path` or `assets.youtube_url`. Use `assets.image_file_path` for "
-        "all-faces mode, or `assets.face_mappings` for individual-faces mode after face detection. "
-        "Generation consumes credits; the queued video charge is an estimate, with the final "
-        "charge available on the completed project.",
+    ("DELETE", "/v1/video-projects/{id}"): (
+        "delete_video_project",
+        "Delete video project",
+        "Deletes the video project and attempts to delete its completed output. Cannot be undone; "
+        "confirm with the user first.",
     ),
-    "/v1/character-replace": (
-        "Replace or animate a character using video and a reference image",
-        "Replace a video subject or transfer video motion onto a reference character image. "
-        "Requires `assets.video_file_path`, `assets.image_file_path` and `end_seconds`. "
-        "Model support controls duration, resolution and subject selection; see parameter schemas. "
-        "Generation consumes credits; the queued video charge is an estimate, with the final "
-        "charge available on the completed project.",
+    ("POST", "/v1/ai-talking-photo"): (
+        "create_talking_photo",
+        "Create talking photo",
+        "Animates a still portrait so it speaks an existing audio recording. Use with a portrait "
+        "photo and an audio file; text alone is not accepted and this tool does not synthesize "
+        "speech. Starts a background job that costs credits; returns a project id for "
+        "wait_for_video_project.",
+    ),
+    ("POST", "/v1/ai-ugc-ad"): (
+        "create_spoken_ad_video",
+        "Create spoken ad video",
+        "Creates a creator-style spoken ad video from a prepared image and a text script. Use when "
+        "the image is ready and the dialogue should be generated from text. Starts a background "
+        "job that costs credits; returns a project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/ai-video-editor"): (
+        "edit_video",
+        "Edit video",
+        "Edits the appearance or content of a supplied video segment using a text prompt. Use with "
+        "a source video, the requested changes and the clip end time. Starts a background job that "
+        "costs credits; returns a project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/ai-video-translator"): (
+        "translate_video",
+        "Translate video",
+        "Translates speech in a supplied video segment into a supported target language. Starts a "
+        "background job that costs credits; returns a project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/ai-video-upscaler"): (
+        "upscale_video",
+        "Upscale video",
+        "Upscales a supplied video segment to a selected output resolution while preserving its "
+        "aspect ratio. Starts a background job that costs credits; returns a project id for "
+        "wait_for_video_project.",
+    ),
+    ("POST", "/v1/animation"): (
+        "create_animation",
+        "Create animation",
+        "Creates a stylized animated video with art and camera settings, using a custom prompt or "
+        "an audio-derived prompt mode. Can use an initial image and audio. Credits depend on frame "
+        "rate and duration; returns a project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/audio-to-video"): (
+        "create_video_from_audio",
+        "Create video from audio",
+        "Generates an audio-guided video from a supplied audio track, with an optional starting "
+        "image and visual prompt. Starts a background job that costs credits; returns a project id "
+        "for wait_for_video_project.",
+    ),
+    ("POST", "/v1/auto-subtitle-generator"): (
+        "add_subtitles_to_video",
+        "Add subtitles to video",
+        "Adds automatically generated subtitles to a supplied video segment using a subtitle "
+        "preset or custom text styling. Starts a background job that costs credits; returns a "
+        "project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/character-replace"): (
+        "replace_character_in_video",
+        "Replace character in video",
+        "Replaces a subject in a video with a character from a reference image, or transfers the "
+        "video's motion onto that character. Starts a background job that costs credits; returns a "
+        "project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/face-swap"): (
+        "swap_face_in_video",
+        "Swap face in video",
+        "Swaps faces in an existing video: all faces with a reference image, or selected faces "
+        "using detect_faces results. Starts a background job that costs credits; returns a project "
+        "id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/image-to-video"): (
+        "create_video_from_image",
+        "Create video from image",
+        "Animates a supplied image into a video using motion instructions and available model "
+        "options. Starts a background job that costs credits; returns a project id for "
+        "wait_for_video_project.",
+    ),
+    ("POST", "/v1/lip-sync"): (
+        "create_lip_sync_video",
+        "Create lip sync video",
+        "Adjusts an existing video's lip movements to match supplied replacement audio. For a "
+        "still portrait plus audio, use create_talking_photo. Starts a background job that costs "
+        "credits; returns a project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/text-to-video"): (
+        "create_video_from_text",
+        "Create video from text",
+        "Generates a video from a text prompt, with optional supported reference inputs and model "
+        "settings. To animate an existing starting image, use create_video_from_image. Starts a "
+        "background job that costs credits; returns a project id for wait_for_video_project.",
+    ),
+    ("POST", "/v1/video-to-video"): (
+        "restyle_video",
+        "Restyle video",
+        "Restyles an existing video clip with an art-style preset or a custom prompt. Supports "
+        "v1/v2 presets, not v3. Starts a background job that costs credits; returns a project id "
+        "for wait_for_video_project.",
+    ),
+    ("GET", "/v1/image-projects/{id}"): (
+        "get_image_project",
+        "Get image project",
+        "Returns an image project's status and, once complete, its download URLs. Use to check "
+        "progress with the id from an image create tool. Read-only.",
+    ),
+    ("DELETE", "/v1/image-projects/{id}"): (
+        "delete_image_project",
+        "Delete image project",
+        "Deletes the image project and attempts to delete its completed output. Cannot be undone; "
+        "confirm with the user first.",
+    ),
+    ("POST", "/v1/ai-clothes-changer"): (
+        "change_clothes_in_photo",
+        "Change clothes in photo",
+        "Changes clothing in a person photo using a supplied garment reference image. Costs 25 "
+        "credits. Starts a background job; returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/ai-face-editor"): (
+        "edit_face_in_photo",
+        "Edit face in photo",
+        "Adjusts facial expression, pose and gaze in a supplied photo using numeric controls. "
+        "Costs 1 credit per edit; output size depends on the subscription tier. Starts a "
+        "background job; returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/ai-gif-generator"): (
+        "create_gif_or_short_video",
+        "Create GIF or short video",
+        "Generates a short animation from a text prompt, with GIF, MP4 or WebM output. Costs 50 "
+        "credits. Starts a background job; returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/ai-image-editor"): (
+        "edit_image",
+        "Edit image",
+        "Edits one or more supplied images using a text prompt. For prompt-only creation use "
+        "generate_image. Costs credits; returns a project id for wait_for_image_project. Model "
+        "eligibility depends on the account plan; the default model is not available on every "
+        "plan.",
+    ),
+    ("POST", "/v1/ai-headshot-generator"): (
+        "generate_headshot",
+        "Generate headshot",
+        "Creates a headshot from a supplied photo containing one detectable face, with optional "
+        "appearance instructions. Costs 50 credits. Starts a background job; returns a project id "
+        "for wait_for_image_project.",
+    ),
+    ("POST", "/v1/ai-image-generator"): (
+        "generate_image",
+        "Generate image",
+        "Generates one or more images from a text prompt, with model, output size and image count "
+        "options. Costs credits; returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/ai-image-upscaler"): (
+        "upscale_image",
+        "Upscale image",
+        "Upscales a supplied image 2x or 4x. Cost depends on scale and mode (25-200 credits); "
+        "returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/ai-meme-generator"): (
+        "create_meme",
+        "Create meme",
+        "Creates a meme from a topic and template selection. Costs 10 credits. Starts a background "
+        "job; returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/ai-qr-code-generator"): (
+        "create_qr_code",
+        "Create QR code",
+        "Creates a stylized QR code from supplied text or a URL and an art-style description. "
+        "Currently costs 0 credits. Starts a background job; returns a project id for "
+        "wait_for_image_project.",
+    ),
+    ("POST", "/v1/body-swap"): (
+        "place_person_in_scene",
+        "Place person in scene",
+        "Places a person from one supplied photo into a supplied scene image. Cost depends on "
+        "resolution (from 50 credits at 640px); returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/face-swap-photo"): (
+        "swap_face_in_photo",
+        "Swap face in photo",
+        "Swaps faces in a supplied photo using a source face image or selected face mappings. "
+        "Costs 10 credits; output size depends on subscription. Returns a project id for "
+        "wait_for_image_project.",
+    ),
+    ("POST", "/v1/head-swap"): (
+        "swap_head_in_photo",
+        "Swap head in photo",
+        "Swaps a head from a supplied image onto a supplied body image. Costs 10 credits; returns "
+        "a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/image-background-remover"): (
+        "remove_image_background",
+        "Remove image background",
+        "Removes an image's background, optionally replacing it with another supplied image. Costs "
+        "5 credits. Starts a background job; returns a project id for wait_for_image_project.",
+    ),
+    ("POST", "/v1/photo-colorizer"): (
+        "colorize_photo",
+        "Colorize photo",
+        "Colorizes a black-and-white or faded photo. Costs 10 credits; returns a project id for "
+        "wait_for_image_project.",
+    ),
+    ("GET", "/v1/audio-projects/{id}"): (
+        "get_audio_project",
+        "Get audio project",
+        "Returns an audio project's status and, once complete, its download URLs. Use to check "
+        "progress with the id from an audio create tool. Read-only.",
+    ),
+    ("DELETE", "/v1/audio-projects/{id}"): (
+        "delete_audio_project",
+        "Delete audio project",
+        "Deletes the audio project and attempts to delete its completed output. Cannot be undone; "
+        "confirm with the user first.",
+    ),
+    ("POST", "/v1/ai-music-generator"): (
+        "generate_music",
+        "Generate music",
+        "Generates music from a description, with optional custom lyrics or instrumental-only "
+        "output. Costs 1 credit per requested second; returns a project id for "
+        "wait_for_audio_project.",
     ),
 }
 
@@ -112,7 +315,7 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         "`standard` costs 1 credit per video frame; `pro` costs 2. Both `standard` and `pro` require "
         "visible mouth movement in the opening seconds of the input video. `pro` requires a Creator, "
         "Pro or Business tier. For a still image, including a static image saved as video, use "
-        "`ai_talking_photo_create_talking_photo` with the original image and audio.",
+        "`create_talking_photo` with the original image and audio.",
     },
     "/v1/face-swap": {
         ("style", "version"): "Select face-swap version `v1` or `v2`. `default` uses the server-selected "
@@ -251,8 +454,9 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     tags = set(operation.get("tags") or [])
     additions: list[str] = []
 
-    if method == "POST" and path in GENERATION_TOOL_METADATA:
-        operation["summary"], operation["description"] = GENERATION_TOOL_METADATA[path]
+    metadata = API_TOOL_METADATA.get((method, path))
+    if metadata:
+        operation["operationId"], operation["summary"], operation["description"] = metadata
 
     properties = (
         operation.get("requestBody", {}).get("content", {}).get("application/json", {})
@@ -286,7 +490,7 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if method == "POST" and path == "/v1/ai-image-editor":
         additions.append(
             "Requires one or more source images in `assets.image_file_paths`. "
-            "For prompt-only creation, use `ai_image_generator_create_image` instead."
+            "For prompt-only creation, use `generate_image` instead."
         )
 
     if method == "POST" and path == "/v1/face-detection":
@@ -335,7 +539,7 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
             )
         )
 
-    if additions:
+    if additions and not metadata:
         operation["description"] = _append_mcp_guidance(operation.get("description", ""), additions)
     if method == "POST" and path in LIKENESS_GENERATION_PATHS:
         description = operation.get("description", "").rstrip()
