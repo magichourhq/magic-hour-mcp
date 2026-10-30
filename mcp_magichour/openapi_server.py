@@ -78,8 +78,8 @@ Choose video from inputs:
 - Still portrait + audio -> ai_talking_photo_create_talking_photo; text alone is not audio.
 - Existing video + replacement audio -> lip_sync_create_video.
 - Preserve an explicitly requested alternative provider.
-- For image model recommendations, prefer nano-banana-2-lite only with verified account support; otherwise check eligibility.
-- For Image-to-Video model recommendations, prefer ltx-2.5 when compatible with the task and account.
+- Choose models from the current schema to match the requested inputs and settings, with verified account eligibility.
+- Preserve an explicitly requested model; explain unsupported settings before proposing a change.
 - Include complete spoken sentences.
 - Use Text-to-Video when no supplied starting image is required.
 - Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.

@@ -90,6 +90,54 @@ GENERATION_TOOL_METADATA = {
     ),
 }
 
+# Reviewer-facing parameter copy describes selection without ranking models.
+GENERATION_PARAMETER_DESCRIPTIONS = {
+    "/v1/image-to-video": {
+        ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
+        "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
+        "Deprecated model values ending in `-audio` enable `audio`.",
+    },
+    "/v1/text-to-video": {
+        ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
+        "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
+        "Deprecated model values ending in `-audio` enable `audio`.",
+    },
+    "/v1/ai-talking-photo": {
+        ("style", "generation_mode"): "Controls motion style. `realistic` animates the supplied portrait; "
+        "`prompted` also accepts a scene prompt. Deprecated aliases remain supported: `pro` and "
+        "`stable` select `realistic`; `standard` and `expressive` select `prompted`.",
+    },
+    "/v1/lip-sync": {
+        ("style", "generation_mode"): "Select the lip-sync mode. `lite` costs 1 credit per video frame. "
+        "`standard` costs 1 credit per video frame; `pro` costs 2. Both `standard` and `pro` require "
+        "visible mouth movement in the opening seconds of the input video. `pro` requires a Creator, "
+        "Pro or Business tier. For a still image, including a static image saved as video, use "
+        "`ai_talking_photo_create_talking_photo` with the original image and audio.",
+    },
+    "/v1/face-swap": {
+        ("style", "version"): "Select face-swap version `v1` or `v2`. `default` uses the server-selected "
+        "version, which may change over time.",
+        ("assets", "face_swap_mode"): "Choose which faces to swap. `all-faces` uses one source image "
+        "for all detected faces (`image_file_path` required). `individual-faces` uses exact "
+        "`face_mappings`.",
+    },
+    "/v1/face-swap-photo": {
+        ("assets", "face_swap_mode"): "Choose which faces to swap. `all-faces` uses one source image "
+        "for all detected faces (`source_file_path` required). `individual-faces` uses exact "
+        "`face_mappings`.",
+    },
+    "/v1/video-to-video": {
+        ("style", "version"): "Select restyling version `v1` or `v2`. `default` uses the selected art "
+        "style's default version. Some styles default to v3, which this API does not support. "
+        "For `Studio Ghibli`, explicitly set `version` to `v2` for its supported preset.",
+        ("style", "model"): "Select a listed rendering model for the art style. `default` uses the "
+        "selected art style's default model.",
+        ("style", "prompt_type"): "`default` uses the art style's preset prompt and ignores `prompt`. "
+        "`custom` uses the supplied `prompt`; v1 still adds its LoRA prompt to apply the art style. "
+        "`append_default` appends the preset prompt to the supplied `prompt`.",
+    },
+}
+
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 GENERATION_ESTIMATE_PATHS = (
     "/v1/ai-image-generator/estimate",
@@ -205,6 +253,22 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if method == "POST" and path in GENERATION_TOOL_METADATA:
         operation["summary"], operation["description"] = GENERATION_TOOL_METADATA[path]
+
+    if method == "POST" and path in GENERATION_PARAMETER_DESCRIPTIONS:
+        properties = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
+        for property_path, description in GENERATION_PARAMETER_DESCRIPTIONS[path].items():
+            parameter = properties[property_path[0]]
+            for name in property_path[1:]:
+                parameter = parameter["properties"][name]
+            parameter["description"] = description
+
+    if method == "POST" and path in {"/v1/ai-image-editor", "/v1/ai-image-generator"}:
+        model = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]["model"]
+        model["description"] = model["description"].replace(
+            "Use the model we recommend, which will change over time. This is recommended unless you need "
+            "a specific model. This is the default behavior.",
+            "Uses the server-selected default model, which may change over time.",
+        )
 
     asset_type = next((asset for tag, asset in PROJECT_TAG_TO_ASSET.items() if tag in tags), None)
 
