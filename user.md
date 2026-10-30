@@ -30,7 +30,7 @@ Keep API keys private. Real generations spend Magic Hour credits.
    This creates an API key named "Claude connector" in your Developer Hub; delete it
    there to disconnect.
 5. Return to Claude and verify the connector is enabled. Ask Claude to call
-   `account_retrieve`; a returned credit balance confirms real API authorization.
+   `get_account_info`; a returned credit balance confirms real API authorization.
 
 ## Connect with Claude Code
 
@@ -38,7 +38,7 @@ Keep API keys private. Real generations spend Magic Hour credits.
 claude mcp add --scope user --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
-Start a new Claude Code session and ask it to call `account_retrieve`.
+Start a new Claude Code session and ask it to call `get_account_info`.
 
 If `--scope user` is not supported, use project scope:
 
@@ -68,11 +68,11 @@ Add the MCP server:
 codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var MAGIC_HOUR_API_KEY
 ```
 
-Start Codex from that same shell and ask it to call `account_retrieve`.
+Start Codex from that same shell and ask it to call `get_account_info`.
 
 ## Verify API access before generating
 
-Use `account_retrieve` to verify API authorization and inspect the account before
+Use `get_account_info` to verify API authorization and inspect the account before
 generating. It does not validate a particular model, input or setting, or quote
 that request's credit cost. Tool discovery can work without credentials, and an
 invalid API key can still receive
@@ -134,7 +134,7 @@ Do not shorten the URL, remove query parameters, or append `expires_at`.
 If a link shows `SignatureDoesNotMatch`, ask the assistant for the exact download URL again.
 
 For inputs, prefer an uploaded file or existing Magic Hour `file_path`. The
-upload tool is `video_assets_generate_presigned_url`; it accepts
+upload tool is `get_upload_urls`; it accepts
 image, audio, and video files.
 
 ## Troubleshooting

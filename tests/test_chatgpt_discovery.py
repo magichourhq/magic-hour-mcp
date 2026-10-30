@@ -29,25 +29,25 @@ EXPECTED_MCP_SERVER_INSTRUCTIONS = """
 Create and edit images and video, generate music, and retrieve existing audio projects.
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. Without one, report the unavailable quote and obtain an explicit credit budget before generating. Estimates never authorize spending.
-workflow_guide_retrieve gives static inputs/docs/review, not account eligibility.
+get_workflow_guide gives static inputs/docs/review, not account eligibility.
 After creation, use matching wait_for_*_project with the returned id.
-Upload local bytes before using file_path; preserve exact signed download URLs.
+For *_file_path inputs, upload local bytes with get_upload_urls before using file_path. Direct public media URLs must be stable and fetchable as raw bytes; hotlinked URLs can fail. Preserve exact signed download URLs, including query parameters; never append expiration metadata.
 Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
 On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
 On tier restrictions, explain the block; never retry unchanged or blindly remove fields. Ask before changing explicit model/resolution requirements.
 
 Choose video from inputs:
 
-- Approved image -> image_to_video_create_video directly; edit only for a requested visual change or a source problem that prevents the shot.
-- Still portrait + audio -> ai_talking_photo_create_talking_photo; text alone is not audio.
-- Existing video + replacement audio -> lip_sync_create_video.
+- Approved image -> create_video_from_image directly; edit only for a requested visual change or a source problem that prevents the shot.
+- Still portrait + audio -> create_talking_photo; text alone is not audio.
+- Existing video + replacement audio -> create_lip_sync_video.
 - Preserve an explicitly requested alternative provider.
-- For image model recommendations, prefer nano-banana-2-lite only with verified account support; otherwise check eligibility.
-- For Image-to-Video model recommendations, prefer ltx-2.5 when compatible with the task and account.
+- Choose models from the current schema to match the requested inputs and settings, with verified account eligibility.
+- Preserve an explicitly requested model; explain unsupported settings before proposing a change.
 - Include complete spoken sentences.
 - Use Text-to-Video when no supplied starting image is required.
 - Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
-""".strip()
+  """.strip()
 
 
 class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):

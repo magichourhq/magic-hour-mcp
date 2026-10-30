@@ -106,7 +106,7 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def upload(self, *kinds):
         extensions = {"image": "png", "audio": "wav", "video": "mp4"}
         content = {"image": IMAGE, "audio": AUDIO, "video": VIDEO}
-        result = data(await self.caller.call_tool("video_assets_generate_presigned_url", {
+        result = data(await self.caller.call_tool("get_upload_urls", {
             "items": [{"type": kind, "extension": extensions[kind]} for kind in kinds],
         }))
         async with ASYNC_CLIENT(transport=self.transport) as storage:
@@ -130,9 +130,9 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(base64.b64decode(resource.blob), VIDEO)
 
     async def test_product_image_reaches_video_without_an_image_edit(self):
-        self.assertEqual(data(await self.caller.call_tool("account_retrieve", {}))["tier"], "pro")
+        self.assertEqual(data(await self.caller.call_tool("get_account_info", {}))["tier"], "pro")
         image, = await self.upload("image")
-        result = data(await self.caller.call_tool("image_to_video_create_video", {
+        result = data(await self.caller.call_tool("create_video_from_image", {
             "assets": {"image_file_path": image}, "end_seconds": 5,
         }))
         await self.finish(result["id"])
@@ -141,7 +141,7 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_talking_photo_uses_image_and_audio(self):
         image, audio = await self.upload("image", "audio")
-        result = data(await self.caller.call_tool("ai_talking_photo_create_talking_photo", {
+        result = data(await self.caller.call_tool("create_talking_photo", {
             "assets": {"image_file_path": image, "audio_file_path": audio},
             "start_seconds": 0, "end_seconds": 5,
         }))
@@ -150,7 +150,7 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_lip_sync_uses_video_and_audio(self):
         video, audio = await self.upload("video", "audio")
-        result = data(await self.caller.call_tool("lip_sync_create_video", {
+        result = data(await self.caller.call_tool("create_lip_sync_video", {
             "assets": {"video_source": "file", "video_file_path": video, "audio_file_path": audio},
             "start_seconds": 0, "end_seconds": 5,
         }))
@@ -161,7 +161,7 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         image, = await self.upload("image")
         ids = []
         for i in range(3):
-            result = data(await self.caller.call_tool("ai_ugc_ad_create_video", {
+            result = data(await self.caller.call_tool("create_spoken_ad_video", {
                 "assets": {"image_file_path": image}, "script": f"Approved variant {i + 1}.", "end_seconds": 5,
             }))
             ids.append(result["id"])
@@ -172,7 +172,7 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_application_resumes_a_timeout_without_recreating_the_job(self):
         image, = await self.upload("image")
-        result = data(await self.caller.call_tool("image_to_video_create_video", {
+        result = data(await self.caller.call_tool("create_video_from_image", {
             "assets": {"image_file_path": image}, "end_seconds": 5,
         }))
         timed_out = data(await self.caller.call_tool("wait_for_video_project", {
@@ -185,8 +185,8 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_audio_and_wrong_source_type_never_reach_creation(self):
         cases = [
-            ("ai_talking_photo_create_talking_photo", {"assets": {"image_file_path": "photo.png"}, "start_seconds": 0, "end_seconds": 5}),
-            ("lip_sync_create_video", {"assets": {"image_file_path": "photo.png", "audio_file_path": "speech.wav"}, "start_seconds": 0, "end_seconds": 5}),
+            ("create_talking_photo", {"assets": {"image_file_path": "photo.png"}, "start_seconds": 0, "end_seconds": 5}),
+            ("create_lip_sync_video", {"assets": {"image_file_path": "photo.png", "audio_file_path": "speech.wav"}, "start_seconds": 0, "end_seconds": 5}),
         ]
         for name, arguments in cases:
             with self.subTest(tool=name), self.assertRaises(McpError):
@@ -195,7 +195,7 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_polling_error_can_resume_the_original_job(self):
         image, = await self.upload("image")
-        result = data(await self.caller.call_tool("image_to_video_create_video", {
+        result = data(await self.caller.call_tool("create_video_from_image", {
             "assets": {"image_file_path": image}, "end_seconds": 5,
         }))
         self.poll_error_once = True

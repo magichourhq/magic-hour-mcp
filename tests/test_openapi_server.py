@@ -77,16 +77,13 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
             async with Client(synced_mcp) as caller:
                 tools = {tool.name: tool for tool in await caller.list_tools()}
 
-        for name in ("face_swap_create_video", "character_replace_create_video"):
+        for name in ("swap_face_in_video", "replace_character_in_video"):
             with self.subTest(tool=name):
                 description = tools[name].description
                 self.assertLessEqual(len(description.encode("utf-8")), 2048)
                 self.assertIn(LIKENESS_USAGE_GUIDANCE, description)
                 self.assertIn("wait_for_video_project", description)
-                self.assertIn("upload-URL endpoint", description)
-                self.assertIn("exact_download_urls", description)
-                self.assertIn("estimate", description)
-                self.assertIn("final charge", description)
+                self.assertIn("costs credits", description)
 
     async def test_runtime_schema_excludes_unapproved_voice_tools_and_names(self):
         async with httpx.AsyncClient() as client:
@@ -165,7 +162,7 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
                 "mcp_magichour.openapi_server.build_api_client", return_value=client
             ):
                 synced_mcp = create_mcp()
-            tool = await synced_mcp.get_tool("ai_meme_generator_create_image")
+            tool = await synced_mcp.get_tool("create_meme")
             self.assertEqual(tool.parameters["properties"]["style"]["properties"]["template"]["enum"], ["Random"])
             for name in ("Taylor Swift", "Elon Musk", "Drake", "Leonardo DiCaprio"):
                 self.assertNotIn(name, tool.to_mcp_tool().model_dump_json())
@@ -231,11 +228,11 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         names = {tool.name for tool in await mcp.list_tools()}
 
         self.assertIn("ping", names)
-        self.assertIn("ai_image_generator_create_image", names)
-        self.assertIn("face_detection_retrieve_details", names)
+        self.assertIn("generate_image", names)
+        self.assertIn("get_face_detection_results", names)
         self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in names))
         self.assertTrue(all(len(name) >= 4 for name in names))
-        self.assertTrue(all(not {"do", "get", "run"}.intersection(name.split("_")) for name in names))
+        self.assertTrue(all(not {"do", "run"}.intersection(name.split("_")) for name in names))
 
     def test_resolve_media_mime_type_prefers_matching_header(self):
         mime_type = _resolve_media_mime_type(

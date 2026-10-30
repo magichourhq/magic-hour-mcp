@@ -19,12 +19,12 @@ At startup, the server reads `docs/openapi.json` and builds tools with `FastMCP.
 
 OpenAPI `operationId` values are normalized to descriptive snake_case tool names. Examples:
 
-- `video_assets_generate_presigned_url`
-- `ai_image_generator_create_image`
-- `image_projects_retrieve_details`
-- `video_projects_retrieve_details`
+- `get_upload_urls`
+- `generate_image`
+- `get_image_project`
+- `get_video_project`
 
-`video_assets_generate_presigned_url` is the shared `/v1/files/upload-urls` endpoint. It accepts `video`, `audio`, and `image` asset items.
+`get_upload_urls` is the shared `/v1/files/upload-urls` endpoint. It accepts `video`, `audio`, and `image` asset items.
 
 Do not hand-register Magic Hour endpoints in the host backend. Update
 `docs/openapi.json` and restart the MCP server to pick up new endpoints.
@@ -112,7 +112,7 @@ MAGIC_HOUR_OPENAPI_PATH=docs/openapi.json
 Use MCP Inspector against `/mcp/` with the bearer header, then verify:
 
 1. `ping` returns `pong`.
-2. `video_assets_generate_presigned_url` returns `upload_url`, `expires_at`, and
+2. `get_upload_urls` returns `upload_url`, `expires_at`, and
    `file_path` for a valid key.
 3. A create tool returns `{id, credits_charged}`.
 4. Its `wait_for_*_project` helper reaches a terminal state.

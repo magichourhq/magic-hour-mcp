@@ -32,7 +32,7 @@ Any `*_file_path` field in a request body should preferably use one of:
 
 Direct public media URLs can also work when they are stable, fetchable, and return raw file bytes. Treat them as best-effort rather than the default path, because hotlinked URLs can fail or return HTML/auth/redirect responses instead of the file.
 
-MCP tool calls carry JSON, not binary data. Upload raw bytes separately. The flow is `video_assets_generate_presigned_url`, upload bytes, then pass `file_path` to the generated create tool. `video_assets_generate_presigned_url` is the shared `/v1/files/upload-urls` tool for `video`, `audio`, and `image` items.
+MCP tool calls carry JSON, not binary data. Upload raw bytes separately. The flow is `get_upload_urls`, upload bytes, then pass `file_path` to the generated create tool. `get_upload_urls` is the shared `/v1/files/upload-urls` tool for `video`, `audio`, and `image` items.
 
 ## Output delivery
 
@@ -103,7 +103,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/ai-image-editor` | Image Projects | AI Image Editor |
 | POST | `/v1/ai-image-generator` | Image Projects | AI Image Generator |
 | POST | `/v1/ai-image-upscaler` | Image Projects | AI Image Upscaler |
-| POST | `/v1/ai-meme-generator` | Image Projects | AI Meme Generator |
+| POST | `/v1/ai-meme-generator` | Image Projects | Create meme |
 | POST | `/v1/ai-qr-code-generator` | Image Projects | AI QR Code Generator |
 | POST | `/v1/body-swap` | Image Projects | Body Swap |
 | POST | `/v1/face-swap-photo` | Image Projects | Face Swap Photo |
@@ -713,9 +713,9 @@ AI Image Upscaler
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-meme-generator
-`operationId: ai_meme_generator_create_image`
+`operationId: create_meme`
 
-AI Meme Generator
+Create meme
 
 
 **Request Body:**

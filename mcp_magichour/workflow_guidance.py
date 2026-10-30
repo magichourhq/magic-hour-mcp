@@ -26,11 +26,11 @@ WORKFLOWS = {
         "input": "An existing video and an approved replacement face image.",
         "product_url": f"{SITE}/products/face-swap",
         "api_docs_url": f"{DOCS}/api-reference/video-projects/face-swap-video",
-        "creation_tool": "face_swap_create_video",
+        "creation_tool": "swap_face_in_video",
         "steps": [
-            "Use the approved source face and target clip; upload local files with video_assets_generate_presigned_url and send their raw bytes to upload_url.",
-            "For one selected person in a multi-person clip, use face_detection_detect_faces and face_detection_retrieve_details, then assets.face_swap_mode=individual-faces with assets.face_mappings; do not swap every face.",
-            "Call face_swap_create_video for the requested start_seconds and end_seconds, then wait_for_video_project with the returned id.",
+            "Use the approved source face and target clip; upload local files with get_upload_urls and send their raw bytes to upload_url.",
+            "For one selected person in a multi-person clip, use detect_faces and get_face_detection_results, then assets.face_swap_mode=individual-faces with assets.face_mappings; do not swap every face.",
+            "Call swap_face_in_video for the requested start_seconds and end_seconds, then wait_for_video_project with the returned id.",
         ],
         "example_request": "Put my face into this short movie-style scene. Keep the other people unchanged and show me the finished clip.",
         "follow_up": "Reuse the accepted clip for subtitles or another edit; do not regenerate the scene merely to change its captions.",
@@ -41,14 +41,14 @@ WORKFLOWS = {
         "input": "Source images and a description of the requested edit.",
         "product_url": f"{SITE}/products/ai-image-editor",
         "api_docs_url": f"{DOCS}/api-reference/image-projects/ai-image-editor",
-        "creation_tool": "ai_image_editor_create_image",
+        "creation_tool": "edit_image",
         "steps": [
-            "Use the supplied reference images. With no source image, use ai_image_generator_create_image instead of inventing image file paths.",
+            "Use the supplied reference images. With no source image, use generate_image instead of inventing image file paths.",
             "State what changes and what stays fixed: identity, pose, clothing, background, lighting and aspect ratio.",
-            "Call ai_image_editor_create_image with supported account settings, then wait_for_image_project. Review the still before using it as a video reference.",
+            "Call edit_image with supported account settings, then wait_for_image_project. Review the still before using it as a video reference.",
         ],
         "example_request": "Turn this portrait into a cinematic space-pilot scene. Preserve my face and keep the framing vertical for a short video.",
-        "follow_up": "Animate the accepted still with image_to_video_create_video rather than recreating its identity from a text prompt.",
+        "follow_up": "Animate the accepted still with create_video_from_image rather than recreating its identity from a text prompt.",
         "review": "Check identity, unchanged regions, anatomy and requested edits. Model and resolution eligibility depend on the account.",
     },
     "image-to-video": {
@@ -56,11 +56,11 @@ WORKFLOWS = {
         "input": "A reference image and a motion instruction.",
         "product_url": f"{SITE}/products/image-to-video",
         "api_docs_url": f"{DOCS}/api-reference/video-projects/image-to-video",
-        "creation_tool": "image_to_video_create_video",
+        "creation_tool": "create_video_from_image",
         "steps": [
             "Animate the approved supplied image directly when it already meets the brief. Use Image Editor only for a requested visual change or a source problem that prevents the shot.",
             "Describe subject motion and one camera move; preserve identity, style, lighting and aspect ratio from the reference.",
-            "Call image_to_video_create_video with a supported model, resolution and duration, then wait_for_video_project with the returned id.",
+            "Call create_video_from_image with a supported model, resolution and duration, then wait_for_video_project with the returned id.",
         ],
         "example_request": "Animate this portrait: the pilot turns toward a distant planet as the camera slowly pushes in. Keep the face and outfit consistent.",
         "follow_up": "Keep the accepted footage for captions, lip sync or later editing. For a new shot, reuse the same reference image.",
@@ -71,11 +71,11 @@ WORKFLOWS = {
         "input": "A description of a new scene; use image-to-video when a specific reference image matters.",
         "product_url": f"{SITE}/products/ai-video-generator",
         "api_docs_url": f"{DOCS}/api-reference/video-projects/text-to-video",
-        "creation_tool": "text_to_video_create_video",
+        "creation_tool": "create_video_from_text",
         "steps": [
             "Use text-to-video for a new scene without a required likeness; use an image reference and image-to-video when identity must stay consistent.",
             "Specify the subject, one action, camera move, framing and mood. Request only audio and duration supported by the selected model.",
-            "Call text_to_video_create_video, then wait_for_video_project with the returned id and review the actual result.",
+            "Call create_video_from_text, then wait_for_video_project with the returned id and review the actual result.",
         ],
         "example_request": "Create a short cinematic scene of a tiny astronaut discovering a glowing forest inside a glass bottle, with a slow orbiting camera.",
         "follow_up": "Edit or subtitle the accepted result instead of paying to regenerate unchanged footage.",
@@ -86,11 +86,11 @@ WORKFLOWS = {
         "input": "An existing video and replacement audio for the selected segment.",
         "product_url": f"{SITE}/products/lip-sync",
         "api_docs_url": f"{DOCS}/api-reference/video-projects/lip-sync",
-        "creation_tool": "lip_sync_create_video",
+        "creation_tool": "create_lip_sync_video",
         "steps": [
             "Use existing video via assets.video_source and its matching assets.video_file_path or assets.youtube_url, plus the approved recording in assets.audio_file_path; upload local files before calling the creation tool. For a still portrait plus audio, use talking-photo instead.",
             "Choose a segment long enough for the complete sentence, including pauses; do not cut off the narration.",
-            "Call lip_sync_create_video, then wait_for_video_project with the returned id and check speech timing before adding subtitles.",
+            "Call create_lip_sync_video, then wait_for_video_project with the returned id and check speech timing before adding subtitles.",
         ],
         "example_request": "Make this character deliver my recorded line. Preserve the scene and let the entire sentence finish.",
         "follow_up": "Add captions to the accepted lip-synced clip rather than generating the performance again.",
@@ -101,14 +101,14 @@ WORKFLOWS = {
         "input": "A prepared presenter/product image, an approved script and a supported duration.",
         "product_url": f"{SITE}/products/ai-ugc-ad-generator",
         "api_docs_url": f"{SITE}/openapi.json",
-        "creation_tool": "ai_ugc_ad_create_video",
+        "creation_tool": "create_spoken_ad_video",
         "steps": [
             "Prepare the presenter image with Image Editor if needed; wait for the image result before creating the video.",
-            "Pass assets.image_file_path, the approved script and end_seconds to ai_ugc_ad_create_video using supported account settings.",
+            "Pass assets.image_file_path, the approved script and end_seconds to create_spoken_ad_video using supported account settings.",
             "Use wait_for_video_project with the returned id; review speech timing, identity and any spoken claims before reuse.",
         ],
         "example_request": "Use this prepared presenter image and my approved script to announce the new release. Let the complete sentence finish.",
-        "follow_up": "Add subtitles to the accepted clip with auto_subtitle_generator_create_video; do not regenerate the presenter to change captions.",
+        "follow_up": "Add subtitles to the accepted clip with add_subtitles_to_video; do not regenerate the presenter to change captions.",
         "review": "Compose the image separately with Image Editor if needed, then generate speech and video from the prepared image and script. Use permitted assets and review product fidelity, spoken claims and speech timing; do not present generated testimonials as real customer experience.",
     },
     "talking-photo": {
@@ -116,14 +116,14 @@ WORKFLOWS = {
         "input": "A portrait and an audio file, with start_seconds and end_seconds selecting the spoken segment. Text alone is not a valid input.",
         "product_url": f"{SITE}/products/ai-talking-photo",
         "api_docs_url": f"{DOCS}/api-reference/video-projects/ai-talking-photo",
-        "creation_tool": "ai_talking_photo_create_talking_photo",
+        "creation_tool": "create_talking_photo",
         "steps": [
             "Use a portrait and an existing approved recording. If the user has only text, obtain the audio first; this tool cannot turn text into speech.",
-            "Optionally colorize an old photo with photo_colorizer_create_image and wait_for_image_project before animating it. Preserve the person's likeness.",
-            "Call ai_talking_photo_create_talking_photo with both assets.image_file_path and assets.audio_file_path and a segment that includes the complete sentence, then wait_for_video_project.",
+            "Optionally colorize an old photo with colorize_photo and wait_for_image_project before animating it. Preserve the person's likeness.",
+            "Call create_talking_photo with both assets.image_file_path and assets.audio_file_path and a segment that includes the complete sentence, then wait_for_video_project.",
         ],
         "example_request": "Bring this old family portrait to life using my recording of the letter. Keep the face recognizable and include the full spoken passage.",
-        "follow_up": "Use auto_subtitle_generator_create_video on the accepted clip when captions are requested; finish with wait_for_video_project.",
+        "follow_up": "Use add_subtitles_to_video on the accepted clip when captions are requested; finish with wait_for_video_project.",
         "review": "Use talking photo for a still portrait; use lip sync for existing footage. Review facial motion and speech timing.",
     },
     "media-apis": {
@@ -169,20 +169,18 @@ def workflow_guide(workflow: str) -> dict:
 
 def register_workflow_guidance(mcp: FastMCP) -> None:
     @mcp.tool(
-        name="workflow_guide_retrieve",
+        name="get_workflow_guide",
         title="Choose a media workflow",
         description=(
-            "Read Magic Hour workflow guidance for face swap, image editing, image-to-video, "
-            "video generation, lip sync, UGC ads, talking photos or API integration. "
-            "Returns product and documentation URLs, exact tool names, ordered steps, "
-            "example requests, follow-up edits and review criteria; "
-            "does not generate media, spend credits or check account access."
+            'Returns required inputs, ordered steps, example requests and review criteria for '
+            'eight supported Magic Hour workflows. Use when planning a generation, not to run one. '
+            'Requires authentication but does not check account eligibility or spend credits.'
         ),
         annotations=ToolAnnotations(
             readOnlyHint=True, destructiveHint=False, openWorldHint=False
         ),
     )
-    def workflow_guide_retrieve(workflow: Workflow) -> dict:
+    def get_workflow_guide(workflow: Workflow) -> dict:
         return workflow_guide(workflow)
 
     @mcp.resource(

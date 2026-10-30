@@ -14,14 +14,16 @@ Hosted creation endpoint: **https://mcp.magichour.ai/**
 
 Follow the [client setup guide](https://docs.magichour.ai/integration/model-context-protocol)
 for Claude, Claude Code, Codex CLI or ChatGPT. After connecting, call
-`account_retrieve` to verify API access and inspect the account before generation;
+`get_account_info` to verify API access and inspect the account before generation;
 `ping` alone does not validate the API key.
 
 Try: “Use my portrait to create a cinematic space-pilot still, then animate it
 with a slow camera push. Keep my face consistent, wait for the render and show
 the finished video. Check account eligibility and cost before spending credits.”
 
-Use `workflow_guide_retrieve` for the ordered tool steps and output review.
+Use `get_workflow_guide` for the ordered tool steps and output review.
+After a tool-name update, refresh the client’s cached tool catalog or reconnect.
+Use the names returned by `tools/list`; dated example receipts keep their original IDs.
 For documentation search while coding, use the separate
 [API Docs MCP](https://docs.magichour.ai/integration/api-docs-mcp).
 
@@ -121,14 +123,14 @@ MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/late
 
 ## Read-only workflow guidance
 
-`workflow_guide_retrieve` accepts `video-face-swap`, `image-editor`, `image-to-video`,
+`get_workflow_guide` accepts `video-face-swap`, `image-editor`, `image-to-video`,
 `video-generator`, `lip-sync`, `ugc-ads`, `talking-photo` or `media-apis`. It returns
 inputs, product and API documentation URLs, exact creation-tool names, ordered
 steps, example requests, follow-up edits and review criteria. It makes no API
 request, spends no credits and does not verify account access. Like other tools, it requires the existing authentication flow.
 
 Clients can also discover the public `magic-hour://workflows/index` resource and
-read `magic-hour://workflows/{workflow}`. UGC uses `ai_ugc_ad_create_video` with a
+read `magic-hour://workflows/{workflow}`. UGC uses `create_spoken_ad_video` with a
 prepared image, script and supported duration; image composition is a separate
 Image Editor call. Keep the returned project ID and use `wait_for_video_project`
 to retrieve the finished file.
@@ -161,14 +163,14 @@ API key as the access token, which this server passes through to the API. Produc
    - URL: `http://127.0.0.1:8000/`
    - Header: `Authorization: Bearer <magic_hour_api_key>`
 4. Call `ping`.
-5. Call `video_assets_generate_presigned_url` or another generated tool.
+5. Call `get_upload_urls` or another generated tool.
 
 Notes:
 
 - FastMCP generates endpoint tools from OpenAPI at startup.
 - Creation tools return `id` and `credits_charged` immediately.
 - OpenAPI `operationId` values are normalized to descriptive snake_case tool names.
-- The shared `/v1/files/upload-urls` endpoint is named `video_assets_generate_presigned_url`. It accepts `video`, `audio`, and `image` items.
+- The shared `/v1/files/upload-urls` endpoint is named `get_upload_urls`. It accepts `video`, `audio`, and `image` items.
 - Use `wait_for_*_project` to poll jobs. Use `exact_download_urls` exactly as
   returned; never append expiration metadata.
 - Image and audio wait tools also return inline media when supported.
@@ -179,7 +181,7 @@ Rebuild and type-check the MCP App UI with `cd web && npm ci && npm run build`.
 
 Magic Hour does not accept raw file bytes inside tool arguments. The flow is:
 
-1. Call the generated shared upload-URL tool, `video_assets_generate_presigned_url`
+1. Call the generated shared upload-URL tool, `get_upload_urls`
 2. Upload the file bytes to the returned `upload_url`
 3. Pass the returned `file_path` into the generated creation tool
 
