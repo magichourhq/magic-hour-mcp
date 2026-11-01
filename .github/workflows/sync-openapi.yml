@@ -41,9 +41,33 @@ jobs:
       - name: Fetch OpenAPI spec
         run: |
           curl --fail --silent --show-error --location \
-            https://docs.magichour.ai/api-reference/openapi.json \
+            https://magichour.ai/docs/api/openapi.json \
             --output /tmp/magic-hour-openapi.json
-          python -m json.tool /tmp/magic-hour-openapi.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          omitted = object()
+
+          def strip_deprecated(value):
+              if isinstance(value, list):
+                  cleaned = [strip_deprecated(item) for item in value]
+                  return [item for item in cleaned if item is not omitted]
+              if isinstance(value, dict):
+                  if value.get("deprecated") is True:
+                      return omitted
+                  cleaned = {key: strip_deprecated(item) for key, item in value.items()}
+                  cleaned = {key: item for key, item in cleaned.items() if item is not omitted}
+                  if "properties" in cleaned and isinstance(cleaned.get("required"), list):
+                      cleaned["required"] = [key for key in cleaned["required"] if key in cleaned["properties"]]
+                      if not cleaned["required"]:
+                          del cleaned["required"]
+                  return cleaned
+              return value
+
+          path = Path("/tmp/magic-hour-openapi.json")
+          path.write_text(json.dumps(strip_deprecated(json.loads(path.read_text())), indent=2) + "\n")
+          PY
           mv /tmp/magic-hour-openapi.json docs/openapi.json
 
       - name: Regenerate API reference
@@ -83,5 +107,5 @@ jobs:
             --base "$BASE_BRANCH" \
             --head "$SYNC_BRANCH" \
             --title "chore: sync OpenAPI spec" \
-            --body "Automated update from https://docs.magichour.ai/api-reference/openapi.json." \
+            --body "Automated update from https://magichour.ai/docs/api/openapi.json, excluding deprecated fields." \
             --reviewer "$REVIEWER"

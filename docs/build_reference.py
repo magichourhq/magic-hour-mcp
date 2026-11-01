@@ -71,7 +71,7 @@ tag_order = ['Files', 'Video Projects', 'Image Projects', 'Audio Projects']
 
 out = []
 out.append("# Magic Hour API reference for MCP tool design\n")
-out.append("Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`), with MCP-specific policies applied. Regenerate this file with `python docs/build_reference.py` if the spec changes.\n")
+out.append("Source: https://magichour.ai/docs/api/openapi.json (saved as `docs/openapi.json` without deprecated fields), with MCP-specific policies applied. Regenerate this file with `python docs/build_reference.py` if the spec changes.\n")
 
 out.append("## Authentication\n")
 out.append("""- Every request requires `Authorization: Bearer <api_key>`.
