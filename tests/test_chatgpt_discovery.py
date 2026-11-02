@@ -28,7 +28,7 @@ from mcp_magichour.openapi_server import (
 EXPECTED_MCP_SERVER_INSTRUCTIONS = """
 Create and edit images and video, generate music, and retrieve existing audio projects.
 Tool calls require authentication.
-When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. Without one, report the unavailable quote and obtain an explicit credit budget before generating. Estimates never authorize spending.
+When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote. Estimates never authorize spending.
 get_workflow_guide gives static inputs/docs/review, not account eligibility.
 After creation, use matching wait_for_*_project with the returned id.
 For *_file_path inputs, upload local bytes with get_upload_urls before using file_path. Direct public media URLs must be stable and fetchable as raw bytes; hotlinked URLs can fail. Preserve exact signed download URLs, including query parameters; never append expiration metadata.
@@ -95,7 +95,7 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("retrieve existing audio projects", copy)
         self.assertIn("When exposed, use a matching estimate with the exact create body", instructions)
         self.assertIn("resolve blocked/unavailable", instructions)
-        self.assertIn("Without one, report the unavailable quote and obtain an explicit credit budget before generating", instructions)
+        self.assertIn("For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote", instructions)
         self.assertIn("Estimates never authorize spending", instructions)
 
     async def test_mcp_app_http_view_is_public_with_scoped_csp(self):
