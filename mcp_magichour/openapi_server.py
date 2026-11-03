@@ -16,10 +16,12 @@ from urllib.parse import urlparse
 import httpx
 from fastmcp import FastMCP
 from fastmcp.apps import AppConfig, ResourceCSP
+from fastmcp.exceptions import ToolError
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
 from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, ToolAnnotations
+from pydantic import BaseModel
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -91,6 +93,13 @@ MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 
 
+class ChatGPTImage(BaseModel):
+    download_url: str
+    file_id: str
+    mime_type: str = ""
+    file_name: str = ""
+
+
 def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
     with Path(path).open("r", encoding="utf-8") as spec_file:
         return json.load(spec_file)
@@ -147,6 +156,69 @@ def create_mcp() -> FastMCP:
 
 def register_custom_tools(mcp: FastMCP) -> None:
     register_workflow_guidance(mcp)
+
+    @mcp.tool(
+        name="upload_chatgpt_image",
+        title="Upload attached image",
+        description=(
+            "Uploads a PNG, JPEG or WebP image attached in ChatGPT to the connected Magic Hour "
+            "account. Use this for native ChatGPT photo attachments instead of asking the chat's "
+            "file runtime to PUT bytes to get_upload_urls. Pass the returned file_path to the "
+            "existing image or video generation tool. Accepts one image up to 20 MiB. Does not "
+            "generate media or spend generation credits."
+        ),
+        meta={"openai/fileParams": ["image"]},
+        annotations=ToolAnnotations(
+            title="Upload attached image", readOnlyHint=False,
+            destructiveHint=False, openWorldHint=True,
+        ),
+    )
+    async def upload_chatgpt_image(image: ChatGPTImage) -> dict[str, str]:
+        async def transfer() -> dict[str, str]:
+            _require_file_host(image.download_url, "files.oaiusercontent.com")
+            async with build_api_client() as api, httpx.AsyncClient(
+                timeout=API_TIMEOUT, follow_redirects=False,
+            ) as files:
+                # Verify the connected account before fetching a third-party file.
+                account = await api.get("/v1/account")
+                account.raise_for_status()
+                media = bytearray()
+                async with files.stream("GET", image.download_url) as source:
+                    source.raise_for_status()
+                    async for chunk in source.aiter_bytes():
+                        if len(media) + len(chunk) > 20 * 1024 * 1024:
+                            raise ToolError("The attached image exceeds the 20 MiB upload limit.")
+                        media.extend(chunk)
+
+                if media.startswith(b"\x89PNG\r\n\x1a\n"):
+                    extension = "png"
+                elif media.startswith(b"\xff\xd8\xff"):
+                    extension = "jpg"
+                elif media[:4] == b"RIFF" and media[8:12] == b"WEBP":
+                    extension = "webp"
+                else:
+                    raise ToolError("Attach a PNG, JPEG or WebP image.")
+
+                response = await api.post(
+                    "/v1/files/upload-urls",
+                    json={"items": [{"type": "image", "extension": extension}]},
+                )
+                response.raise_for_status()
+                item = response.json()["items"][0]
+                _require_file_host(item["upload_url"], urlparse(MCP_APP_MEDIA_ORIGIN).hostname)
+                uploaded = await files.put(item["upload_url"], content=bytes(media))
+                uploaded.raise_for_status()
+                return {"file_path": item["file_path"]}
+
+        try:
+            return await asyncio.wait_for(transfer(), timeout=60.0)
+        except httpx.HTTPStatusError as error:
+            raise ToolError(
+                f"Image transfer failed (HTTP {error.response.status_code}). "
+                "Check the Magic Hour connection and reattach the image if its link expired."
+            ) from None
+        except (httpx.RequestError, asyncio.TimeoutError):
+            raise ToolError("Image transfer failed. Reattach the image and retry the upload.") from None
 
     @mcp.resource(
         MCP_APP_VIEW_URI,
@@ -384,6 +456,20 @@ async def _wait_for_project_result(
         max_bytes_per_download=max_bytes_per_download,
         distinct_id=distinct_id,
     )
+
+
+def _require_file_host(url: str, hostname: str) -> None:
+    try:
+        parsed = urlparse(url)
+        allowed = (
+            parsed.scheme == "https" and parsed.hostname == hostname
+            and parsed.port in (None, 443) and not parsed.username and not parsed.password
+            and not parsed.fragment
+        )
+    except ValueError:
+        allowed = False
+    if not allowed:
+        raise ToolError("The file URL is not a supported image-transfer destination.")
 
 
 async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:

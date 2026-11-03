@@ -133,8 +133,14 @@ Do not shorten the URL, remove query parameters, or append `expires_at`.
 
 If a link shows `SignatureDoesNotMatch`, ask the assistant for the exact download URL again.
 
-For inputs, prefer an uploaded file or existing Magic Hour `file_path`. The
-upload tool is `get_upload_urls`; it accepts
+For photos attached in ChatGPT, use `upload_chatgpt_image` with the native file
+reference. It transfers a PNG, JPEG or WebP image (up to 20 MiB) to the connected
+Magic Hour account and returns the `file_path` for the generation tool. The chat
+runtime does not need to upload the bytes itself. This transfer does not start a
+generation or spend generation credits.
+
+For local files in other clients, use `get_upload_urls` and PUT the raw bytes to
+the returned URL before passing its `file_path` to a generation tool. It accepts
 image, audio, and video files.
 
 ## Troubleshooting
