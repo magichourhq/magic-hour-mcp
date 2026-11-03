@@ -26,21 +26,27 @@ from mcp_magichour.openapi_server import (
 )
 
 EXPECTED_MCP_SERVER_INSTRUCTIONS = """
-Create and edit images, video, and audio with Magic Hour.
+Create and edit images and video, generate music, and retrieve existing audio projects.
 Tool calls require authentication.
-Creation tools are asynchronous; use the matching wait_for_*_project tool after starting a project.
-Upload local media before passing its file_path, and preserve signed download URLs exactly as returned.
+When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote. Estimates never authorize spending.
+get_workflow_guide gives static inputs/docs/review, not account eligibility.
+After creation, use matching wait_for_*_project with the returned id.
+For *_file_path inputs, upload local bytes with get_upload_urls before using file_path. Direct public media URLs must be stable and fetchable as raw bytes; hotlinked URLs can fail. Preserve exact signed download URLs, including query parameters; never append expiration metadata.
+Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
+On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
+On tier restrictions, explain the block; never retry unchanged or blindly remove fields. Ask before changing explicit model/resolution requirements.
 
-For video creation, unless the user requests otherwise:
+Choose video from inputs:
 
-- Prefer AI Image Editor followed by Image-to-Video.
-- Reuse reference images across scenes for visual consistency.
-- Prefer nano-banana-2-lite for image creation and editing.
-- Prefer ltx-2.3 for Image-to-Video.
-- Add voiceovers using AI Voice Generator when a voiceover would suit the video. Choose the voice that would be the best narrator for this video.
-- Let the narration finish each sentence. Never cut it off.
-- Use Text-to-Video only when consistency is unimportant.
-- Keep character identity, visual style, color palette, lighting, and aspect ratio consistent across scenes.
+- Approved image -> create_video_from_image directly; edit only for a requested visual change or a source problem that prevents the shot.
+- Still portrait + audio -> create_talking_photo; text alone is not audio.
+- Existing video + replacement audio -> create_lip_sync_video.
+- Preserve an explicitly requested alternative provider.
+- Choose models from the current schema to match the requested inputs and settings, with verified account eligibility.
+- Preserve an explicitly requested model; explain unsupported settings before proposing a change.
+- Include complete spoken sentences.
+- Use Text-to-Video when no supplied starting image is required.
+- Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
   """.strip()
 
 
@@ -61,6 +67,36 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             headers={"Accept": "application/json, text/event-stream"},
         ) as client:
             await self.assert_discovery_and_auth(client)
+
+    async def test_initialize_reports_unavailable_audio_and_quotes(self):
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="https://mcp.example",
+            headers={"Accept": "application/json, text/event-stream"},
+        ) as client:
+            initialized = await client.post("/", json={
+                "jsonrpc": "2.0", "id": 1, "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18", "capabilities": {},
+                    "clientInfo": {"name": "capability-regression", "version": "1"},
+                },
+            })
+            listed = await client.post("/", json={
+                "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {},
+            })
+            card = await client.get(MCP_SERVER_CARD_PATH)
+
+        names = {tool["name"] for tool in self.result(listed)["tools"]}
+        self.assertNotIn("ai_voice_generator_create_audio", names)
+        self.assertNotIn("ai_voice_cloner_create_audio", names)
+        instructions = self.result(initialized)["instructions"]
+        for copy in (instructions, card.json()["description"]):
+            self.assertIn("generate music", copy)
+            self.assertIn("retrieve existing audio projects", copy)
+        self.assertIn("When exposed, use a matching estimate with the exact create body", instructions)
+        self.assertIn("resolve blocked/unavailable", instructions)
+        self.assertIn("For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote", instructions)
+        self.assertIn("Estimates never authorize spending", instructions)
 
     async def test_mcp_app_http_view_is_public_with_scoped_csp(self):
         async with app.router.lifespan_context(app), httpx.AsyncClient(
@@ -275,10 +311,9 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
                 "params": {"name": "ping", "arguments": {}},
             },
         )
-        result = self.result(called)
-        self.assertTrue(result["isError"])
-        self.assertIn("mcp/www_authenticate", result["_meta"])
-        self.assertIn("resource_metadata=", result["_meta"]["mcp/www_authenticate"][0])
+        self.assertEqual(called.status_code, 401)
+        self.assertEqual(called.json(), {"error": "unauthorized"})
+        self.assertIn("resource_metadata=", called.headers["www-authenticate"])
 
         authorized = await client.post(
             "/",

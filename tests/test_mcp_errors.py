@@ -7,6 +7,15 @@ from mcp_magichour.openapi_server import app
 
 
 class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_excluded_voice_tools_cannot_be_called(self):
+        for name in ("ai_voice_generator_create_audio", "ai_voice_cloner_create_audio"):
+            with self.subTest(name=name):
+                payload = await self.call_tool(name, {
+                    "style": {"prompt": "Hello", "voice_name": "Unapproved preset"},
+                })
+                self.assertEqual(payload["error"]["code"], -32602)
+                self.assertEqual(payload["error"]["message"], f"Unknown tool: {name!r}")
+
     async def call_tool(self, name: str, arguments: dict, *, authorized: bool = True) -> dict:
         headers = {"Accept": "application/json, text/event-stream"}
         if authorized:
@@ -27,6 +36,11 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
                 },
             )
 
+        if not authorized:
+            self.assertEqual(response.status_code, 401)
+            self.assertIn("resource_metadata=", response.headers["www-authenticate"])
+            return response.json()
+
         payload = next(
             line.removeprefix("data: ")
             for line in response.text.splitlines()
@@ -40,17 +54,16 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["error"]["code"], -32602)
         self.assertEqual(payload["error"]["message"], "Unknown tool: 'tool_that_does_not_exist'")
 
-    async def test_unauthenticated_invalid_calls_return_structured_json_rpc_errors(self):
+    async def test_unauthenticated_invalid_calls_receive_http_auth_challenge(self):
         cases = [
-            ("tool_that_does_not_exist", {}, "Unknown tool"),
-            ("ping", {"unexpected": True}, "Invalid arguments"),
+            ("tool_that_does_not_exist", {}),
+            ("ping", {"unexpected": True}),
         ]
 
-        for tool, arguments, expected_message in cases:
+        for tool, arguments in cases:
             with self.subTest(tool):
                 payload = await self.call_tool(tool, arguments, authorized=False)
-                self.assertEqual(payload["error"]["code"], -32602)
-                self.assertIn(expected_message, payload["error"]["message"])
+                self.assertEqual(payload, {"error": "unauthorized"})
 
     async def test_bad_arguments_return_structured_json_rpc_errors(self):
         cases = [
@@ -59,20 +72,20 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
             ("unexpected parameter", "ping", {"unexpected": True}, "was unexpected"),
             (
                 "wrong nested enum",
-                "video_assets_generate_presigned_url",
+                "get_upload_urls",
                 {"items": [{"type": "document", "extension": "pdf"}]},
                 "is not one of",
             ),
-            ("empty required array", "video_assets_generate_presigned_url", {"items": []}, "should be non-empty"),
+            ("empty required array", "get_upload_urls", {"items": []}, "should be non-empty"),
             (
                 "missing nested parameter",
-                "video_assets_generate_presigned_url",
+                "get_upload_urls",
                 {"items": [{"type": "video"}]},
                 "'extension' is a required property",
             ),
             (
                 "invalid extension pattern",
-                "video_assets_generate_presigned_url",
+                "get_upload_urls",
                 {"items": [{"type": "video", "extension": ".mp4"}]},
                 "does not match",
             ),

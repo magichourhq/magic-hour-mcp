@@ -1,3 +1,4 @@
+import json
 import re
 import unittest
 from base64 import b64encode
@@ -5,6 +6,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
+from fastmcp import Client
+from mcp.shared.exceptions import McpError
 
 from mcp_magichour.openapi_server import (
     _project_download_guidance_text,
@@ -14,11 +17,156 @@ from mcp_magichour.openapi_server import (
     _project_to_tool_result,
     _resolve_media_mime_type,
     app,
+    create_mcp,
+    load_openapi_spec,
     mcp,
 )
+from mcp_magichour.openapi_policies import VOICE_PRESET_DESCRIPTION
 
 
 class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_ui_metadata_is_exposed_to_clients(self):
+        from mcp_magichour.project_result_app import (
+            MCP_APP_MIME_TYPE, MCP_APP_ORIGIN, MCP_APP_VIEW_URI,
+        )
+
+        async with Client(mcp) as caller:
+            tools = {tool.name: tool for tool in await caller.list_tools()}
+            resources = await caller.list_resources()
+            contents = await caller.read_resource(MCP_APP_VIEW_URI)
+        for asset in ("video", "image", "audio"):
+            meta = tools[f"wait_for_{asset}_project"].meta
+            self.assertEqual(meta["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+            for state in ("invoking", "invoked"):
+                label = meta["openai/toolInvocation"][state]
+                self.assertIsInstance(label, str)
+                self.assertTrue(label.strip())
+                self.assertLessEqual(len(label), 64)
+                self.assertNotIn(f"openai/toolInvocation/{state}", meta)
+        resource = next(r for r in resources if str(r.uri) == MCP_APP_VIEW_URI)
+        self.assertEqual(resource.mimeType, MCP_APP_MIME_TYPE)
+        self.assertTrue(resource.description)
+        self.assertEqual(len(contents), 1)
+        content = contents[0]
+        self.assertEqual(content.mimeType, MCP_APP_MIME_TYPE)
+        self.assertTrue(content.meta["openai/widgetDescription"])
+        self.assertEqual(content.meta["ui"]["domain"], MCP_APP_ORIGIN)
+        self.assertIn("csp", content.meta["ui"])
+
+    async def test_metadata_fits_claude_code_utf8_budget(self):
+        from mcp_magichour.openapi_server import MCP_SERVER_INSTRUCTIONS
+
+        self.assertLessEqual(len(MCP_SERVER_INSTRUCTIONS.encode("utf-8")), 2048)
+        for tool in await mcp.list_tools():
+            with self.subTest(tool=tool.name):
+                self.assertLessEqual(len((tool.description or "").encode("utf-8")), 2048)
+
+    async def test_synced_likeness_descriptions_fit_client_budget(self):
+        from mcp_magichour.openapi_policies import LIKENESS_USAGE_GUIDANCE
+
+        spec = load_openapi_spec()
+        paths = ("/v1/face-swap", "/v1/character-replace")
+        for path in paths:
+            spec["paths"][path]["post"]["description"] = "Upstream boilerplate. " * 200
+
+        async with httpx.AsyncClient() as client:
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ):
+                synced_mcp = create_mcp()
+            async with Client(synced_mcp) as caller:
+                tools = {tool.name: tool for tool in await caller.list_tools()}
+
+        for name in ("swap_face_in_video", "replace_character_in_video"):
+            with self.subTest(tool=name):
+                description = tools[name].description
+                self.assertLessEqual(len(description.encode("utf-8")), 2048)
+                self.assertIn(LIKENESS_USAGE_GUIDANCE, description)
+                self.assertIn("wait_for_video_project", description)
+                self.assertIn("costs credits", description)
+
+    async def test_runtime_schema_excludes_unapproved_voice_tools_and_names(self):
+        async with httpx.AsyncClient() as client:
+            with patch("mcp_magichour.openapi_server.build_api_client", return_value=client), patch(
+                "mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ()
+            ):
+                empty_mcp = create_mcp()
+            async with Client(empty_mcp) as caller:
+                tools = await caller.list_tools()
+        names = {tool.name for tool in tools}
+        self.assertNotIn("ai_voice_generator_create_audio", names)
+        self.assertNotIn("ai_voice_cloner_create_audio", names)
+        serialized = "\n".join(tool.model_dump_json() for tool in tools)
+        # Negative assertions only: these are never sample requests or approvals.
+        for name in ("Elon Musk", "Taylor Swift", "Donald Trump", "Barack Obama", "Joe Biden", "Morgan Freeman", "Kanye West", "Drake", "Leonardo DiCaprio"):
+            self.assertNotIn(name, serialized)
+
+    async def test_openapi_sync_cannot_expand_runtime_voice_schema(self):
+        spec = load_openapi_spec()
+        operation = spec["paths"]["/v1/ai-voice-generator"]["post"]
+        voice = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]["style"]["properties"]["voice_name"]
+        unapproved = "New unapproved upstream preset"
+        voice["enum"].append(unapproved)
+        voice["description"] = unapproved
+        voice["default"] = unapproved
+        operation["requestBody"]["content"]["application/json"]["example"] = {"style": {"voice_name": unapproved}}
+        approved = ("Test approved preset",)
+
+        forwarded = []
+
+        def upstream(request):
+            forwarded.append(json.loads(request.content))
+            return httpx.Response(200, json={"id": "test-audio", "credits_charged": 1})
+
+        async with httpx.AsyncClient(base_url="https://api.example.test", transport=httpx.MockTransport(upstream)) as client:
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ), patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", approved):
+                synced_mcp = create_mcp()
+            tool = await synced_mcp.get_tool("ai_voice_generator_create_audio")
+            self.assertEqual(tool.parameters["properties"]["style"]["properties"]["voice_name"]["enum"], list(approved))
+            self.assertNotIn(unapproved, tool.to_mcp_tool().model_dump_json())
+            self.assertEqual(tool.parameters["properties"]["style"]["properties"]["voice_name"]["description"], VOICE_PRESET_DESCRIPTION)
+            self.assertIsNone(await synced_mcp.get_tool("ai_voice_cloner_create_audio"))
+            arguments = {"style": {"prompt": "Hello", "voice_name": approved[0]}}
+            with patch("mcp_magichour.oauth_compat.current_authorization_header", return_value="Bearer test-token"):
+                async with Client(synced_mcp) as caller:
+                    tools = await caller.list_tools()
+                    listed_generator = next(t for t in tools if t.name == "ai_voice_generator_create_audio")
+                    self.assertEqual(listed_generator.inputSchema["properties"]["style"]["properties"]["voice_name"]["enum"], list(approved))
+                    self.assertNotIn("ai_voice_cloner_create_audio", {t.name for t in tools})
+                    await caller.call_tool("ai_voice_generator_create_audio", arguments)
+                    with self.assertRaises(McpError):
+                        await caller.call_tool("ai_voice_generator_create_audio", {
+                            "style": {"prompt": "Hello", "voice_name": unapproved},
+                        })
+            self.assertEqual(forwarded, [arguments])
+
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ), patch("mcp_magichour.openapi_policies.APPROVED_VOICE_NAMES", ()):
+                empty_mcp = create_mcp()
+            async with Client(empty_mcp) as caller:
+                self.assertFalse({"ai_voice_generator_create_audio", "ai_voice_cloner_create_audio"}.intersection(
+                    t.name for t in await caller.list_tools()
+                ))
+
+    async def test_synced_meme_templates_cannot_expose_public_figure_names(self):
+        spec = load_openapi_spec()
+        schema = spec["paths"]["/v1/ai-meme-generator"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        template = schema["properties"]["style"]["properties"]["template"]
+        template["enum"].append("Taylor Swift")
+        template["example"] = "Elon Musk"
+        async with httpx.AsyncClient() as client:
+            with patch("mcp_magichour.openapi_server.load_openapi_spec", return_value=spec), patch(
+                "mcp_magichour.openapi_server.build_api_client", return_value=client
+            ):
+                synced_mcp = create_mcp()
+            tool = await synced_mcp.get_tool("create_meme")
+            self.assertEqual(tool.parameters["properties"]["style"]["properties"]["template"]["enum"], ["Random"])
+            for name in ("Taylor Swift", "Elon Musk", "Drake", "Leonardo DiCaprio"):
+                self.assertNotIn(name, tool.to_mcp_tool().model_dump_json())
+
     async def test_favicon_is_public_and_serves_packaged_asset(self):
         favicon_path = Path(__file__).parent.parent / "mcp_magichour" / "favicon.ico"
 
@@ -80,11 +228,11 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         names = {tool.name for tool in await mcp.list_tools()}
 
         self.assertIn("ping", names)
-        self.assertIn("ai_image_generator_create_image", names)
-        self.assertIn("face_detection_retrieve_details", names)
+        self.assertIn("generate_image", names)
+        self.assertIn("get_face_detection_results", names)
         self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in names))
         self.assertTrue(all(len(name) >= 4 for name in names))
-        self.assertTrue(all(not {"do", "get", "run"}.intersection(name.split("_")) for name in names))
+        self.assertTrue(all(not {"do", "run"}.intersection(name.split("_")) for name in names))
 
     def test_resolve_media_mime_type_prefers_matching_header(self):
         mime_type = _resolve_media_mime_type(

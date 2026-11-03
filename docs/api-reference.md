@@ -1,6 +1,6 @@
 # Magic Hour API reference for MCP tool design
 
-Source: https://docs.magichour.ai/api-reference/openapi.json (fetched and saved as `docs/openapi.json`). Regenerate this file with `python docs/build_reference.py` if the spec changes.
+Source: https://magichour.ai/docs/api/openapi.json (saved as `docs/openapi.json` without deprecated fields), with MCP-specific policies applied. Regenerate this file with `python docs/build_reference.py` if the spec changes.
 
 ## Authentication
 
@@ -32,7 +32,7 @@ Any `*_file_path` field in a request body should preferably use one of:
 
 Direct public media URLs can also work when they are stable, fetchable, and return raw file bytes. Treat them as best-effort rather than the default path, because hotlinked URLs can fail or return HTML/auth/redirect responses instead of the file.
 
-MCP tool calls carry JSON, not binary data. Upload raw bytes separately. The flow is `video_assets_generate_presigned_url`, upload bytes, then pass `file_path` to the generated create tool. `video_assets_generate_presigned_url` is the shared `/v1/files/upload-urls` tool for `video`, `audio`, and `image` items.
+MCP tool calls carry JSON, not binary data. Upload raw bytes separately. The flow is `get_upload_urls`, upload bytes, then pass `file_path` to the generated create tool. `get_upload_urls` is the shared `/v1/files/upload-urls` tool for `video`, `audio`, and `image` items.
 
 ## Output delivery
 
@@ -59,9 +59,10 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 
 ## Voice presets
 
-- The Magic Hour API accepts `voice_name` as a string for AI voice generation.
-- The runtime OpenAPI MCP server does not maintain a custom per-voice list tool.
-- Use the Magic Hour product/docs as the source of truth for supported voice names, then pass the selected string into `ai_voice_generator_create_audio`.
+- Select one of Magic Hour’s approved preset voices.
+- MCP accepts only exact `voice_name` strings in `APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`; the main product and public API are unchanged.
+- An empty allowlist omits AI Voice Generator entirely from MCP. Adding verified generic/non-celebrity API names enables only those presets on the next deployment.
+- AI Voice Cloner is excluded from MCP discovery and calls.
 
 ## Magic Hour's documentation MCP
 
@@ -78,8 +79,12 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/face-detection` | Files | Face Detection |
 | GET | `/v1/face-detection/{id}` | Files | Get face detection details |
 | POST | `/v1/files/upload-urls` | Files | Generate asset upload urls |
+| GET | `/v1/saved-items` | Files | List saved items |
 | POST | `/v1/ai-talking-photo` | Video Projects | AI Talking Photo |
+| POST | `/v1/ai-ugc-ad` | Video Projects | AI UGC Ad Generator |
 | POST | `/v1/ai-video-editor` | Video Projects | AI Video Editor |
+| POST | `/v1/ai-video-translator` | Video Projects | AI Video Translator |
+| POST | `/v1/ai-video-upscaler` | Video Projects | AI Video Upscaler |
 | POST | `/v1/animation` | Video Projects | Animation |
 | POST | `/v1/audio-to-video` | Video Projects | Audio-to-Video |
 | POST | `/v1/auto-subtitle-generator` | Video Projects | Auto Subtitle Generator |
@@ -98,7 +103,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/ai-image-editor` | Image Projects | AI Image Editor |
 | POST | `/v1/ai-image-generator` | Image Projects | AI Image Generator |
 | POST | `/v1/ai-image-upscaler` | Image Projects | AI Image Upscaler |
-| POST | `/v1/ai-meme-generator` | Image Projects | AI Meme Generator |
+| POST | `/v1/ai-meme-generator` | Image Projects | Create meme |
 | POST | `/v1/ai-qr-code-generator` | Image Projects | AI QR Code Generator |
 | POST | `/v1/body-swap` | Image Projects | Body Swap |
 | POST | `/v1/face-swap-photo` | Image Projects | Face Swap Photo |
@@ -107,8 +112,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | GET | `/v1/image-projects/{id}` | Image Projects | Get image details |
 | DELETE | `/v1/image-projects/{id}` | Image Projects | Delete image |
 | POST | `/v1/photo-colorizer` | Image Projects | Photo Colorizer |
-| POST | `/v1/ai-voice-cloner` | Audio Projects | AI Voice Cloner |
-| POST | `/v1/ai-voice-generator` | Audio Projects | AI Voice Generator |
+| POST | `/v1/ai-music-generator` | Audio Projects | AI Music Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
 | GET | `/v1/account` | Account | Get account details |
@@ -128,7 +132,7 @@ Face Detection
 **Request Body:**
 - `confidence_score` (number, optional) default=0.5 range=[0,1]: Confidence threshold for filtering detected faces. * Higher values (e.g., 0.9) include only faces detected with high certainty, reducing false positives. * Lower values (e.g., 0.3) include more faces, but may increase...
 - `assets` (object, required): Provide the assets for face detection
-  - `target_file_path` (string, required): This is the image or video where the face will be detected. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `target_file_path` (string, required): This is the image or video where the face will be detected. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): The id of the task. Use this value in the [get face detection details API](https://docs.magichour.ai/api-reference/files/get-face-detection-details) to get the details of the face detection task.
@@ -170,6 +174,31 @@ Generate asset upload urls
     - `expires_at` (string, required): when the upload url expires, and will need to request a new one.
     - `file_path` (string, required): this value is used in APIs that needs assets, such as image_file_path, video_file_path, and audio_file_path
 
+#### GET /v1/saved-items
+`operationId: savedItems.list`
+
+List saved items
+
+**Path Parameters:**
+- `type` (query, optional): Only return saved items of this type.
+- `limit` (query, optional): Maximum number of saved items to return. Defaults to 20.
+- `cursor` (query, optional): Opaque pagination cursor from the previous response's next_cursor.
+
+**Response 200:**
+- `items` (array, required):
+  items:
+    - `id` (string, required): Unique ID of the saved item.
+    - `type` (string, required) enum=['character', 'reference', 'voice', 'moodboard', 'brand_kit']: Saved item type.
+    - `name` (string, required): User-provided name of the saved item.
+    - `assets` (array, required):
+      items:
+        - `file_path` (string, required): Durable asset path. Pass it to a compatible API asset field without uploading it again.
+        - `media_kind` (string, required) enum=['IMAGE', 'VIDEO', 'AUDIO']: Media type of the asset.
+        - `is_primary` (boolean, required): Whether this asset is the saved item's primary asset.
+        - `url` (string, required): Signed URL for previewing or downloading the asset. Expires after 24 hours.
+        - `url_expires_at` (string, required): When the signed URL expires. The saved asset and file_path do not expire.
+- `next_cursor` (string, required): Cursor for the next page, or null when there are no more saved items.
+
 ### Video projects
 
 
@@ -180,16 +209,34 @@ AI Talking Photo
 
 
 **Request Body:**
-- `name` (string, optional) default=Talking Photo - dateTime: Give your image a custom name for easy identification.
-- `start_seconds` (number, required) range=[0,None]: The start time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 300s, prompted 45s.
-- `end_seconds` (number, required) range=[0.1,None]: The end time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 300s, prompted 45s.
+- `name` (string, optional) default=Talking Photo - dateTime: Give your video a custom name for easy identification.
+- `start_seconds` (number, required) range=[0,None]: The start time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 300s, prompted 60s.
+- `end_seconds` (number, required) range=[0.1,None]: The end time of the input audio in seconds. Maximum clip length depends on style.generation_mode: realistic 300s, prompted 60s.
 - `assets` (object, required): Provide the assets for creating a talking photo
-  - `image_file_path` (string, required): The source image to animate. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
-  - `audio_file_path` (string, required): The audio file to sync with the image. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, required): The source image to animate. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+  - `audio_file_path` (string, required): The audio file to sync with the image. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 - `style` (object, optional): Attributes used to dictate the style of the output
   - `generation_mode` (string, optional) enum=['realistic', 'prompted', 'pro', 'standard', 'stable', 'expressive'] default=realistic: Controls overall motion style. * `realistic` - Maintains likeness well, high quality, and reliable. * `prompted` - Slightly lower likeness; allows option to prompt scene.
   - `prompt` (string, optional): A text prompt to guide the generation. Only applicable when generation_mode is `prompted`. This field is ignored for other modes.
-- `max_resolution` (integer, optional): Constrains the larger dimension (height or width) of the output video. Allows you to set a lower resolution than your plan's maximum if desired. The value is capped by your plan's max resolution.
+- `resolution` (string, optional) enum=['480p', '720p']: Output preset. Overrides `max_resolution`. Defaults to 480p in prompted mode; realistic mode uses the mapped plan maximum.
+
+**Response 200:**
+- `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
+
+#### POST /v1/ai-ugc-ad
+`operationId: aiUgcAd.createVideo`
+
+AI UGC Ad Generator
+
+
+**Request Body:**
+- `assets` (object, required):
+  - `image_file_path` (string, required): Prepared image to animate. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+- `script` (string, required): The words the actor should speak. Character limits apply after trimming: * kling-3.0: 2304 characters. * ltx-2.5: 1804 characters. * veo3.1: 2500 characters. LTX and Kling dialogue wrappers count toward their model...
+- `end_seconds` (number, required) range=[1,None]: Video duration in seconds. Supported values by model: * kling-3.0: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 seconds. * ltx-2.5: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 seconds. * veo3.1:...
+- `model` (string, optional) enum=['kling-3.0', 'ltx-2.5', 'veo3.1']: Defaults to kling-3.0 on paid plans and ltx-2.5 on free plans.
+- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Defaults to 720p on paid plans and 480p on free plans. Unsupported model/resolution combinations and resolutions unavailable for your plan are rejected.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -204,13 +251,50 @@ AI Video Editor
 **Request Body:**
 - `name` (string, optional) default=Video Editor - dateTime: Give your video a custom name for easy identification.
 - `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
-- `end_seconds` (number, required) range=[0.1,None]: End time of your clip in seconds. Must be greater than `start_seconds`. Minimum duration depends on model: `gemini-omni-1.1`: 3s, `ltx-2.3`: 0.5s. Maximum duration depends on model: `gemini-omni-1.1`: 10s, `ltx-2.3`:...
-- `model` (string, optional) enum=['gemini-omni-1.1', 'gemini-omni', 'ltx-2.3']: Editing model. Defaults to `ltx-2.3` for free tier and `gemini-omni-1.1` for paid. `gemini-omni` is deprecated; use `gemini-omni-1.1` instead.
-- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output resolution. Defaults to `480p` for free tier and `720p` for paid. `gemini-omni-1.1` and deprecated `gemini-omni` support 720p and 1080p; LTX-2.3 supports 480p, 720p, and 1080p.
-- `style` (object, required): 
+- `end_seconds` (number, required) range=[0.1,None]: End time of your clip in seconds. Must be greater than `start_seconds`. Allowed duration depends on model: `gemini-omni-1.1`: 3-10s, `wan-3.0`: 2-15s, `ltx-2.5`: 0.5-60s (30s at 1080p).
+- `model` (string, optional) enum=['gemini-omni-1.1', 'wan-3.0', 'ltx-2.5', 'gemini-omni', 'ltx-2.3']: Editing model. Defaults to LTX 2.5 for free tier and `gemini-omni-1.1` for paid. `wan-3.0` requires a paid tier. `gemini-omni` is deprecated; use `gemini-omni-1.1` instead.
+- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output resolution. Defaults to `480p` for free tier and `720p` for paid. Supported per model: `gemini-omni-1.1`: 720p, 1080p; `wan-3.0`: 480p, 720p, 1080p; `ltx-2.5`: 480p, 720p, 1080p.
+- `style` (object, required):
   - `prompt` (string, required): The prompt used to edit the video.
 - `assets` (object, required): Provide the assets for video editing.
-  - `video_file_path` (string, required): The video to edit. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
+  - `video_file_path` (string, required): The video to edit. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+
+**Response 200:**
+- `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
+
+#### POST /v1/ai-video-translator
+`operationId: aiVideoTranslator.createVideo`
+
+AI Video Translator
+
+
+**Request Body:**
+- `name` (string, optional) default=Video Translator - dateTime: Give your video a custom name for easy identification.
+- `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
+- `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds. The clip must be 1-30 seconds long.
+- `target_language` (string, required) enum=[53 values, e.g. ['English', 'Chinese (Simplified)', 'Hindi', 'Spanish', 'Arabic', 'French'], ...]: Language to translate the video's speech into.
+- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output video resolution. Defaults to 480p. 720p and 1080p require a paid plan.
+- `assets` (object, required): Source video for the translation job.
+  - `video_file_path` (string, required): Source video containing the speech to translate. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+
+**Response 200:**
+- `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
+
+#### POST /v1/ai-video-upscaler
+`operationId: aiVideoUpscaler.createVideo`
+
+AI Video Upscaler
+
+
+**Request Body:**
+- `name` (string, optional) default=Video Upscaler - dateTime: Give your video a custom name for easy identification.
+- `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
+- `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
+- `resolution` (string, required) enum=['720p', '1080p', '2k', '4k']: Output resolution. `720p` and `1080p` set the output's short side, `2k` and `4k` its long side; the aspect ratio is kept. Requires a paid plan.
+- `assets` (object, required): Source video for the upscale job.
+  - `video_file_path` (string, required): Video to upscale. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -237,9 +321,9 @@ Animation
   - `transition_speed` (integer, required) range=[1,10]: Change determines how quickly the video's content changes across frames. * Higher = more rapid transitions. * Lower = more stable visual experience.
 - `assets` (object, required): Provide the assets for animation.
   - `audio_source` (string, required) enum=['none', 'file', 'youtube']: Optionally add an audio source if you'd like to incorporate audio into your video
-  - `audio_file_path` (string, optional): The path of the input audio. This field is required if `audio_source` is `file`. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `audio_file_path` (string, optional): The path of the input audio. This field is required if `audio_source` is `file`. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the...
   - `youtube_url` (string, optional): Using a youtube video as the input source. This field is required if `audio_source` is `youtube`
-  - `image_file_path` (string, optional): An initial image to use a the first frame of the video. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, optional): An initial image to use a the first frame of the video. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -257,8 +341,8 @@ Audio-to-Video
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `assets` (object, required): Provide the audio file and an optional reference image.
-  - `audio_file_path` (string, required): The path of the audio file. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
-  - `image_file_path` (string, optional): Reference image for the initial frame of the video. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `audio_file_path` (string, required): The path of the audio file. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, optional): Reference image for the initial frame of the video. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 - `style` (object, optional): Attributes used to dictate the style of the output
   - `prompt` (string, optional): Prompt to guide the visual style of the video.
 
@@ -277,7 +361,7 @@ Auto Subtitle Generator
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
 - `assets` (object, required): Provide the assets for auto subtitle generator
-  - `video_file_path` (string, required): This is the video used to add subtitles. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `video_file_path` (string, required): This is the video used to add subtitles. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 - `style` (object, required): Style of the subtitle. At least one of `.style.template` or `.style.custom_config` must be provided. * If only `.style.template` is provided, default values for the template will be used. * If both are provided, the...
   - `template` (string, optional) enum=['karaoke', 'cinematic', 'minimalist', 'highlight']: Preset subtitle templates. Please visit https://magichour.ai/create/auto-subtitle-generator to see the style of the existing templates.
   - `custom_config` (object, optional): Custom subtitle configuration.
@@ -305,14 +389,16 @@ Character Replace
 - `name` (string, optional) default=Character Replace - dateTime: Give your video a custom name for easy identification.
 - `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
-- `resolution` (string, optional) enum=['480p', '720p']: Output video resolution. Defaults to 480p, the lowest resolution available on your plan.
+- `model` (string, optional) enum=['wan-animate', 'kling-3.0', 'minimax-h3'] default=wan-animate: Model to use. Defaults to `wan-animate`.
+- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output video resolution. Must be supported by `model`. Defaults to the lowest resolution available on your plan for that model.
 - `assets` (object, required): Source video and reference character image for the job.
-  - `video_file_path` (string, required): Source video containing the subject to replace or animate. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
-  - `image_file_path` (string, required): Reference character image used as the replacement or animation target. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `video_file_path` (string, required): Source video containing the subject to replace or animate. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, required): Reference character image used as the replacement or animation target. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the...
 - `style` (object, optional): Optional style controls for replace vs animate mode and subject selection.
   - `mode` (string, optional) enum=['replace', 'animate']: Processing mode. `replace` swaps the detected subject with your reference character. `animate` transfers motion from the video onto your character image.
-  - `selection_mode` (string, optional) enum=['auto', 'point']: How to locate the subject in the source video. `auto` detects a person automatically. `point` uses your `points` to mark the subject. Defaults to `auto`.
-  - `points` (array, optional): On-frame markers for manual subject selection. Required when `selection_mode` is `point`. Ignored when `selection_mode` is `auto` or omitted.
+  - `prompt` (string, optional): Optional direction. Supported by kling-3.0, minimax-h3.
+  - `selection_mode` (string, optional) enum=['auto', 'point']: How to locate the subject in the source video. `auto` detects a person automatically. `point` uses your `points` to mark the subject and is supported by `wan-animate`, `minimax-h3`. `minimax-h3` subject `points` are...
+  - `points` (array, optional): On-frame markers for manual subject selection. Required when `selection_mode` is `point`. Ignored when `selection_mode` is `auto` or omitted. Rejected for models without subject selection (supported by `wan-animate`,...
     items:
       - `position_x` (integer, required) range=[0,None]: Horizontal pixel coordinate in the source video frame at `time_seconds`, measured from the left edge.
       - `position_y` (integer, required) range=[0,None]: Vertical pixel coordinate in the source video frame at `time_seconds`, measured from the top edge.
@@ -335,14 +421,14 @@ Face Swap Video
 - `style` (object, optional): Style of the face swap video.
   - `version` (string, optional) enum=['v1', 'v2', 'default']: * `v1` - May preserve skin detail and texture better, but weaker identity preservation. * `v2` - Faster, sharper, better handling of hair and glasses. stronger identity preservation. * `default` - Use the version we...
 - `assets` (object, required): Provide the assets for face swap. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: - **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) - **individual-faces** — specify exact mappings using `face_mappings`
   - `image_file_path` (string, optional): The path of the input image with the face to be swapped. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
       - `original_face` (string, required): The face detected from the image in `target_file_path`. The file name is in the format of `<face_frame>-<face_index>.png`. This value is corresponds to the response in the [face detection...
-      - `new_face` (string, required): The face image that will be used to replace the face in the `original_face`. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+      - `new_face` (string, required): The face image that will be used to replace the face in the `original_face`. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of...
   - `video_source` (string, required) enum=['file', 'youtube']: Choose your video source.
-  - `video_file_path` (string, optional): Your video file. Required if `video_source` is `file`. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `video_file_path` (string, optional): Your video file. Required if `video_source` is `file`. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `youtube_url` (string, optional): YouTube URL (required if `video_source` is `youtube`).
 
 **Response 200:**
@@ -358,13 +444,13 @@ Image-to-Video
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.5', 'minimax-h3', 'wan-2.2', 'seedance-1.5'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[24 values, e.g. ['default', 'minimax-h3', 'kling-4.0', 'kling-3.0', 'ltx-2.5', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
   - `prompt` (string, optional): The prompt used for the video.
-- `assets` (object, required): Provide the assets for image-to-video. Sora 2 only supports images with an aspect ratio of `9:16` or `16:9`.
-  - `image_file_path` (string, required): The path of the image file. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
+- `assets` (object, required): Provide the assets for image-to-video.
+  - `image_file_path` (string, required): The path of the image file. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `end_image_file_path` (string, optional): The image to use as the last frame of the video.
 
 **Response 200:**
@@ -383,12 +469,12 @@ Lip Sync
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
 - `max_fps_limit` (number, optional) range=[1,None]: Defines the maximum FPS (frames per second) for the output video. If the input video's FPS is lower than this limit, the output video will retain the input FPS. This is useful for reducing unnecessary frame usage in...
 - `assets` (object, required): Provide the assets for lip-sync. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
-  - `audio_file_path` (string, required): The path of the audio file. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
+  - `audio_file_path` (string, required): The path of the audio file. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `video_source` (string, required) enum=['file', 'youtube']: Choose your video source.
-  - `video_file_path` (string, optional): Your video file. Required if `video_source` is `file`. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `video_file_path` (string, optional): Your video file. Required if `video_source` is `file`. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `youtube_url` (string, optional): YouTube URL (required if `video_source` is `youtube`).
 - `style` (object, optional): Attributes used to dictate the style of the output
-  - `generation_mode` (string, optional) enum=['lite', 'standard', 'pro'] default=lite: A specific version of our lip sync system, optimized for different needs. * `lite` - Fast and affordable lip sync - best for simple videos. Costs 1 credit per frame of video. * `standard` - Natural, accurate lip sync -...
+  - `generation_mode` (string, optional) enum=['lite', 'standard', 'pro'] default=lite: A specific version of our lip sync system, optimized for different needs. * `lite` - Fast lip sync - best for simple videos. Costs 1 credit per frame of video. * `standard` - Natural, accurate lip sync - best for most...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -403,12 +489,16 @@ Text-to-Video
 **Request Body:**
 - `name` (string, optional) default=Text To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
+- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Provide `aspect_ratio` to set the video’s aspect ratio. Determines the aspect ratio of the output video.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
-- `model` (string, optional) enum=[21 values, e.g. ['default', 'ltx-2', 'ltx-2.5', 'minimax-h3', 'wan-2.2', 'seedance-1.5'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[24 values, e.g. ['default', 'minimax-h3', 'kling-4.0', 'kling-3.0', 'ltx-2.5', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
-- `style` (object, required): 
+- `style` (object, required):
   - `prompt` (string, required): The prompt used for the video.
+- `references` (array, optional): Reference media for video generation. Name references without @ and refer to them as @name in style.prompt. Maximum 10 references total.
+  items:
+    - `name` (string, required):
+    - `file_path` (string, required): This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -427,7 +517,7 @@ Get video details
 - `name` (string, required): The name of the video.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the video.
 - `type` (string, required): The type of the video project. Possible values are ANIMATION, AUTO_SUBTITLE, VIDEO_TO_VIDEO, FACE_SWAP, TEXT_TO_VIDEO, IMAGE_TO_VIDEO, LIP_SYNC, TALKING_PHOTO, AVATAR, VIDEO_UPSCALER, VIDEO_EDITOR, CHARACTER_REPLACE,...
-- `created_at` (string, required): 
+- `created_at` (string, required):
 - `width` (integer, required): The width of the final output video. A value of -1 indicates the width can be ignored.
 - `height` (integer, required): The height of the final output video. A value of -1 indicates the height can be ignored.
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
@@ -438,10 +528,10 @@ Get video details
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
   - `message` (string, required): Details on the reason why a failure happened.
   - `code` (string, required): An error code to indicate why a failure happened.
-- `downloads` (array, required): 
+- `downloads` (array, required):
   items:
-    - `url` (string, required): 
-    - `expires_at` (string, required): 
+    - `url` (string, required):
+    - `expires_at` (string, required):
 
 #### DELETE /v1/video-projects/{id}
 `operationId: videoProjects.delete`
@@ -462,15 +552,15 @@ Video-to-Video
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
 - `fps_resolution` (string, optional) enum=['FULL', 'HALF'] default=HALF: Determines whether the resulting video will have the same frame per second as the original video, or half. * `FULL` - the result video will have the same FPS as the input video * `HALF` - the result video will have half...
-- `style` (object, required): 
-  - `art_style` (string, required) enum=[75 values, e.g. ['Minecraft', 'Watercolor', 'Pixel', 'Retro Sci-Fi', 'Lego', 'Origami'], ...]: 
-  - `version` (string, optional) enum=['v1', 'v2', 'default'] default=default: * `v1` - more detail, closer prompt adherence, and frame-by-frame previews. * `v2` - faster, more consistent, and less noisy. * `default` - use the default version for the selected art style.
+- `style` (object, required):
+  - `art_style` (string, required) enum=[75 values, e.g. ['Minecraft', 'Watercolor', 'Pixel', 'Retro Sci-Fi', 'Lego', 'Origami'], ...]:
+  - `version` (string, optional) enum=['v1', 'v2', 'default'] default=default: * `v1` - more detail, closer prompt adherence, and frame-by-frame previews. * `v2` - faster, more consistent, and less noisy. * `default` - use the selected art style's default version. Some art styles default to v3,...
   - `prompt_type` (string, optional) enum=['default', 'custom', 'append_default'] default=default: * `default` - Use the default recommended prompt for the art style. * `custom` - Only use the prompt passed in the API. Note: for v1, lora prompt will still be auto added to apply the art style properly. *...
   - `prompt` (string, optional): The prompt used for the video. Prompt is required if `prompt_type` is `custom` or `append_default`. If `prompt_type` is `default`, then the `prompt` value passed will be ignored.
   - `model` (string, optional) enum=['Dreamshaper', 'Absolute Reality', 'Flat 2D Anime', 'Soft Anime', 'Kaywaii', 'Western Anime', '3D Anime', 'default'] default=default: * `Dreamshaper` - a good all-around model that works for both animations as well as realism. * `Absolute Reality` - better at realism, but you'll often get similar results with Dreamshaper as well. * `Flat 2D Anime` -...
 - `assets` (object, required): Provide the assets for video-to-video. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
   - `video_source` (string, required) enum=['file', 'youtube']: Choose your video source.
-  - `video_file_path` (string, optional): Your video file. Required if `video_source` is `file`. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `video_file_path` (string, optional): Your video file. Required if `video_source` is `file`. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `youtube_url` (string, optional): YouTube URL (required if `video_source` is `youtube`).
 
 **Response 200:**
@@ -489,8 +579,8 @@ AI Clothes Changer
 **Request Body:**
 - `name` (string, optional) default=Clothes Changer - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for clothes changer
-  - `person_file_path` (string, required): The image with the person. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
-  - `garment_file_path` (string, required): The image of the outfit. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
+  - `person_file_path` (string, required): The image with the person. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+  - `garment_file_path` (string, required): The image of the outfit. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `garment_type` (string, optional) enum=['entire_outfit', 'upper_body', 'lower_body', 'dresses']: Type of clothing item to swap. If not provided, swaps the entire outfit. * `upper_body` - for shirts/jackets * `lower_body` - for pants/skirts * `dresses` - for entire outfit (deprecated, use `entire_outfit` instead) *...
 
 **Response 200:**
@@ -506,7 +596,7 @@ AI Face Editor
 **Request Body:**
 - `name` (string, optional) default=Face Editor - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for face editor
-  - `image_file_path` (string, required): This is the image whose face will be edited. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, required): This is the image whose face will be edited. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 - `style` (object, required): Face editing parameters
   - `enhance_face` (boolean, optional) default=False: Enhance face features
   - `eyebrow_direction` (number, optional) default=0 range=[-100,100]: Eyebrow direction (-100 to 100), in increments of 5
@@ -536,7 +626,7 @@ AI GIF Generator
 
 **Request Body:**
 - `name` (string, optional) default=Ai Gif - dateTime: Give your gif a custom name for easy identification.
-- `style` (object, required): 
+- `style` (object, required):
   - `prompt` (string, required): The prompt used for the GIF.
 - `output_format` (string, optional) enum=['gif', 'mp4', 'webm'] default=gif: The output file format for the generated animation.
 
@@ -552,10 +642,10 @@ AI Headshot Generator
 
 **Request Body:**
 - `name` (string, optional) default=Ai Headshot - dateTime: Give your image a custom name for easy identification.
-- `style` (object, optional): 
+- `style` (object, optional):
   - `prompt` (string, optional): Prompt used to guide the style of your headshot. We recommend omitting the prompt unless you want to customize your headshot. You can visit [AI headshot generator](https://magichour.ai/create/ai-headshot-generator) to...
 - `assets` (object, required): Provide the assets for headshot photo
-  - `image_file_path` (string, required): The image used to generate the headshot. This image must contain one detectable face. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, required): The image used to generate the headshot. This image must contain one detectable face. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
@@ -570,13 +660,13 @@ AI Image Editor
 **Request Body:**
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
-- `model` (string, optional) enum=[12 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'flux-2-klein', 'nano-banana-2-lite'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[15 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'nano-banana-2', 'flux-2-klein', 'nano-banana-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
-- `style` (object, required): 
+- `style` (object, required):
   - `prompt` (string, required): The prompt used to edit the image.
 - `assets` (object, required): Provide the assets for image edit
-  - `image_file_paths` (array, optional): The image(s) used in the edit, maximum of 10 images. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `image_file_paths` (array, optional): The image(s) used in the edit, maximum of 10 images. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
     items: type=string
 
 **Response 200:**
@@ -592,7 +682,7 @@ AI Image Generator
 **Request Body:**
 - `name` (string, optional) default=Ai Image - dateTime: Give your image a custom name for easy identification.
 - `image_count` (integer, required) range=[1,16]: Number of images to generate. Maximum varies by model.
-- `model` (string, optional) enum=[13 values, e.g. ['default', 'nano-banana-2', 'gpt-image-2', 'gpt-image-2.5-flare', 'z-image-turbo', 'flux-2-klein'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[16 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): The art style to use for image generation.
@@ -616,23 +706,23 @@ AI Image Upscaler
   - `mode` (string, optional) enum=['pro', 'preserve', 'balanced', 'creative']: The upscaling mode. `"preserve"` uses the fast pro pipeline (1× credit multiplier). `"balanced"` and `"creative"` use the creative pipeline (2× credit multiplier). `"pro"` is deprecated and maps to `"preserve"`....
   - `prompt` (string, optional): A prompt to guide the final image. Only used when mode is `creative`.
 - `assets` (object, required): Provide the assets for upscaling
-  - `image_file_path` (string, required): The image to upscale. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls API](https://docs.magichour.ai/api-reference/files/generate-asset-upload-urls).
+  - `image_file_path` (string, required): The image to upscale. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
 
 #### POST /v1/ai-meme-generator
-`operationId: aiMemeGenerator.createImage`
+`operationId: create_meme`
 
-AI Meme Generator
+Create meme
 
 
 **Request Body:**
 - `name` (string, optional): The name of the meme.
-- `style` (object, required): 
+- `style` (object, required):
   - `topic` (string, required): The topic of the meme.
-  - `template` (string, required) enum=[101 values, e.g. ['Random', 'Drake Hotline Bling', 'Galaxy Brain', 'Two Buttons', "Gru's Plan", 'Tuxedo Winnie The Pooh'], ...]: To use our templates, pass in one of the enum values.
+  - `template` (string, required) enum=['Random']: Select a random meme template.
   - `searchWeb` (boolean, optional) default=False: Whether to search the web for meme content.
 
 **Response 200:**
@@ -648,7 +738,7 @@ AI QR Code Generator
 **Request Body:**
 - `name` (string, optional) default=Qr Code - dateTime: Give your image a custom name for easy identification.
 - `content` (string, required): The content of the QR code.
-- `style` (object, required): 
+- `style` (object, required):
   - `art_style` (string, required): To use our templates, pass in one of Watercolor, Cyberpunk City, Ink Landscape, Interior Painting, Japanese Street, Mech, Minecraft, Picasso Painting, Game Map, Spaceship, Chinese Painting, Winter Village, or pass any...
 
 **Response 200:**
@@ -665,8 +755,8 @@ Body Swap
 - `name` (string, optional) default=Body Swap - dateTime: Give your image a custom name for easy identification.
 - `resolution` (string, required) enum=['640px', '1k', '2k', '4k']: Output resolution. Determines credits charged for the run.
 - `assets` (object, required): Person image and scene image for body swap
-  - `person_file_path` (string, required): Image of the person to place into the scene. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
-  - `scene_file_path` (string, required): Original scene image (background). This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `person_file_path` (string, required): Image of the person to place into the scene. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+  - `scene_file_path` (string, required): Original scene image (background). This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
@@ -681,13 +771,13 @@ Face Swap Photo
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for face swap photo
-  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) +- **individual-faces** — specify exact mappings using `face_mappings`
+  - `face_swap_mode` (string, optional) enum=['all-faces', 'individual-faces'] default=all-faces: Choose how to swap faces: - **all-faces** (recommended) — swap all detected faces using one source image (`source_file_path` required) - **individual-faces** — specify exact mappings using `face_mappings`
   - `source_file_path` (string, optional): This is the image from which the face is extracted. The value is required if `face_swap_mode` is `all-faces`.
   - `face_mappings` (array, optional): This is the array of face mappings used for multiple face swap. The value is required if `face_swap_mode` is `individual-faces`.
     items:
       - `original_face` (string, required): The face detected from the image in `target_file_path`. The file name is in the format of `<face_frame>-<face_index>.png`. This value is corresponds to the response in the [face detection...
-      - `new_face` (string, required): The face image that will be used to replace the face in the `original_face`. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
-  - `target_file_path` (string, required): This is the image where the face from the source image will be placed. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+      - `new_face` (string, required): The face image that will be used to replace the face in the `original_face`. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of...
+  - `target_file_path` (string, required): This is the image where the face from the source image will be placed. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
@@ -703,8 +793,8 @@ Head Swap
 - `name` (string, optional) default=Head Swap - dateTime: Give your image a custom name for easy identification.
 - `max_resolution` (integer, optional): Constrains the larger dimension (height or width) of the output. Omit to use the maximum allowed for your plan (capped at 2048px). Values above your plan maximum are clamped down to your plan's maximum.
 - `assets` (object, required): Provide the body and head images for head swap
-  - `body_file_path` (string, required): Image that receives the swapped head. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
-  - `head_file_path` (string, required): Image of the head to place on the body. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `body_file_path` (string, required): Image that receives the swapped head. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+  - `head_file_path` (string, required): Image of the head to place on the body. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
@@ -719,7 +809,7 @@ Image Background Remover
 **Request Body:**
 - `name` (string, optional) default=Background Remover - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for background removal
-  - `image_file_path` (string, required): The image to remove the background. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, required): The image to remove the background. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `background_image_file_path` (string, optional): The image used as the new background for the image_file_path. This image will be resized to match the image in image_file_path. Please make sure the resolution between the images are similar.
 
 **Response 200:**
@@ -739,14 +829,14 @@ Get image details
 - `name` (string, required): The name of the image.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the image.
 - `image_count` (integer, required): Number of images generated
-- `type` (string, required): The type of the image project. Possible values are FACE_EDITOR, AI_IMAGE_EDITOR, AI_SELFIE, AI_HEADSHOT, AI_INFLUENCER, AI_IMAGE, AI_MEME, CLOTHES_CHANGER, BACKGROUND_REMOVER, FACE_SWAP, IMAGE_UPSCALER, IMAGE_ENHANCER,...
-- `created_at` (string, required): 
+- `type` (string, required): The type of the image project. Possible values are FACE_EDITOR, AI_IMAGE_EDITOR, GENERATIVE_FILL, AI_SELFIE, AI_HEADSHOT, AI_INFLUENCER, AI_IMAGE, AI_MEME, CLOTHES_CHANGER, BACKGROUND_REMOVER, FACE_SWAP, IMAGE_UPSCALER,...
+- `created_at` (string, required):
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
-- `downloads` (array, required): 
+- `downloads` (array, required):
   items:
-    - `url` (string, required): 
-    - `expires_at` (string, required): 
+    - `url` (string, required):
+    - `expires_at` (string, required):
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
   - `message` (string, required): Details on the reason why a failure happened.
   - `code` (string, required): An error code to indicate why a failure happened.
@@ -768,7 +858,7 @@ Photo Colorizer
 **Request Body:**
 - `name` (string, optional) default=Photo Colorizer - dateTime: Give your image a custom name for easy identification.
 - `assets` (object, required): Provide the assets for photo colorization
-  - `image_file_path` (string, required): The image used to generate the colorized image. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
+  - `image_file_path` (string, required): The image used to generate the colorized image. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
@@ -777,34 +867,19 @@ Photo Colorizer
 ### Audio projects
 
 
-#### POST /v1/ai-voice-cloner
-`operationId: aiVoiceCloner.createAudio`
+#### POST /v1/ai-music-generator
+`operationId: aiMusicGenerator.createAudio`
 
-AI Voice Cloner
-
-
-**Request Body:**
-- `name` (string, optional) default=Voice Cloner - dateTime: Give your audio a custom name for easy identification.
-- `assets` (object, required): Provide the assets for voice cloning.
-  - `audio_file_path` (string, required): The audio used to clone the voice. This value is either - a direct URL to the video file - `file_path` field from the response of the [upload urls...
-- `style` (object, required): 
-  - `prompt` (string, required): Text used to generate speech from the cloned voice. The character limit is 1000 characters.
-
-**Response 200:**
-- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
-- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
-
-#### POST /v1/ai-voice-generator
-`operationId: aiVoiceGenerator.createAudio`
-
-AI Voice Generator
+AI Music Generator
 
 
 **Request Body:**
-- `name` (string, optional) default=Voice Generator - dateTime: Give your audio a custom name for easy identification.
-- `style` (object, required): The content used to generate speech.
-  - `prompt` (string, required): Text used to generate speech. The character limit is 1000 characters.
-  - `voice_name` (string, required) enum=[1267 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Available voices: Elon Musk, Mark Zuckerberg, Joe Rogan, Barack Obama, Morgan Freeman, Kanye West, Donald Trump, Joe Biden, Kim Kardashian, Taylor Swift, James Earl Jones, Samuel L....
+- `name` (string, optional) default=AI Music Generator: Give your audio a custom name for easy identification.
+- `duration` (integer, required) range=[15,300]: Requested track duration in seconds, from 15 to 300. Determines credits charged.
+- `style` (object, required):
+  - `prompt` (string, required): Describe the song, including genre, mood, and instruments.
+  - `instrumental` (boolean, optional) default=False: Generate music without vocals. When true, lyrics is ignored.
+  - `lyrics` (string, optional): Custom lyrics. Omit or leave blank for AI-generated lyrics when instrumental is false.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
@@ -822,14 +897,14 @@ Get audio details
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
 - `name` (string, required): The name of the audio.
 - `status` (string, required) enum=['draft', 'queued', 'rendering', 'complete', 'error', 'canceled']: The status of the audio.
-- `type` (string, required): The type of the audio project. Possible values are VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR
-- `created_at` (string, required): 
+- `type` (string, required): The type of the audio project. Possible values are AUDIO_TRANSLATOR, VOICE_GENERATOR, VOICE_CHANGER, VOICE_CLONER, VIDEO_TO_AUDIO, MUSIC_GENERATOR, SOUND_EFFECT_GENERATOR
+- `created_at` (string, required):
 - `enabled` (boolean, required): Whether this resource is active. If false, it is deleted.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
-- `downloads` (array, required): 
+- `downloads` (array, required):
   items:
-    - `url` (string, required): 
-    - `expires_at` (string, required): 
+    - `url` (string, required):
+    - `expires_at` (string, required):
 - `error` (object, required): In the case of an error, this object will contain the error encountered during video render
   - `message` (string, required): Details on the reason why a failure happened.
   - `code` (string, required): An error code to indicate why a failure happened.
