@@ -112,6 +112,7 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
 export default function App() {
   const [toolOutput, setToolOutput] = useState<unknown>();
   const [storedOutput, setStoredOutput] = useState<unknown>();
+  const [selectedOutput, setSelectedOutput] = useState(0);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const { app, error: connectionError } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
@@ -120,6 +121,7 @@ export default function App() {
       createdApp.ontoolresult = (result) => {
         if (result.isError || Object.keys(record(result.structuredContent)).length) {
           setToolOutput(result.structuredContent ?? {});
+          setSelectedOutput(0);
         }
       };
       createdApp.onhostcontextchanged = (context) => {
@@ -135,6 +137,9 @@ export default function App() {
       const host = (window as Window & { openai?: unknown }).openai;
       const updates = record((event as CustomEvent | undefined)?.detail).globals;
       setStoredOutput(chatGptOutput({ ...record(host), ...record(updates) }));
+      if (!event || "toolOutput" in record(updates) || "toolResponseMetadata" in record(updates)) {
+        setSelectedOutput(0);
+      }
     };
     window.addEventListener("openai:set_globals", readStoredOutput);
     readStoredOutput();
@@ -158,7 +163,7 @@ export default function App() {
     const url = safeMediaUrl(value);
     return url ? [url] : [];
   });
-  const downloadUrl = urls[0] ?? null;
+  const downloadUrl = urls[selectedOutput] ?? null;
   const type = projectType(project, downloadUrl);
   const name = text(project.name, `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
@@ -202,6 +207,14 @@ export default function App() {
       <section className="content">
         <span className="badge" data-tone={tone}>{capitalize(status)}</span>
         <h1>{name}</h1>
+        {urls.length > 1 && (
+          <label className="output-picker">
+            Output
+            <select value={selectedOutput} onChange={(event) => setSelectedOutput(Number(event.target.value))}>
+              {urls.map((url, index) => <option key={url} value={index}>{index + 1} of {urls.length}</option>)}
+            </select>
+          </label>
+        )}
         <details className="details">
           <summary>Generation details</summary>
           <dl className="detail-list">
