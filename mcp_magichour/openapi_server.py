@@ -175,7 +175,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
     )
     async def upload_chatgpt_image(image: ChatGPTImage) -> dict[str, str]:
         async def transfer() -> dict[str, str]:
-            _require_file_host(image.download_url, "files.oaiusercontent.com")
+            _require_file_host(image.download_url, "files.oaiusercontent.com", purpose="ChatGPT image source")
             async with build_api_client() as api, httpx.AsyncClient(
                 timeout=API_TIMEOUT, follow_redirects=False,
             ) as files:
@@ -205,7 +205,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
                 )
                 response.raise_for_status()
                 item = response.json()["items"][0]
-                _require_file_host(item["upload_url"], urlparse(MCP_APP_MEDIA_ORIGIN).hostname)
+                _require_file_host(
+                    item["upload_url"], urlparse(MCP_APP_MEDIA_ORIGIN).hostname,
+                    purpose="Magic Hour upload destination",
+                )
                 uploaded = await files.put(item["upload_url"], content=bytes(media))
                 uploaded.raise_for_status()
                 return {"file_path": item["file_path"]}
@@ -458,18 +461,27 @@ async def _wait_for_project_result(
     )
 
 
-def _require_file_host(url: str, hostname: str) -> None:
+def _require_file_host(url: str, hostname: str, *, purpose: str) -> None:
     try:
         parsed = urlparse(url)
-        allowed = (
-            parsed.scheme == "https" and parsed.hostname == hostname
-            and parsed.port in (None, 443) and not parsed.username and not parsed.password
-            and not parsed.fragment
-        )
+        port = parsed.port
     except ValueError:
-        allowed = False
-    if not allowed:
-        raise ToolError("The file URL is not a supported image-transfer destination.")
+        raise ToolError(f"{purpose}: invalid URL.") from None
+
+    if parsed.scheme != "https":
+        reason = "HTTPS is required"
+    elif parsed.hostname != hostname:
+        reason = f"unsupported host {parsed.hostname!r}; expected {hostname!r}"
+    elif port not in (None, 443):
+        reason = "port 443 is required"
+    elif parsed.username or parsed.password:
+        reason = "URL credentials are not supported"
+    elif parsed.fragment:
+        reason = "URL fragments are not supported"
+    else:
+        return
+    # Report the failing stage/host without revealing file paths or signed queries.
+    raise ToolError(f"{purpose}: {reason}.")
 
 
 async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes: int) -> tuple[bytes, str]:
