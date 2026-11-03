@@ -175,7 +175,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
     )
     async def upload_chatgpt_image(image: ChatGPTImage) -> dict[str, str]:
         async def transfer() -> dict[str, str]:
-            _require_file_host(image.download_url, "files.oaiusercontent.com", purpose="ChatGPT image source")
+            _require_file_host(
+                image.download_url, "oaiusercontent.com",
+                purpose="ChatGPT image source", allow_subdomains=True,
+            )
             async with build_api_client() as api, httpx.AsyncClient(
                 timeout=API_TIMEOUT, follow_redirects=False,
             ) as files:
@@ -461,7 +464,9 @@ async def _wait_for_project_result(
     )
 
 
-def _require_file_host(url: str, hostname: str, *, purpose: str) -> None:
+def _require_file_host(
+    url: str, hostname: str, *, purpose: str, allow_subdomains: bool = False,
+) -> None:
     try:
         parsed = urlparse(url)
         port = parsed.port
@@ -470,7 +475,9 @@ def _require_file_host(url: str, hostname: str, *, purpose: str) -> None:
 
     if parsed.scheme != "https":
         reason = "HTTPS is required"
-    elif parsed.hostname != hostname:
+    elif parsed.hostname != hostname and not (
+        allow_subdomains and (parsed.hostname or "").endswith(f".{hostname}")
+    ):
         reason = f"unsupported host {parsed.hostname!r}; expected {hostname!r}"
     elif port not in (None, 443):
         reason = "port 443 is required"
