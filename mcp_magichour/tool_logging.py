@@ -14,6 +14,8 @@ MAX_STRING_LENGTH = 200
 _SECRET_KEYS = {
     "apikey",
     "authorization",
+    "fileid",
+    "filename",
     "password",
     "prompt",
     "secret",
