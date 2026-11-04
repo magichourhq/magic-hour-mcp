@@ -44,6 +44,7 @@ button, a { font: inherit; }
 .preview {
   position: relative;
   display: grid;
+  width: 100%;
   aspect-ratio: 16 / 9;
   min-height: 330px;
   max-height: 720px;
