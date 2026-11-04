@@ -93,8 +93,9 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
     if (code !== 1) captureUiError(code === 2 ? "media_network" : code === 3 ? "media_decode" : code === 4 ? "media_unsupported" : "media_load");
   };
   if (status !== "complete" || !url) {
-    const failed = ["error", "canceled", "cancelled", "timeout"].includes(status);
-    return <Placeholder icon={failed ? "!" : "…"} heading={failed ? "Project unavailable" : "Waiting for result"} message={message} />;
+    const failed = ["error", "canceled", "cancelled"].includes(status);
+    const heading = status === "timeout" ? "Waiting paused" : failed ? "Project unavailable" : "Waiting for result";
+    return <Placeholder icon={failed ? "!" : "…"} heading={heading} message={message} />;
   }
   if (type === "image") return <img src={url} alt={name} onError={failed} />;
   if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onError={failed} />;
@@ -168,7 +169,7 @@ export default function App() {
   const name = text(project.name, `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
-  const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
+  const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled"].includes(status) ? "danger" : "warning";
   const message = optionalText(project.message)
     ?? optionalText(project.error)
     ?? optionalText(record(project.error).message)
