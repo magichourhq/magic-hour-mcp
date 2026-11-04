@@ -50,7 +50,8 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         content = contents[0]
         self.assertEqual(content.mimeType, MCP_APP_MIME_TYPE)
         self.assertTrue(content.meta["openai/widgetDescription"])
-        self.assertEqual(content.meta["ui"]["domain"], MCP_APP_ORIGIN)
+        self.assertNotIn("domain", content.meta["ui"])
+        self.assertEqual(content.meta["openai/widgetDomain"], MCP_APP_ORIGIN)
         self.assertIn("csp", content.meta["ui"])
 
     async def test_metadata_fits_claude_code_utf8_budget(self):

@@ -240,7 +240,6 @@ def register_custom_tools(mcp: FastMCP) -> None:
             ),
         },
         app=AppConfig(
-            domain=MCP_APP_ORIGIN,
             csp=ResourceCSP(
                 connect_domains=[MCP_APP_SERVER_ORIGIN, MCP_APP_ORIGIN],
                 resource_domains=[MCP_APP_ORIGIN, MCP_APP_MEDIA_ORIGIN],
