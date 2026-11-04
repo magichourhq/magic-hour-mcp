@@ -343,6 +343,7 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 GENERATION_ESTIMATE_PATHS = (
+    "/v1/estimate",
     "/v1/ai-image-generator/estimate",
     "/v1/ai-image-editor/estimate",
     "/v1/image-to-video/estimate",
@@ -503,7 +504,7 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if is_estimate:
         additions.append(
             "Read-only preflight: returns cost and eligibility, not generated media. "
-            "Does not create a project or spend credits. A ready result is a snapshot, not a reservation; "
+            "Does not create a project or spend credits. An estimate is a snapshot, not a reservation; "
             "blocked or unavailable does not authorize generation. No wait or polling tool is needed."
         )
 
