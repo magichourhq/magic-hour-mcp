@@ -203,9 +203,14 @@ export default function App() {
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
         <Preview type={type} url={downloadUrl} name={name} status={status} message={message} />
+        {canFullscreen && type !== "video" && (
+          <button className="preview-fullscreen" type="button" onClick={requestFullscreen} aria-label="Fullscreen">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
+          </button>
+        )}
       </section>
       <section className="content">
-        <span className="badge" data-tone={tone}>{capitalize(status)}</span>
+        {status !== "complete" && <span className="badge" data-tone={tone}>{capitalize(status)}</span>}
         <h1>{name}</h1>
         {urls.length > 1 && (
           <label className="output-picker">
@@ -215,20 +220,24 @@ export default function App() {
             </select>
           </label>
         )}
-        <details className="details">
-          <summary>Generation details</summary>
-          <dl className="detail-list">
-            {model && <div className="detail"><dt>Model</dt><dd>{model}</dd></div>}
-            {prompt && <div className="detail"><dt>Prompt</dt><dd className="detail-copy">{prompt}</dd></div>}
-            <div className="detail"><dt>Project ID</dt><dd>{text(project.id)}</dd></div>
-            <div className="detail"><dt>Media</dt><dd>{capitalize(type)}</dd></div>
-            <div className="detail"><dt>Credits</dt><dd>{project.credits_charged == null ? "—" : String(project.credits_charged)}</dd></div>
-            <div className="detail"><dt>Outputs</dt><dd>{urls.length}</dd></div>
-          </dl>
-        </details>
-        <div className="actions">
-          {downloadUrl && <a className="action" href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={openDownload}>Download</a>}
-          {canFullscreen && <button className="action action-secondary" type="button" onClick={requestFullscreen}>Fullscreen</button>}
+        <div className="toolbar">
+          <details className="details">
+            <summary>Details</summary>
+            <dl className="detail-list">
+              {model && <div className="detail"><dt>Model</dt><dd>{model}</dd></div>}
+              {prompt && <div className="detail"><dt>Prompt</dt><dd className="detail-copy">{prompt}</dd></div>}
+              <div className="detail"><dt>Project ID</dt><dd>{text(project.id)}</dd></div>
+              <div className="detail"><dt>Media</dt><dd>{capitalize(type)}</dd></div>
+              <div className="detail"><dt>Credits</dt><dd>{project.credits_charged == null ? "—" : String(project.credits_charged)}</dd></div>
+              <div className="detail"><dt>Outputs</dt><dd>{urls.length}</dd></div>
+            </dl>
+          </details>
+          <div className="actions">
+            {downloadUrl && <a className="action" href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={openDownload}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 15v5h16v-5" /></svg>
+              Download
+            </a>}
+          </div>
         </div>
       </section>
     </main>

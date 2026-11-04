@@ -235,7 +235,8 @@ def register_custom_tools(mcp: FastMCP) -> None:
             "openai/widgetDomain": MCP_APP_ORIGIN,
             "openai/widgetDescription": (
                 "Displays Magic Hour project status, generated image, video, or audio previews, "
-                "and download links, including errors or canceled projects."
+                "download controls, and expandable generation details, including errors or canceled projects. "
+                "Do not repeat the displayed status or generation details in the assistant reply unless asked."
             ),
         },
         app=AppConfig(
