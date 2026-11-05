@@ -192,7 +192,14 @@ class MCPToolOAuthMiddleware(Middleware):
                 'error="invalid_token", error_description="Authentication required"'
             )
             return ToolResult(
-                content=[TextContent(type="text", text="Authentication required.")],
+                content=[TextContent(
+                    type="text",
+                    text=(
+                        "Authentication required."
+                        if isinstance(cause, AuthError)
+                        else "Authentication required (HTTP 401). Reconnect Magic Hour."
+                    ),
+                )],
                 meta={"mcp/www_authenticate": [challenge]},
                 is_error=True,
             )
