@@ -97,8 +97,9 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
     }
   };
   if (status !== "complete" || !url) {
-    const failed = ["error", "canceled", "cancelled", "timeout"].includes(status);
-    return <Placeholder icon={failed ? "!" : "…"} heading={failed ? "Project unavailable" : "Waiting for result"} message={message} />;
+    const failed = ["error", "canceled", "cancelled"].includes(status);
+    const heading = status === "timeout" ? "Waiting paused" : failed ? "Project unavailable" : "Waiting for result";
+    return <Placeholder icon={failed ? "!" : "…"} heading={heading} message={message} />;
   }
   if (loadFailed) return <Placeholder icon="!" heading="Preview unavailable" message="Try Download, or ask to refresh this result's link." />;
   if (type === "image") return <img src={url} alt={name} onError={failed} />;
@@ -181,7 +182,7 @@ export default function App() {
   const name = text(project.name, `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
-  const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled", "timeout"].includes(status) ? "danger" : "warning";
+  const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled"].includes(status) ? "danger" : "warning";
   const message = optionalText(project.message)
     ?? optionalText(project.error)
     ?? optionalText(record(project.error).message)
