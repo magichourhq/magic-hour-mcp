@@ -45,6 +45,7 @@ from .project_result_app import (
     MCP_APP_VIEW_CSP,
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
+    install_ui_read_origin,
     read_mcp_app_html,
 )
 from .tool_logging import ToolCallLoggingMiddleware
@@ -152,6 +153,7 @@ def create_mcp() -> FastMCP:
     mcp.add_middleware(MCPToolOAuthMiddleware())
     install_structured_tool_errors(mcp)
     analytics.instrument_mcp(mcp)
+    install_ui_read_origin(mcp)
     return mcp
 
 

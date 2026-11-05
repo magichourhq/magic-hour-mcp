@@ -133,6 +133,12 @@ Do not shorten the URL, remove query parameters, or append `expires_at`.
 
 If a link shows `SignatureDoesNotMatch`, ask the assistant for the exact download URL again.
 
+When the result card offers **Refresh link**, use it to retrieve the same completed
+project's current links and retry its preview. The selected output is preserved,
+including when output order changes. A failed refresh keeps the current result;
+it does not generate another project or spend generation credits. Clients without
+this control can ask the assistant to retrieve the original project again.
+
 For photos attached in ChatGPT, use `upload_chatgpt_image` with the native file
 reference. It transfers a PNG, JPEG or WebP image (up to 20 MiB) to the connected
 Magic Hour account and returns the `file_path` for the generation tool. The chat
