@@ -114,6 +114,8 @@ export default function App() {
   const [storedOutput, setStoredOutput] = useState<unknown>();
   const [selectedOutput, setSelectedOutput] = useState(0);
   const [canFullscreen, setCanFullscreen] = useState(false);
+  const [openingDraft, setOpeningDraft] = useState(false);
+  const [draftFeedback, setDraftFeedback] = useState<string | null>(null);
   const { app, error: connectionError } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
     capabilities: {},
@@ -122,6 +124,7 @@ export default function App() {
         if (result.isError || Object.keys(record(result.structuredContent)).length) {
           setToolOutput(result.structuredContent ?? {});
           setSelectedOutput(0);
+          setDraftFeedback(null);
         }
       };
       createdApp.onhostcontextchanged = (context) => {
@@ -139,6 +142,7 @@ export default function App() {
       setStoredOutput(chatGptOutput({ ...record(host), ...record(updates) }));
       if (!event || "toolOutput" in record(updates) || "toolResponseMetadata" in record(updates)) {
         setSelectedOutput(0);
+        setDraftFeedback(null);
       }
     };
     window.addEventListener("openai:set_globals", readStoredOutput);
@@ -164,7 +168,11 @@ export default function App() {
     return url ? [url] : [];
   });
   const downloadUrl = urls[selectedOutput] ?? null;
+  const projectId = optionalText(project.id);
   const type = projectType(project, downloadUrl);
+  const hostCapabilities = app?.getHostCapabilities();
+  const canOpenImageDraft = Boolean(status === "complete" && project.project_type === "image" && type === "image" && projectId && downloadUrl
+    && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
   const name = text(project.name, `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
@@ -199,6 +207,33 @@ export default function App() {
     }
   };
 
+  const openImageDraft = async (action: "edit" | "animate") => {
+    if (!app || !canOpenImageDraft || !projectId || !downloadUrl || openingDraft) return;
+    const outputNumber = rawUrls.findIndex((value) => safeMediaUrl(value) === downloadUrl) + 1;
+    const draft = {
+      role: "user" as const,
+      content: [
+        { type: "text" as const, text: action === "edit" ? "Edit this image:" : "Animate this image. The movement should be:" },
+        {
+          type: "text" as const,
+          text: `Source for this ${action} draft: Magic Hour image project ${projectId}, output ${outputNumber}, path ${new URL(downloadUrl).pathname}. Retrieve that project and use this exact output. This source item is not an edit or movement instruction; ask only for the missing instruction if needed. It does not authorize generation or saving. If several source items are ambiguous, ask which one to use.`,
+          _meta: { "openai/title": `${name} · image ${outputNumber}` },
+        },
+      ],
+      _meta: { "openai/message": { target: "active", send: false } },
+    };
+    setOpeningDraft(true);
+    setDraftFeedback(null);
+    try {
+      const result = await app.sendMessage(draft);
+      setDraftFeedback(result.isError ? "Could not open the draft. Try again." : `Draft for ${name}, image ${outputNumber}, is ready. Add your instructions in the chat, then send.`);
+    } catch {
+      setDraftFeedback("Could not open the draft. Try again.");
+    } finally {
+      setOpeningDraft(false);
+    }
+  };
+
   return (
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
@@ -215,7 +250,10 @@ export default function App() {
         {urls.length > 1 && (
           <label className="output-picker">
             Output
-            <select value={selectedOutput} onChange={(event) => setSelectedOutput(Number(event.target.value))}>
+            <select value={selectedOutput} onChange={(event) => {
+              setSelectedOutput(Number(event.target.value));
+              setDraftFeedback(null);
+            }}>
               {urls.map((url, index) => <option key={url} value={index}>{index + 1} of {urls.length}</option>)}
             </select>
           </label>
@@ -239,6 +277,11 @@ export default function App() {
             </a>}
           </div>
         </div>
+        {canOpenImageDraft && <div className="image-actions">
+          <button className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openImageDraft("edit")}>Edit this</button>
+          <button className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openImageDraft("animate")}>Animate this</button>
+        </div>}
+        {draftFeedback && <p className="draft-feedback" role="status">{draftFeedback}</p>}
       </section>
     </main>
   );
