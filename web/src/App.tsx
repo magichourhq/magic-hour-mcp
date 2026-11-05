@@ -3,6 +3,15 @@ import { useEffect, useState, type MouseEvent, type SyntheticEvent } from "react
 import { captureUiError, captureUiResult } from "./analytics";
 
 type MediaType = "image" | "video" | "audio" | "media";
+const UI_READ_ORIGIN = "magic-hour/ui-read";
+type ResultState = {
+  toolOutput: unknown;
+  selectedOutput: number;
+  contextRevision: number;
+  previewRevision: number;
+  pendingRead: { id: string; projectType: string; contextRevision: number } | null;
+  feedback: string | null;
+};
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -39,6 +48,35 @@ function safeMediaUrl(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function projectUrls(project: Record<string, unknown>): string[] {
+  const values = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
+  return values.flatMap((value) => {
+    const url = safeMediaUrl(value);
+    return url ? [url] : [];
+  });
+}
+
+function receiveToolOutput(current: ResultState, toolOutput: unknown, readOrigin: string): ResultState {
+  const previous = record(current.toolOutput);
+  const next = record(toolOutput);
+  // Only the direct response may apply this widget's reads, even after a delayed host echo.
+  if (next[UI_READ_ORIGIN] === readOrigin) return current;
+  const sameProject = Boolean(optionalText(previous.id) && previous.id === next.id && previous.project_type === next.project_type);
+  let selectedOutput = 0;
+  if (sameProject && previous.status === "complete" && next.status === "complete") {
+    const previousPaths = projectUrls(previous).map((url) => new URL(url).pathname);
+    const selectedPath = previousPaths[current.selectedOutput];
+    if (selectedPath) {
+      const nextPaths = projectUrls(next).map((url) => new URL(url).pathname);
+      if (previousPaths.filter((path) => path === selectedPath).length !== 1 || nextPaths.filter((path) => path === selectedPath).length !== 1) {
+        return { ...current, feedback: "Could not match the refreshed output. The current selection is unchanged." };
+      }
+      selectedOutput = nextPaths.indexOf(selectedPath);
+    }
+  }
+  return { ...current, toolOutput, selectedOutput, contextRevision: current.contextRevision + 1, feedback: null };
 }
 
 function projectType(result: Record<string, unknown>, url: string | null): MediaType {
@@ -86,9 +124,10 @@ type PreviewProps = {
   name: string;
   status: string;
   message: string;
+  canRefreshLink: boolean;
 };
 
-function Preview({ projectId, type, url, name, status, message }: PreviewProps) {
+function Preview({ projectId, type, url, name, status, message, canRefreshLink }: PreviewProps) {
   const [loadFailed, setLoadFailed] = useState(false);
   const loaded = () => {
     if (projectId && url && type !== "media") void captureUiResult("preview_loaded", projectId, type, url);
@@ -108,7 +147,7 @@ function Preview({ projectId, type, url, name, status, message }: PreviewProps) 
     const heading = status === "timeout" ? "Waiting paused" : failed ? "Project unavailable" : "Waiting for result";
     return <Placeholder icon={failed ? "!" : "…"} heading={heading} message={message} />;
   }
-  if (loadFailed) return <Placeholder icon="!" heading="Preview unavailable" message="Try Download, or ask to refresh this result's link." />;
+  if (loadFailed) return <Placeholder icon="!" heading="Preview unavailable" message={canRefreshLink ? "Use Refresh link to retrieve this result again, or try Download." : "Try Download, or ask to refresh this result's link."} />;
   if (type === "image") return <img src={url} alt={name} onLoad={loaded} onError={failed} />;
   if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onLoadedData={loaded} onPlaying={playing} onError={failed} />;
   if (type === "audio") {
@@ -123,23 +162,20 @@ function Preview({ projectId, type, url, name, status, message }: PreviewProps) 
 }
 
 export default function App() {
-  const [toolOutput, setToolOutput] = useState<unknown>();
-  const [selectedOutput, setSelectedOutput] = useState(0);
+  const [readOrigin] = useState(() => crypto.randomUUID());
+  const [result, setResult] = useState<ResultState>({ toolOutput: undefined, selectedOutput: 0, contextRevision: 0, previewRevision: 0, pendingRead: null, feedback: null });
+  const { toolOutput, selectedOutput, previewRevision, pendingRead, feedback } = result;
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [openingDraft, setOpeningDraft] = useState(false);
   const [draftFeedback, setDraftFeedback] = useState<string | null>(null);
-  const [checkingProject, setCheckingProject] = useState<string | null>(null);
-  const [statusFeedback, setStatusFeedback] = useState<{ id: string; message: string } | null>(null);
   const { app, error: connectionError } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (createdApp) => {
       createdApp.ontoolresult = (result) => {
         if (result.isError || Object.keys(record(result.structuredContent)).length) {
-          setToolOutput(result.structuredContent ?? {});
-          setSelectedOutput(0);
+          setResult((current) => receiveToolOutput(current, result.structuredContent ?? {}, readOrigin));
           setDraftFeedback(null);
-          setStatusFeedback(null);
         }
       };
       createdApp.onhostcontextchanged = (context) => {
@@ -158,15 +194,13 @@ export default function App() {
       // A metadata-only notification must not reuse an older host.toolOutput.
       const output = chatGptOutput(event ? updates : host);
       if (!event && !Object.keys(record(output)).length) return;
-      setToolOutput(output);
-      setSelectedOutput(0);
+      setResult((current) => receiveToolOutput(current, output, readOrigin));
       setDraftFeedback(null);
-      setStatusFeedback(null);
     };
     window.addEventListener("openai:set_globals", readHostOutput);
     readHostOutput();
     return () => window.removeEventListener("openai:set_globals", readHostOutput);
-  }, []);
+  }, [readOrigin]);
 
   useEffect(() => {
     const availableModes = app?.getHostContext()?.availableDisplayModes;
@@ -181,18 +215,17 @@ export default function App() {
   const style = record(project.style);
   const status = text(project.status, "waiting").toLowerCase();
   const rawUrls = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
-  const urls = rawUrls.flatMap((value) => {
-    const url = safeMediaUrl(value);
-    return url ? [url] : [];
-  });
+  const urls = projectUrls(project);
   const downloadUrl = urls[selectedOutput] ?? null;
   const projectId = optionalText(project.id);
   const type = projectType(project, downloadUrl);
   const hostCapabilities = app?.getHostCapabilities();
   const canOpenDraft = Boolean(status === "complete" && ["image", "video"].includes(type) && project.project_type === type && projectId && downloadUrl
     && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
-  const canCheckStatus = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
-    && !["complete", "error", "canceled", "cancelled"].includes(status) && hostCapabilities?.serverTools);
+  const canReadProject = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
+    && !["error", "canceled", "cancelled"].includes(status) && hostCapabilities?.serverTools);
+  const readBusyLabel = pendingRead?.id !== projectId || pendingRead?.projectType !== project.project_type
+    ? "Finishing check…" : status === "complete" ? "Refreshing…" : "Checking…";
   const name = text(project.name, `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
@@ -218,36 +251,56 @@ export default function App() {
     }
   };
 
-  const checkStatus = async () => {
-    if (!app || !canCheckStatus || !projectId || checkingProject === projectId) return;
+  const readProject = async () => {
+    if (!app || !canReadProject || !projectId || pendingRead) return;
     const id = projectId;
-    const projectType = project.project_type;
-    setCheckingProject(id);
-    setStatusFeedback(null);
+    const projectType = String(project.project_type);
+    const request = { id, projectType, contextRevision: result.contextRevision };
+    const refreshing = status === "complete";
+    const originalPaths = urls.map((url) => new URL(url).pathname);
+    const failureMessage = refreshing
+      ? "Could not refresh this result's links. The current selection is unchanged."
+      : "Could not check this project's status. Try again.";
+    setResult((current) => ({ ...current, pendingRead: request, feedback: null }));
+    let updated: Record<string, unknown> | undefined;
+    let refreshedPaths: (string | null)[] = [];
     try {
-      const result = await app.callServerTool({
+      const response = await app.callServerTool({
         name: `wait_for_${projectType}_project`,
         arguments: { id, timeout_seconds: 5, include_inline_downloads: false, max_inline_downloads: 0 },
+        _meta: { [UI_READ_ORIGIN]: readOrigin },
       });
-      const updated = record(result.structuredContent);
-      if (result.isError || updated.id !== id || updated.project_type !== projectType) {
-        setStatusFeedback({ id, message: "Could not check this project's status. Try again." });
-        return;
+      const candidate = record(response.structuredContent);
+      const refreshedUrls = Array.isArray(candidate.exact_download_urls) ? candidate.exact_download_urls.map(safeMediaUrl) : [];
+      refreshedPaths = refreshedUrls.map((url) => url ? new URL(url).pathname : null);
+      if (!response.isError && candidate.id === id && candidate.project_type === projectType
+        && (!refreshing || (candidate.status === "complete" && refreshedPaths.length > 0 && !refreshedPaths.includes(null)
+          && new Set(originalPaths).size === originalPaths.length
+          && originalPaths.every((path) => refreshedPaths.filter((candidate) => candidate === path).length === 1)))) {
+        updated = candidate;
       }
-      // A late status response must not replace a different project opened meanwhile.
-      setToolOutput((current: unknown) => {
-        const latest = record(current);
-        return latest.id === id && !["complete", "error", "canceled", "cancelled"].includes(String(latest.status)) ? updated : current;
-      });
     } catch {
-      setStatusFeedback({ id, message: "Could not check this project's status. Try again." });
-    } finally {
-      setCheckingProject((current) => current === id ? null : current);
+      // Preserve the existing result and show the same bounded recovery message.
     }
+    setResult((current) => {
+      const latest = record(current.toolOutput);
+      if (current.pendingRead !== request) return current;
+      if (current.contextRevision !== request.contextRevision || latest.id !== id || latest.project_type !== projectType) return { ...current, pendingRead: null };
+      if (!updated) return { ...current, pendingRead: null, feedback: failureMessage };
+      const selectedPath = originalPaths[current.selectedOutput];
+      return {
+        toolOutput: updated,
+        selectedOutput: refreshing && selectedPath ? refreshedPaths.indexOf(selectedPath) : 0,
+        contextRevision: current.contextRevision + 1,
+        previewRevision: current.previewRevision + (refreshing ? 1 : 0),
+        pendingRead: null,
+        feedback: null,
+      };
+    });
   };
 
   const selectOutput = (index: number) => {
-    setSelectedOutput(index);
+    setResult((current) => ({ ...current, selectedOutput: index, feedback: null }));
     setDraftFeedback(null);
   };
 
@@ -301,7 +354,7 @@ export default function App() {
   return (
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
-        <Preview key={`${projectId}:${downloadUrl}`} projectId={projectId} type={type} url={downloadUrl} name={name} status={status} message={message} />
+        <Preview key={`${projectId}:${downloadUrl}:${previewRevision}`} projectId={projectId} type={type} url={downloadUrl} name={name} status={status} message={message} canRefreshLink={canReadProject && status === "complete"} />
         {canFullscreen && type !== "video" && (
           <button className="preview-fullscreen" type="button" onClick={requestFullscreen} aria-label="Fullscreen">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
@@ -311,10 +364,10 @@ export default function App() {
       <section className="content">
         {status !== "complete" && <span className="badge" data-tone={tone}>{capitalize(status)}</span>}
         <h1>{name}</h1>
-        {canCheckStatus && <button className="action action-secondary check-status" type="button" disabled={checkingProject === projectId} onClick={checkStatus}>
-          {checkingProject === projectId ? "Checking…" : "Check status"}
+        {canReadProject && <button className="action action-secondary check-status" type="button" disabled={pendingRead !== null} onClick={readProject}>
+          {pendingRead ? readBusyLabel : status === "complete" ? "Refresh link" : "Check status"}
         </button>}
-        {canCheckStatus && statusFeedback?.id === projectId && <p className="draft-feedback" role="status">{statusFeedback.message}</p>}
+        {canReadProject && feedback && <p className="draft-feedback" role="status">{feedback}</p>}
         {urls.length > 1 && type === "image" && <div className="output-thumbnails" role="group" aria-label="Image outputs">
           {urls.map((url, index) => <button key={url} className="output-thumbnail" type="button" aria-label={`Select image ${index + 1} of ${urls.length}`} aria-pressed={index === selectedOutput} onClick={() => selectOutput(index)}>
             <img src={url} alt="" loading="lazy" />
