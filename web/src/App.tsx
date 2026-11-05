@@ -88,14 +88,19 @@ type PreviewProps = {
 };
 
 function Preview({ type, url, name, status, message }: PreviewProps) {
+  const [loadFailed, setLoadFailed] = useState(false);
   const failed = (event: SyntheticEvent<HTMLImageElement | HTMLMediaElement>) => {
     const code = event.currentTarget instanceof HTMLMediaElement ? event.currentTarget.error?.code : undefined;
-    if (code !== 1) captureUiError(code === 2 ? "media_network" : code === 3 ? "media_decode" : code === 4 ? "media_unsupported" : "media_load");
+    if (code !== 1) {
+      captureUiError(code === 2 ? "media_network" : code === 3 ? "media_decode" : code === 4 ? "media_unsupported" : "media_load");
+      setLoadFailed(true);
+    }
   };
   if (status !== "complete" || !url) {
     const failed = ["error", "canceled", "cancelled", "timeout"].includes(status);
     return <Placeholder icon={failed ? "!" : "…"} heading={failed ? "Project unavailable" : "Waiting for result"} message={message} />;
   }
+  if (loadFailed) return <Placeholder icon="!" heading="Preview unavailable" message="Try Download, or ask to refresh this result's link." />;
   if (type === "image") return <img src={url} alt={name} onError={failed} />;
   if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onError={failed} />;
   if (type === "audio") {
@@ -237,7 +242,7 @@ export default function App() {
   return (
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
-        <Preview type={type} url={downloadUrl} name={name} status={status} message={message} />
+        <Preview key={downloadUrl} type={type} url={downloadUrl} name={name} status={status} message={message} />
         {canFullscreen && type !== "video" && (
           <button className="preview-fullscreen" type="button" onClick={requestFullscreen} aria-label="Fullscreen">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
