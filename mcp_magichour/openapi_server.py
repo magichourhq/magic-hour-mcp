@@ -65,29 +65,21 @@ MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_VERSION = "0.1.0"
 MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
 MCP_SERVER_INSTRUCTIONS = """
-Create and edit images and video, generate music, and retrieve existing audio projects.
-Tool calls require authentication.
-When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote. Estimates never authorize spending.
-get_workflow_guide gives static inputs/docs/review, not account eligibility.
-After creation, use matching wait_for_*_project with the returned id.
-For *_file_path inputs, upload local bytes with get_upload_urls before using file_path. Direct public media URLs must be stable and fetchable as raw bytes; hotlinked URLs can fail. Preserve exact signed download URLs, including query parameters; never append expiration metadata.
-For native ChatGPT attachments, use upload_chatgpt_image for images or upload_chatgpt_media for images, video and audio within its supported formats and 20 MiB limit. Set media_type to the attachment's actual kind, not the type of generation requested. Keep each returned path paired with its input role; never pass a bare file ID, filename or chat-local path as a Magic Hour asset.
-Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
-On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
-On tier restrictions, explain the block; never retry unchanged or blindly remove fields. Ask before changing explicit model/resolution requirements.
-
-Choose video from inputs:
-
-- Approved image -> create_video_from_image directly; edit only for a requested visual change or a source problem that prevents the shot.
-- Still portrait + audio -> create_talking_photo; text alone is not audio.
-- Existing video + replacement audio -> create_lip_sync_video.
-- Preserve an explicitly requested alternative provider.
-- Choose models from the current schema to match the requested inputs and settings, with verified account eligibility.
-- Preserve an explicitly requested model; explain unsupported settings before proposing a change.
-- Include complete spoken sentences.
-- Use Text-to-Video when no supplied starting image is required.
-- Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
-  """.strip()
+Create/edit images and video, generate music and retrieve existing audio projects. Authenticate tool calls.
+When exposed, estimate the exact create body; resolve blocked/unavailable. Default complete requests to one eligible result without a budget question. Preserve explicit settings/limits; never invent quotes. Estimates never authorize spending.
+get_workflow_guide is static, not account eligibility.
+After creation, use matching wait_for_*_project with returned id.
+For *_file_path, upload local bytes via get_upload_urls. Public media URLs must serve stable raw bytes; hotlinks may fail. Preserve signed URLs/query strings; never append expiry.
+Native ChatGPT attachments: upload_chatgpt_image for images; upload_chatgpt_media for image/video/audio (supported formats; 20 MiB). media_type is the input kind, not requested output. Pair returned paths with input roles. Bare file IDs, filenames and chat-local paths are not Magic Hour assets.
+Omit unrequested options only with eligible defaults. Image Editor defaults to paid-tier nano-banana; on Free use model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock settings.
+Explain tier blocks; never retry unchanged or blindly drop fields. Ask before changing explicit model/resolution.
+Video:
+- Approved image -> create_video_from_image directly; edit only for requested visual changes or source problems blocking the shot.
+- Still portrait+audio -> create_talking_photo; text is not audio.
+- Existing video+replacement audio -> create_lip_sync_video.
+Preserve requested providers and models. Choose from current schemas by supported inputs/settings and verified eligibility; explain unsupported settings before proposing changes.
+Use complete spoken sentences. Use Text-to-Video when no supplied starting image is required. Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
+""".strip()
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images and video, generate music, and retrieve existing audio projects."
