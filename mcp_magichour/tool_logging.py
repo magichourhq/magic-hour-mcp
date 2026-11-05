@@ -14,6 +14,8 @@ MAX_STRING_LENGTH = 200
 _SECRET_KEYS = {
     "apikey",
     "authorization",
+    "fileid",
+    "filename",
     "password",
     "prompt",
     "secret",
@@ -28,8 +30,7 @@ def _safe_tool_arguments(value: Any) -> Any:
             normalized_key = re.sub(r"[^a-z0-9]", "", str(key).lower())
             if (
                 normalized_key in _SECRET_KEYS
-                or normalized_key.endswith("url")
-                or normalized_key.endswith("filepath")
+                or normalized_key.endswith(("url", "urls", "filepath", "filepaths"))
             ):
                 safe[str(key)] = "[redacted]"
             else:
