@@ -6,28 +6,31 @@ Use this guide if Magic Hour has a hosted MCP endpoint at:
 https://mcp.magichour.ai/
 ```
 
-You do not need this repo. After setup, ask for an image, video, or audio result
-in plain English; the assistant handles the tool calls.
+You do not need this repo. After setup, ask for an image or video result in plain
+English; the assistant handles the tool calls. The hosted server accepts audio
+inputs and retrieves existing audio projects, but does not expose voice generation
+or voice cloning.
 
 ## What you need
 
-- A Magic Hour API key
+- A Magic Hour account for the Claude OAuth connector sign-in flow
+- For the Claude Code and Codex CLI bearer-token setup below, a Magic Hour API key
 - Claude, Claude Code, or Codex CLI
+- Enough credits for the generation you request
 
-Keep your API key private. Real generations can spend Magic Hour credits.
+Claude OAuth users sign in and select **Allow**; no manual key entry is needed.
+Keep API keys private. Real generations spend Magic Hour credits.
 
 ## Connect with Claude
 
 1. In Claude, open **Settings > Connectors** and add a custom connector.
 2. Enter `https://mcp.magichour.ai/` as the connector URL.
-3. Open **Advanced settings** and set **OAuth Client ID** to
-   `magic-hour-mcp`. This is required because the server does not support dynamic
-   client registration.
-4. Add the connector, then select **Connect**.
-5. On the Magic Hour authorization page, paste your Magic Hour API key and select
-   **Connect**.
-6. Return to Claude and verify the connector is enabled. Ask Claude to call the
-   Magic Hour `ping` tool; the expected result is `pong`.
+3. Add the connector, then select **Connect**.
+4. Sign in to Magic Hour if asked, then select **Allow** on the authorization page.
+   This creates an API key named "Claude connector" in your Developer Hub; delete it
+   there to disconnect.
+5. Return to Claude and verify the connector is enabled. Ask Claude to call
+   `get_account_info`; a returned credit balance confirms real API authorization.
 
 ## Connect with Claude Code
 
@@ -35,7 +38,7 @@ Keep your API key private. Real generations can spend Magic Hour credits.
 claude mcp add --scope user --transport http magic-hour https://mcp.magichour.ai/ --header "Authorization: Bearer YOUR_MAGIC_HOUR_API_KEY"
 ```
 
-Start a new Claude Code session and ask it to call the Magic Hour `ping` tool.
+Start a new Claude Code session and ask it to call `get_account_info`.
 
 If `--scope user` is not supported, use project scope:
 
@@ -65,16 +68,31 @@ Add the MCP server:
 codex mcp add magic-hour --url https://mcp.magichour.ai/ --bearer-token-env-var MAGIC_HOUR_API_KEY
 ```
 
-Start Codex from that same shell and ask it to call the Magic Hour `ping` tool.
+Start Codex from that same shell and ask it to call `get_account_info`.
 
 ## Verify API access before generating
 
-After `ping`, ask the agent to call `account_retrieve` and confirm eligibility for
-the intended generation. Tool discovery can work without credentials, and an
-invalid API key can still receive `pong`; only the account read checks actual
-API authorization. `Authentication required` means the bearer token is missing;
+Use `get_account_info` to verify API authorization and inspect the account before
+generating. It does not validate a particular model, input or setting, or quote
+that request's credit cost. Tool discovery can work without credentials, and an
+invalid API key can still receive
+`pong`; only the account read checks actual API authorization. `Authentication
+required` means the bearer token is missing;
 an account `401` means authorization failed. Check the key and the environment
 that launched the agent before reinstalling anything. Keep account details private.
+
+Before a paid request, choose the model, duration, resolution and audio settings
+using the [model directory](https://docs.magichour.ai/api-reference/models) and
+[billing guide](https://docs.magichour.ai/billing/overview). The
+[workload evaluation guide](https://docs.magichour.ai/integration/evaluating-media-apis)
+shows what to record when comparing cost, usable outputs and integration work.
+If the available information does not establish the request's cost or access,
+resolve that uncertainty before asking the assistant to generate.
+
+Keep the project ID returned by creation. If waiting times out, resume that
+project rather than creating and paying for another attempt. Ask for the finished
+download and inspect it; a completed status alone does not establish that the
+result meets your brief.
 
 ## Improve output quality with Magic Hour skills
 
@@ -86,7 +104,7 @@ Install the cookbook and choose your agent:
 npx skills add magichourhq/skills --skill '*'
 ```
 
-For controlled product or character animation, create or edit the still image first, fix composition and identity issues there, then use that approved image as the image-to-video start frame. Prompt the video step mainly for motion, camera movement, timing, and what must stay fixed.
+For product or character animation, use an approved supplied still directly as the image-to-video start frame. Create or edit a still first only when its appearance must change or a source problem prevents the requested shot. Prompt the video step for motion, camera movement, timing, and what must stay fixed.
 
 ## Prompt cookbook
 
@@ -104,7 +122,6 @@ These examples cover the most-used Magic Hour endpoints. For inputs, use uploade
 | Background Remover | `Remove the background from my uploaded product photo.` | Image | Cutout image |
 | Face Editor | `Make this portrait smile slightly and look toward the camera.` | Face image, edit request | Edited portrait |
 | Head Swap | `Place the head from this photo onto the body in this other photo.` | Head image, body image | Head-swapped image |
-| Voice Generator | `Generate audio saying "Welcome to Magic Hour" with a warm narrator voice.` | Script, voice preference | Generated audio |
 
 Direct public media URLs can work, but uploaded Magic Hour `file_path` inputs are more reliable.
 
@@ -116,8 +133,34 @@ Do not shorten the URL, remove query parameters, or append `expires_at`.
 
 If a link shows `SignatureDoesNotMatch`, ask the assistant for the exact download URL again.
 
-For inputs, prefer an uploaded file or existing Magic Hour `file_path`. The
-upload tool is `video_assets_generate_presigned_url`; it accepts
+When the result card offers **Refresh link**, use it to retrieve the same completed
+project's current links and retry its preview. The selected output is preserved,
+including when output order changes. A failed refresh keeps the current result;
+it does not generate another project or spend generation credits. Clients without
+this control can ask the assistant to retrieve the original project again.
+
+For photos attached in ChatGPT, use `upload_chatgpt_image` with the native file
+reference. It transfers a PNG, JPEG or WebP image (up to 20 MiB) to the connected
+Magic Hour account and returns the `file_path` for the generation tool. The chat
+runtime does not need to upload the bytes itself. This transfer does not start a
+generation or spend generation credits.
+
+For attached video or audio, use `upload_chatgpt_media` with the native `file`
+reference and `media_type=video` or `media_type=audio`. It supports MP4/MOV/WebM
+video and MP3/WAV/M4A/FLAC/Ogg/WebM audio within the same 20 MiB limit. It also
+accepts the image formats above with `media_type=image`. Transfer each reference
+separately and keep its returned path paired with its intended role, such as
+source footage, replacement audio or reference image.
+
+ChatGPT supplies the file object with `download_url` and `file_id`; `mime_type`
+and `file_name` may be omitted. A direct MCP caller must send that object, not a
+bare file ID, filename or local path. A native client may instead display a local
+file input and convert it automatically. The hosted server never reads local
+paths. An unsupported source host remains blocked; reattaching may help with an
+expired link, but does not change host support.
+
+For local files in other clients, use `get_upload_urls` and PUT the raw bytes to
+the returned URL before passing its `file_path` to a generation tool. It accepts
 image, audio, and video files.
 
 ## Troubleshooting
