@@ -413,6 +413,11 @@ async def _wait_for_project(
         async with build_api_client() as client:
             while True:
                 response = await client.get(path, headers={"Authorization": current_authorization_header()})
+                if response.status_code == 404:
+                    raise ToolError(
+                        f"Could not find {project_type} project {project_id} for the connected Magic Hour account. "
+                        "Check the project ID and account connection; the project may have been deleted."
+                    )
                 response.raise_for_status()
                 last_project = response.json()
                 if last_project.get("status") in TERMINAL_PROJECT_STATUSES:
