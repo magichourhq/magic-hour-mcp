@@ -139,6 +139,20 @@ Magic Hour account and returns the `file_path` for the generation tool. The chat
 runtime does not need to upload the bytes itself. This transfer does not start a
 generation or spend generation credits.
 
+For attached video or audio, use `upload_chatgpt_media` with the native `file`
+reference and `media_type=video` or `media_type=audio`. It supports MP4/MOV/WebM
+video and MP3/WAV/M4A/FLAC/Ogg/WebM audio within the same 20 MiB limit. It also
+accepts the image formats above with `media_type=image`. Transfer each reference
+separately and keep its returned path paired with its intended role, such as
+source footage, replacement audio or reference image.
+
+ChatGPT supplies the file object with `download_url` and `file_id`; `mime_type`
+and `file_name` may be omitted. A direct MCP caller must send that object, not a
+bare file ID, filename or local path. A native client may instead display a local
+file input and convert it automatically. The hosted server never reads local
+paths. An unsupported source host remains blocked; reattaching may help with an
+expired link, but does not change host support.
+
 For local files in other clients, use `get_upload_urls` and PUT the raw bytes to
 the returned URL before passing its `file_path` to a generation tool. It accepts
 image, audio, and video files.
