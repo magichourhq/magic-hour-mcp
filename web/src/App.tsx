@@ -226,7 +226,7 @@ export default function App() {
     setDraftFeedback(null);
     try {
       const result = await app.sendMessage(draft);
-      setDraftFeedback(result.isError ? "Could not open the draft. Try again." : "Draft ready. Add your instructions in the chat, then send.");
+      setDraftFeedback(result.isError ? "Could not open the draft. Try again." : `Draft for ${name}, image ${outputNumber}, is ready. Add your instructions in the chat, then send.`);
     } catch {
       setDraftFeedback("Could not open the draft. Try again.");
     } finally {
