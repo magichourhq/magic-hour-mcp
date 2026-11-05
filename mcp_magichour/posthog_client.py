@@ -23,6 +23,7 @@ AnalyticsEvent = Literal[
     "media_project_resolved",
     "media_inline_download_failed",
     "mcp_app_error",
+    "mcp_app_result",
 ]
 ProjectType = Literal["video", "image", "audio"]
 POSTHOG_TOKEN_PLACEHOLDER = "phc_your_project_token_here"
@@ -96,11 +97,11 @@ class Analytics:
             )
 
     async def capture_media_project_resolved(
-        self, *, distinct_id: str, project_type: ProjectType, status: str, download_count: int
+        self, *, distinct_id: str, project_id: str, project_type: ProjectType, status: str, download_count: int
     ) -> None:
         await self.capture_mcp(
             "media_project_resolved",
-            {"project_type": project_type, "status": status, "download_count": download_count},
+            {"project_id": project_id, "project_type": project_type, "status": status, "download_count": download_count},
             distinct_id=distinct_id,
         )
 

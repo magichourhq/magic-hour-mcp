@@ -455,6 +455,7 @@ async def _wait_for_project_result(
     project = await _wait_for_project(project_type, project_id, poll_interval_seconds, timeout_seconds)
     await analytics.capture_media_project_resolved(
         distinct_id=distinct_id,
+        project_id=project_id,
         project_type=project_type,
         status=str(project.get("status", "unknown")),
         download_count=len(_project_download_urls(project)),

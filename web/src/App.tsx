@@ -1,6 +1,6 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useEffect, useState, type MouseEvent, type SyntheticEvent } from "react";
-import { captureUiError } from "./analytics";
+import { captureUiError, captureUiResult } from "./analytics";
 
 type MediaType = "image" | "video" | "audio" | "media";
 
@@ -80,6 +80,7 @@ function Placeholder({ icon, heading, message }: PlaceholderProps) {
 }
 
 type PreviewProps = {
+  projectId: string | null;
   type: MediaType;
   url: string | null;
   name: string;
@@ -87,8 +88,14 @@ type PreviewProps = {
   message: string;
 };
 
-function Preview({ type, url, name, status, message }: PreviewProps) {
+function Preview({ projectId, type, url, name, status, message }: PreviewProps) {
   const [loadFailed, setLoadFailed] = useState(false);
+  const loaded = () => {
+    if (projectId && url && type !== "media") void captureUiResult("preview_loaded", projectId, type, url);
+  };
+  const playing = () => {
+    if (projectId && url && type !== "media") void captureUiResult("playback_started", projectId, type, url);
+  };
   const failed = (event: SyntheticEvent<HTMLImageElement | HTMLMediaElement>) => {
     const code = event.currentTarget instanceof HTMLMediaElement ? event.currentTarget.error?.code : undefined;
     if (code !== 1) {
@@ -102,13 +109,13 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
     return <Placeholder icon={failed ? "!" : "…"} heading={heading} message={message} />;
   }
   if (loadFailed) return <Placeholder icon="!" heading="Preview unavailable" message="Try Download, or ask to refresh this result's link." />;
-  if (type === "image") return <img src={url} alt={name} onError={failed} />;
-  if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onError={failed} />;
+  if (type === "image") return <img src={url} alt={name} onLoad={loaded} onError={failed} />;
+  if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onLoadedData={loaded} onPlaying={playing} onError={failed} />;
   if (type === "audio") {
     return (
       <div className="audio-preview">
         <div className="audio-mark" aria-hidden="true">♪</div>
-        <audio src={url} controls preload="metadata" aria-label={name} onError={failed} />
+        <audio src={url} controls preload="metadata" aria-label={name} onLoadedData={loaded} onPlaying={playing} onError={failed} />
       </div>
     );
   }
@@ -117,11 +124,12 @@ function Preview({ type, url, name, status, message }: PreviewProps) {
 
 export default function App() {
   const [toolOutput, setToolOutput] = useState<unknown>();
-  const [storedOutput, setStoredOutput] = useState<unknown>();
   const [selectedOutput, setSelectedOutput] = useState(0);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [openingDraft, setOpeningDraft] = useState(false);
   const [draftFeedback, setDraftFeedback] = useState<string | null>(null);
+  const [checkingProject, setCheckingProject] = useState<string | null>(null);
+  const [statusFeedback, setStatusFeedback] = useState<{ id: string; message: string } | null>(null);
   const { app, error: connectionError } = useApp({
     appInfo: { name: "Magic Hour project result", version: "1.0.0" },
     capabilities: {},
@@ -131,6 +139,7 @@ export default function App() {
           setToolOutput(result.structuredContent ?? {});
           setSelectedOutput(0);
           setDraftFeedback(null);
+          setStatusFeedback(null);
         }
       };
       createdApp.onhostcontextchanged = (context) => {
@@ -142,18 +151,21 @@ export default function App() {
   });
 
   useEffect(() => {
-    const readStoredOutput = (event?: Event) => {
+    const readHostOutput = (event?: Event) => {
       const host = (window as Window & { openai?: unknown }).openai;
       const updates = record((event as CustomEvent | undefined)?.detail).globals;
-      setStoredOutput(chatGptOutput({ ...record(host), ...record(updates) }));
-      if (!event || "toolOutput" in record(updates) || "toolResponseMetadata" in record(updates)) {
-        setSelectedOutput(0);
-        setDraftFeedback(null);
-      }
+      if (event && !("toolOutput" in record(updates)) && !("toolResponseMetadata" in record(updates))) return;
+      // A metadata-only notification must not reuse an older host.toolOutput.
+      const output = chatGptOutput(event ? updates : host);
+      if (!event && !Object.keys(record(output)).length) return;
+      setToolOutput(output);
+      setSelectedOutput(0);
+      setDraftFeedback(null);
+      setStatusFeedback(null);
     };
-    window.addEventListener("openai:set_globals", readStoredOutput);
-    readStoredOutput();
-    return () => window.removeEventListener("openai:set_globals", readStoredOutput);
+    window.addEventListener("openai:set_globals", readHostOutput);
+    readHostOutput();
+    return () => window.removeEventListener("openai:set_globals", readHostOutput);
   }, []);
 
   useEffect(() => {
@@ -165,7 +177,7 @@ export default function App() {
     if (connectionError) captureUiError("bridge_connection");
   }, [connectionError]);
 
-  const project = record(toolOutput ?? storedOutput);
+  const project = record(toolOutput);
   const style = record(project.style);
   const status = text(project.status, "waiting").toLowerCase();
   const rawUrls = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
@@ -179,6 +191,8 @@ export default function App() {
   const hostCapabilities = app?.getHostCapabilities();
   const canOpenImageDraft = Boolean(status === "complete" && project.project_type === "image" && type === "image" && projectId && downloadUrl
     && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
+  const canCheckStatus = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
+    && !["complete", "error", "canceled", "cancelled"].includes(status) && hostCapabilities?.serverTools);
   const name = text(project.name, `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
@@ -189,6 +203,7 @@ export default function App() {
     ?? (tone === "danger" ? "Magic Hour could not complete this project." : "Magic Hour is preparing the result.");
 
   const openDownload = async (event: MouseEvent<HTMLAnchorElement>) => {
+    if (projectId && downloadUrl && type !== "media") void captureUiResult("download_requested", projectId, type, downloadUrl);
     if (!app || !downloadUrl) return;
     const capabilities = app.getHostCapabilities();
     if (!capabilities?.downloadFile && !capabilities?.openLinks) return;
@@ -201,6 +216,39 @@ export default function App() {
     } catch {
       captureUiError("download_failed");
     }
+  };
+
+  const checkStatus = async () => {
+    if (!app || !canCheckStatus || !projectId || checkingProject === projectId) return;
+    const id = projectId;
+    const projectType = project.project_type;
+    setCheckingProject(id);
+    setStatusFeedback(null);
+    try {
+      const result = await app.callServerTool({
+        name: `wait_for_${projectType}_project`,
+        arguments: { id, timeout_seconds: 5, include_inline_downloads: false, max_inline_downloads: 0 },
+      });
+      const updated = record(result.structuredContent);
+      if (result.isError || updated.id !== id || updated.project_type !== projectType) {
+        setStatusFeedback({ id, message: "Could not check this project's status. Try again." });
+        return;
+      }
+      // A late status response must not replace a different project opened meanwhile.
+      setToolOutput((current: unknown) => {
+        const latest = record(current);
+        return latest.id === id && !["complete", "error", "canceled", "cancelled"].includes(String(latest.status)) ? updated : current;
+      });
+    } catch {
+      setStatusFeedback({ id, message: "Could not check this project's status. Try again." });
+    } finally {
+      setCheckingProject((current) => current === id ? null : current);
+    }
+  };
+
+  const selectOutput = (index: number) => {
+    setSelectedOutput(index);
+    setDraftFeedback(null);
   };
 
   const requestFullscreen = async () => {
@@ -243,7 +291,7 @@ export default function App() {
   return (
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
-        <Preview key={downloadUrl} type={type} url={downloadUrl} name={name} status={status} message={message} />
+        <Preview key={`${projectId}:${downloadUrl}`} projectId={projectId} type={type} url={downloadUrl} name={name} status={status} message={message} />
         {canFullscreen && type !== "video" && (
           <button className="preview-fullscreen" type="button" onClick={requestFullscreen} aria-label="Fullscreen">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
@@ -253,13 +301,19 @@ export default function App() {
       <section className="content">
         {status !== "complete" && <span className="badge" data-tone={tone}>{capitalize(status)}</span>}
         <h1>{name}</h1>
-        {urls.length > 1 && (
+        {canCheckStatus && <button className="action action-secondary check-status" type="button" disabled={checkingProject === projectId} onClick={checkStatus}>
+          {checkingProject === projectId ? "Checking…" : "Check status"}
+        </button>}
+        {canCheckStatus && statusFeedback?.id === projectId && <p className="draft-feedback" role="status">{statusFeedback.message}</p>}
+        {urls.length > 1 && type === "image" && <div className="output-thumbnails" role="group" aria-label="Image outputs">
+          {urls.map((url, index) => <button key={url} className="output-thumbnail" type="button" aria-label={`Select image ${index + 1} of ${urls.length}`} aria-pressed={index === selectedOutput} onClick={() => selectOutput(index)}>
+            <img src={url} alt="" loading="lazy" />
+          </button>)}
+        </div>}
+        {urls.length > 1 && type !== "image" && (
           <label className="output-picker">
             Output
-            <select value={selectedOutput} onChange={(event) => {
-              setSelectedOutput(Number(event.target.value));
-              setDraftFeedback(null);
-            }}>
+            <select value={selectedOutput} onChange={(event) => selectOutput(Number(event.target.value))}>
               {urls.map((url, index) => <option key={url} value={index}>{index + 1} of {urls.length}</option>)}
             </select>
           </label>

@@ -177,6 +177,27 @@ Notes:
 
 Rebuild and type-check the MCP App UI with `cd web && npm ci && npm run build`.
 
+### Result delivery metrics
+
+`media_project_resolved` includes `project_id`, `project_type`, `status` and
+`download_count`. Count distinct projects with status `complete` and at least one
+download to measure completed-project retrievals. Repeated reads remain raw
+events; older events without a project ID cannot be deduplicated or backfilled.
+
+The result card reports `mcp_app_result` events: `preview_loaded` when the main
+media loads, `playback_started` when playback actually starts, and
+`download_requested` when Download is clicked. Properties contain only the
+project ID, media type and SHA-256 output-path hash. No prompts, filenames,
+raw paths, signed URLs or credentials are sent. The widget suppresses repeat
+events within its lifetime; reports must also deduplicate by
+`(event, project_id, project_type, output_id)` across reloads and cards.
+
+UI reports are anonymous and can be spoofed. Reconcile project IDs against
+authenticated completion events and report unmatched coverage separately.
+Loading does not prove visibility or quality; a download request does not prove
+host acceptance or a completed download. These events do not establish unique
+customers, public-plugin installs or paid activation.
+
 ## File uploads
 
 Magic Hour does not accept raw file bytes inside tool arguments. The flow is:

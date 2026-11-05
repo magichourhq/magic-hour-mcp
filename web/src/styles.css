@@ -97,6 +97,11 @@ button, a { font: inherit; }
 h1 { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
 .output-picker { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 700; }
 .output-picker select { flex: 1; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-muted); color: var(--text); font: inherit; }
+.output-thumbnails { display: flex; min-width: 0; gap: 8px; overflow-x: auto; padding: 5px; }
+.output-thumbnail { flex: 0 0 60px; width: 60px; height: 60px; padding: 2px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; }
+.output-thumbnail[aria-pressed="true"] { border-color: var(--accent); }
+.output-thumbnail img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+.check-status { align-self: flex-start; }
 .toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0 16px; }
 .details { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
 .details summary { display: flex; width: fit-content; min-height: 36px; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; font-size: 14px; list-style: none; }
@@ -129,7 +134,7 @@ h1 { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.4; overflow-wr
 .action-secondary { border-color: var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
 .action:disabled { cursor: wait; opacity: .6; }
 .draft-feedback { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-.action:focus-visible, .preview-fullscreen:focus-visible, .details summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+.action:focus-visible, .output-thumbnail:focus-visible, .preview-fullscreen:focus-visible, .details summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
 
 @media (max-width: 560px) {
   .preview, .preview img, .preview video { min-height: 240px; }
