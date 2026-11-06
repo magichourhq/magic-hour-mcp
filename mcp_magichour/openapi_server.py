@@ -63,6 +63,23 @@ API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
 # Leave room for base64 expansion and metadata below client response limits.
 DEFAULT_MEDIA_FETCH_MAX_BYTES = 8 * 1024 * 1024
+# Exact observed accounts verified against the Entra tenant for openai.com.
+CHATGPT_STORAGE_HOSTS = frozenset({
+    "oaisdmntpraustraliaeast.blob.core.windows.net",
+    "oaisdmntprbrazilsouth.blob.core.windows.net",
+    "oaisdmntprcentralindia.blob.core.windows.net",
+    "oaisdmntprcentralus.blob.core.windows.net",
+    "oaisdmntprdenmarkeast.blob.core.windows.net",
+    "oaisdmntpreastus.blob.core.windows.net",
+    "oaisdmntprindiasocentral.blob.core.windows.net",
+    "oaisdmntpritalynorth.blob.core.windows.net",
+    "oaisdmntprnortheu.blob.core.windows.net",
+    "oaisdmntprpolandcentral.blob.core.windows.net",
+    "oaisdmntprseasia.blob.core.windows.net",
+    "oaisdmntprukwest.blob.core.windows.net",
+    "oaisdmntprwestus2.blob.core.windows.net",
+    "oaisdmntprwestus3.blob.core.windows.net",
+})
 MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_VERSION = "0.1.0"
 MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
@@ -383,6 +400,7 @@ async def _upload_chatgpt_file(file: ChatGPTFile, media_type: ProjectType) -> di
         _require_file_host(
             file.download_url, "oaiusercontent.com",
             purpose=f"ChatGPT {media_type} source", allow_subdomains=True,
+            additional_hosts=CHATGPT_STORAGE_HOSTS,
         )
         async with build_api_client() as api, httpx.AsyncClient(
             timeout=API_TIMEOUT, follow_redirects=False,
@@ -535,6 +553,7 @@ async def _wait_for_project_result(
 
 def _require_file_host(
     url: str, hostname: str, *, purpose: str, allow_subdomains: bool = False,
+    additional_hosts: frozenset[str] = frozenset(),
 ) -> None:
     try:
         parsed = urlparse(url)
@@ -544,7 +563,7 @@ def _require_file_host(
 
     if parsed.scheme != "https":
         reason = "HTTPS is required"
-    elif parsed.hostname != hostname and not (
+    elif parsed.hostname != hostname and parsed.hostname not in additional_hosts and not (
         allow_subdomains and (parsed.hostname or "").endswith(f".{hostname}")
     ):
         reason = f"unsupported host {parsed.hostname!r}; expected {hostname!r}"
