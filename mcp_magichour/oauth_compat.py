@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
+import httpx
 from fastmcp.server.dependencies import get_http_request
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.tools.base import Tool, ToolResult
@@ -165,9 +166,24 @@ class MCPToolOAuthMiddleware(Middleware):
         ]
 
     async def on_call_tool(self, context: MiddlewareContext, call_next: Any) -> ToolResult:
+        authorization = None
         try:
-            current_authorization_header()
-        except AuthError:
+            authorization = current_authorization_header()
+            return await call_next(context)
+        except Exception as error:
+            cause = error
+            while cause is not None:
+                if isinstance(cause, AuthError) or (
+                    isinstance(cause, httpx.HTTPStatusError)
+                    and cause.response.status_code == 401
+                    and authorization is not None
+                    and cause.request.headers.get("Authorization") == authorization
+                ):
+                    break
+                # Sanitized attachment errors suppress their cause but retain context.
+                cause = cause.__cause__ or cause.__context__
+            else:
+                raise
             issuer = (
                 OAuthSettings.from_env().issuer_url or str(get_http_request().base_url)
             ).rstrip("/")
@@ -176,11 +192,17 @@ class MCPToolOAuthMiddleware(Middleware):
                 'error="invalid_token", error_description="Authentication required"'
             )
             return ToolResult(
-                content=[TextContent(type="text", text="Authentication required.")],
+                content=[TextContent(
+                    type="text",
+                    text=(
+                        "Authentication required."
+                        if isinstance(cause, AuthError)
+                        else "Authentication required (HTTP 401). Reconnect Magic Hour."
+                    ),
+                )],
                 meta={"mcp/www_authenticate": [challenge]},
                 is_error=True,
             )
-        return await call_next(context)
 
 
 def _accepts_html(scope: Mapping[str, Any]) -> bool:
