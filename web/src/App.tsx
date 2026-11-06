@@ -1,16 +1,17 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import { useEffect, useState, type MouseEvent, type SyntheticEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 import { captureUiError, captureUiResult } from "./analytics";
 
 type MediaType = "image" | "video" | "audio" | "media";
 const UI_READ_ORIGIN = "magic-hour/ui-read";
+type ReadAction = "status" | "preview" | "download";
 type ResultState = {
   toolOutput: unknown;
   selectedOutput: number;
   contextRevision: number;
   previewRevision: number;
-  pendingRead: { id: string; projectType: string; contextRevision: number } | null;
-  feedback: string | null;
+  pendingRead: { id: string; projectType: string; contextRevision: number; action: ReadAction } | null;
+  feedback: { message: string; action: ReadAction } | null;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -71,12 +72,12 @@ function receiveToolOutput(current: ResultState, toolOutput: unknown, readOrigin
     if (selectedPath) {
       const nextPaths = projectUrls(next).map((url) => new URL(url).pathname);
       if (previousPaths.filter((path) => path === selectedPath).length !== 1 || nextPaths.filter((path) => path === selectedPath).length !== 1) {
-        return { ...current, feedback: "Could not match the refreshed output. The current selection is unchanged." };
+        return { ...current, pendingRead: null, feedback: { message: "Could not match this output. Your selection is unchanged.", action: "preview" } };
       }
       selectedOutput = nextPaths.indexOf(selectedPath);
     }
   }
-  return { ...current, toolOutput, selectedOutput, contextRevision: current.contextRevision + 1, feedback: null };
+  return { ...current, toolOutput, selectedOutput, contextRevision: current.contextRevision + 1, pendingRead: null, feedback: null };
 }
 
 function projectType(result: Record<string, unknown>, url: string | null): MediaType {
@@ -105,14 +106,16 @@ type PlaceholderProps = {
   icon: string;
   heading: string;
   message: string;
+  onRetry?: () => void;
 };
 
-function Placeholder({ icon, heading, message }: PlaceholderProps) {
+function Placeholder({ icon, heading, message, onRetry }: PlaceholderProps) {
   return (
     <div className="placeholder">
       <div className="placeholder-icon" aria-hidden="true">{icon}</div>
       <strong>{heading}</strong>
       <p>{message}</p>
+      {onRetry && <button className="action action-secondary" type="button" onClick={onRetry}>Try again</button>}
     </div>
   );
 }
@@ -124,11 +127,23 @@ type PreviewProps = {
   name: string;
   status: string;
   message: string;
-  canRefreshLink: boolean;
+  revision: number;
+  canRecover: boolean;
+  recovering: boolean;
+  onRecover: () => Promise<boolean>;
+  hasFeedback: boolean;
 };
 
-function Preview({ projectId, type, url, name, status, message, canRefreshLink }: PreviewProps) {
-  const [loadFailed, setLoadFailed] = useState(false);
+function Preview({ projectId, type, url, name, status, message, revision, canRecover, recovering, onRecover, hasFeedback }: PreviewProps) {
+  const [failedRevision, setFailedRevision] = useState<string | null>(null);
+  const automaticRecovery = useRef(false);
+  const mediaRevision = `${url}:${revision}`;
+  const loadFailed = failedRevision === mediaRevision;
+  useEffect(() => {
+    if (!loadFailed || !canRecover || recovering || automaticRecovery.current) return;
+    automaticRecovery.current = true;
+    void onRecover().then((started) => { if (!started) automaticRecovery.current = false; });
+  }, [loadFailed, canRecover, recovering, onRecover]);
   const loaded = () => {
     if (projectId && url && type !== "media") void captureUiResult("preview_loaded", projectId, type, url);
   };
@@ -139,7 +154,7 @@ function Preview({ projectId, type, url, name, status, message, canRefreshLink }
     const code = event.currentTarget instanceof HTMLMediaElement ? event.currentTarget.error?.code : undefined;
     if (code !== 1) {
       captureUiError(code === 2 ? "media_network" : code === 3 ? "media_decode" : code === 4 ? "media_unsupported" : "media_load");
-      setLoadFailed(true);
+      setFailedRevision(mediaRevision);
     }
   };
   if (status !== "complete" || !url) {
@@ -147,14 +162,15 @@ function Preview({ projectId, type, url, name, status, message, canRefreshLink }
     const heading = status === "timeout" ? "Waiting paused" : failed ? "Project unavailable" : "Waiting for result";
     return <Placeholder icon={failed ? "!" : "…"} heading={heading} message={message} />;
   }
-  if (loadFailed) return <Placeholder icon="!" heading="Preview unavailable" message={canRefreshLink ? "Use Refresh link to retrieve this result again, or try Download." : "Try Download, or ask to refresh this result's link."} />;
-  if (type === "image") return <img src={url} alt={name} onLoad={loaded} onError={failed} />;
-  if (type === "video") return <video src={url} controls playsInline preload="metadata" aria-label={name} onLoadedData={loaded} onPlaying={playing} onError={failed} />;
+  if (loadFailed) return <Placeholder icon={recovering ? "…" : "!"} heading={recovering ? "Loading your result" : "Preview unavailable"} message={recovering ? "Recovering your existing result." : canRecover ? "Try again, or use Download to get your result." : "Use Download to get your result."}
+    onRetry={!recovering && canRecover && !hasFeedback && automaticRecovery.current ? () => { void onRecover(); } : undefined} />;
+  if (type === "image") return <img key={mediaRevision} src={url} alt={name} onLoad={loaded} onError={failed} />;
+  if (type === "video") return <video key={mediaRevision} src={url} controls playsInline preload="metadata" aria-label={name} onLoadedData={loaded} onPlaying={playing} onError={failed} />;
   if (type === "audio") {
     return (
       <div className="audio-preview">
         <div className="audio-mark" aria-hidden="true">♪</div>
-        <audio src={url} controls preload="metadata" aria-label={name} onLoadedData={loaded} onPlaying={playing} onError={failed} />
+        <audio key={mediaRevision} src={url} controls preload="metadata" aria-label={name} onLoadedData={loaded} onPlaying={playing} onError={failed} />
       </div>
     );
   }
@@ -165,6 +181,7 @@ export default function App() {
   const [readOrigin] = useState(() => crypto.randomUUID());
   const [result, setResult] = useState<ResultState>({ toolOutput: undefined, selectedOutput: 0, contextRevision: 0, previewRevision: 0, pendingRead: null, feedback: null });
   const { toolOutput, selectedOutput, previewRevision, pendingRead, feedback } = result;
+  const activeRead = useRef<ResultState["pendingRead"]>(null);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [openingDraft, setOpeningDraft] = useState(false);
   const [draftFeedback, setDraftFeedback] = useState<string | null>(null);
@@ -174,6 +191,7 @@ export default function App() {
     onAppCreated: (createdApp) => {
       createdApp.ontoolresult = (result) => {
         if (result.isError || Object.keys(record(result.structuredContent)).length) {
+          if (record(result.structuredContent)[UI_READ_ORIGIN] !== readOrigin) activeRead.current = null;
           setResult((current) => receiveToolOutput(current, result.structuredContent ?? {}, readOrigin));
           setDraftFeedback(null);
         }
@@ -194,6 +212,7 @@ export default function App() {
       // A metadata-only notification must not reuse an older host.toolOutput.
       const output = chatGptOutput(event ? updates : host);
       if (!event && !Object.keys(record(output)).length) return;
+      if (record(output)[UI_READ_ORIGIN] !== readOrigin) activeRead.current = null;
       setResult((current) => receiveToolOutput(current, output, readOrigin));
       setDraftFeedback(null);
     };
@@ -224,8 +243,9 @@ export default function App() {
     && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
   const canReadProject = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
     && !["error", "canceled", "cancelled"].includes(status) && hostCapabilities?.serverTools);
-  const readBusyLabel = pendingRead?.id !== projectId || pendingRead?.projectType !== project.project_type
-    ? "Finishing check…" : status === "complete" ? "Refreshing…" : "Checking…";
+  const readBusyLabel = pendingRead?.action === "download" ? "Preparing download…"
+    : pendingRead?.id !== projectId || pendingRead?.projectType !== project.project_type
+      ? "Finishing check…" : status === "complete" ? "Loading your result…" : "Checking…";
   const name = text(project.name, `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
@@ -241,66 +261,88 @@ export default function App() {
     const capabilities = app.getHostCapabilities();
     if (!capabilities?.downloadFile && !capabilities?.openLinks) return;
     event.preventDefault();
-    try {
-      const result = capabilities.downloadFile
-        ? await app.downloadFile({ contents: [{ type: "resource_link", uri: downloadUrl, name }] })
-        : await app.openLink({ url: downloadUrl });
-      if (result.isError) captureUiError("download_rejected");
-    } catch {
-      captureUiError("download_failed");
-    }
+    await readProject("download");
   };
 
-  const readProject = async () => {
-    if (!app || !canReadProject || !projectId || pendingRead) return;
-    const id = projectId;
+  const readProject = async (action: ReadAction = "status"): Promise<boolean> => {
+    if (!app || activeRead.current || (action !== "download" && !canReadProject)) return false;
+    const id = projectId ?? "";
     const projectType = String(project.project_type);
-    const request = { id, projectType, contextRevision: result.contextRevision };
+    const request = { id, projectType, contextRevision: result.contextRevision, action };
+    activeRead.current = request;
     const refreshing = status === "complete";
     const originalPaths = urls.map((url) => new URL(url).pathname);
-    const failureMessage = refreshing
-      ? "Could not refresh this result's links. The current selection is unchanged."
+    const selectedPath = originalPaths[selectedOutput];
+    const failureMessage = action === "download" ? "Could not download your result. Try again."
+      : refreshing ? "Could not load your result. Try again, or use Download."
       : "Could not check this project's status. Try again.";
     setResult((current) => ({ ...current, pendingRead: request, feedback: null }));
-    let updated: Record<string, unknown> | undefined;
-    let refreshedPaths: (string | null)[] = [];
+    const download = async (url: string): Promise<boolean> => {
+      try {
+        const response = hostCapabilities?.downloadFile
+          ? await app.downloadFile({ contents: [{ type: "resource_link", uri: url, name }] })
+          : await app.openLink({ url });
+        if (!response.isError) return true;
+        captureUiError("download_rejected");
+      } catch {
+        captureUiError("download_failed");
+      }
+      return false;
+    };
     try {
+      if (action === "download" && downloadUrl) {
+        const index = rawUrls.findIndex((url) => safeMediaUrl(url) === downloadUrl);
+        const expiration = (Array.isArray(project.download_expiration_metadata) ? project.download_expiration_metadata : [])
+          .map(record).find((item) => String(item.download_index) === String(index))?.expires_at;
+        const expired = typeof expiration === "string" && Date.parse(expiration) <= Date.now() + 30_000;
+        if ((!expired || !canReadProject) && await download(downloadUrl)) return true;
+      }
+      if (activeRead.current !== request) return true;
+      if (!canReadProject) throw new Error("Project recovery unavailable");
       const response = await app.callServerTool({
         name: `wait_for_${projectType}_project`,
         arguments: { id, timeout_seconds: 5, include_inline_downloads: false, max_inline_downloads: 0 },
         _meta: { [UI_READ_ORIGIN]: readOrigin },
       });
+      if (activeRead.current !== request) return true;
       const candidate = record(response.structuredContent);
       const refreshedUrls = Array.isArray(candidate.exact_download_urls) ? candidate.exact_download_urls.map(safeMediaUrl) : [];
-      refreshedPaths = refreshedUrls.map((url) => url ? new URL(url).pathname : null);
-      if (!response.isError && candidate.id === id && candidate.project_type === projectType
-        && (!refreshing || (candidate.status === "complete" && refreshedPaths.length > 0 && !refreshedPaths.includes(null)
+      const refreshedPaths = refreshedUrls.map((url) => url ? new URL(url).pathname : null);
+      if (response.isError || candidate.id !== id || candidate.project_type !== projectType
+        || (refreshing && !(candidate.status === "complete" && refreshedPaths.length > 0 && !refreshedPaths.includes(null)
           && new Set(originalPaths).size === originalPaths.length
-          && originalPaths.every((path) => refreshedPaths.filter((candidate) => candidate === path).length === 1)))) {
-        updated = candidate;
+          && originalPaths.every((path) => refreshedPaths.filter((candidate) => candidate === path).length === 1)))) throw new Error("Result identity mismatch");
+      setResult((current) => {
+        const latest = record(current.toolOutput);
+        if (current.pendingRead !== request || current.contextRevision !== request.contextRevision || latest.id !== id || latest.project_type !== projectType) return current;
+        const currentPath = originalPaths[current.selectedOutput];
+        return {
+          ...current,
+          toolOutput: candidate,
+          selectedOutput: refreshing && currentPath ? refreshedPaths.indexOf(currentPath) : 0,
+          contextRevision: current.contextRevision + 1,
+          previewRevision: current.previewRevision + (action === "preview" ? 1 : 0),
+        };
+      });
+      if (action === "download") {
+        const refreshedUrl = refreshedUrls[refreshedPaths.indexOf(selectedPath)];
+        if (!refreshedUrl || !await download(refreshedUrl)) throw new Error("Download unavailable");
       }
     } catch {
-      // Preserve the existing result and show the same bounded recovery message.
+      if (activeRead.current === request) setResult((current) => current.pendingRead === request
+        ? { ...current, feedback: { message: failureMessage, action } } : current);
+    } finally {
+      if (activeRead.current === request) {
+        activeRead.current = null;
+        setResult((current) => current.pendingRead === request ? { ...current, pendingRead: null } : current);
+      }
     }
-    setResult((current) => {
-      const latest = record(current.toolOutput);
-      if (current.pendingRead !== request) return current;
-      if (current.contextRevision !== request.contextRevision || latest.id !== id || latest.project_type !== projectType) return { ...current, pendingRead: null };
-      if (!updated) return { ...current, pendingRead: null, feedback: failureMessage };
-      const selectedPath = originalPaths[current.selectedOutput];
-      return {
-        toolOutput: updated,
-        selectedOutput: refreshing && selectedPath ? refreshedPaths.indexOf(selectedPath) : 0,
-        contextRevision: current.contextRevision + 1,
-        previewRevision: current.previewRevision + (refreshing ? 1 : 0),
-        pendingRead: null,
-        feedback: null,
-      };
-    });
+    return true;
   };
 
   const selectOutput = (index: number) => {
-    setResult((current) => ({ ...current, selectedOutput: index, feedback: null }));
+    activeRead.current = null;
+    setResult((current) => ({ ...current, selectedOutput: index, pendingRead: null, feedback: null }));
     setDraftFeedback(null);
   };
 
@@ -354,7 +396,12 @@ export default function App() {
   return (
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
-        <Preview key={`${projectId}:${downloadUrl}:${previewRevision}`} projectId={projectId} type={type} url={downloadUrl} name={name} status={status} message={message} canRefreshLink={canReadProject && status === "complete"} />
+        <Preview
+          key={`${projectId}:${project.project_type}:${downloadUrl ? new URL(downloadUrl).pathname : ""}`}
+          projectId={projectId} type={type} url={downloadUrl} name={name} status={status} message={message}
+          revision={previewRevision} canRecover={canReadProject && status === "complete"} recovering={pendingRead !== null}
+          onRecover={() => readProject("preview")} hasFeedback={feedback !== null}
+        />
         {canFullscreen && type !== "video" && (
           <button className="preview-fullscreen" type="button" onClick={requestFullscreen} aria-label="Fullscreen">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
@@ -364,10 +411,14 @@ export default function App() {
       <section className="content">
         {status !== "complete" && <span className="badge" data-tone={tone}>{capitalize(status)}</span>}
         <h1>{name}</h1>
-        {canReadProject && <button className="action action-secondary check-status" type="button" disabled={pendingRead !== null} onClick={readProject}>
-          {pendingRead ? readBusyLabel : status === "complete" ? "Refresh link" : "Check status"}
+        {canReadProject && status !== "complete" && <button className="action action-secondary check-status" type="button" disabled={pendingRead !== null} onClick={() => readProject()}>
+          {pendingRead ? readBusyLabel : "Check status"}
         </button>}
-        {canReadProject && feedback && <p className="draft-feedback" role="status">{feedback}</p>}
+        {status === "complete" && pendingRead && <p className="draft-feedback" role="status">{readBusyLabel}</p>}
+        {feedback && <div className="draft-feedback" role="status">
+          <p>{feedback.message}</p>
+          {(canReadProject || feedback.action === "download") && <button className="action action-secondary" type="button" disabled={pendingRead !== null} onClick={() => readProject(feedback.action)}>Try again</button>}
+        </div>}
         {urls.length > 1 && type === "image" && <div className="output-thumbnails" role="group" aria-label="Image outputs">
           {urls.map((url, index) => <button key={url} className="output-thumbnail" type="button" aria-label={`Select image ${index + 1} of ${urls.length}`} aria-pressed={index === selectedOutput} onClick={() => selectOutput(index)}>
             <img src={url} alt="" loading="lazy" />
