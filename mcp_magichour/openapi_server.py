@@ -73,7 +73,6 @@ When exposed, use a matching estimate with the exact create body; resolve blocke
 get_workflow_guide gives static inputs/docs/review, not account eligibility.
 After creation, use matching wait_for_*_project with the returned id.
 For *_file_path inputs, upload local bytes with get_upload_urls before using file_path. Direct public media URLs must be stable and fetchable as raw bytes; hotlinked URLs can fail. Preserve exact signed download URLs, including query parameters; never append expiration metadata.
-For native ChatGPT attachments, use upload_chatgpt_image for images or upload_chatgpt_media for images, video and audio within its supported formats and 20 MiB limit. Set media_type to the attachment's actual kind, not the type of generation requested. Keep each returned path paired with its input role; never pass a bare file ID, filename or chat-local path as a Magic Hour asset.
 Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
 On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
 On tier restrictions, explain the block; never retry unchanged or blindly remove fields. Ask before changing explicit model/resolution requirements.
@@ -192,7 +191,8 @@ def register_custom_tools(mcp: FastMCP) -> None:
         description=(
             "Uploads one native ChatGPT attachment to the connected Magic Hour account: "
             "PNG/JPEG/WebP images, MP4/MOV/WebM video, or MP3/WAV/M4A/FLAC/Ogg/WebM audio, up to 20 MiB. "
-            "Set media_type to the attachment's actual kind: image, video or audio. For multiple references, call separately and keep "
+            "Set media_type to the attachment's actual kind, not the requested output: image, video or audio. "
+            "For multiple references, call separately and keep "
             "each returned file_path paired with the intended input. Pass the real attachment "
             "through the file parameter; a bare file ID, filename or chat-local path is not the "
             "raw MCP file object. Does not generate media or spend generation credits."
