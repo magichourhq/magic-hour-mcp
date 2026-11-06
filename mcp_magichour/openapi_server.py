@@ -434,15 +434,15 @@ async def _upload_chatgpt_file(file: ChatGPTFile, media_type: ProjectType) -> di
                 b"OpusHead" in media[:128] or b"\x01vorbis" in media[:128]
             ):
                 extension = "ogg"
-            elif media_type == "audio" and media[4:8] == b"ftyp" and media[8:12] in {b"M4A ", b"M4B "}:
+            elif media_type == "audio" and media[4:8] == b"ftyp" and media[8:12] in (b"M4A ", b"M4B "):
                 extension = "m4a"
             elif media_type in {"video", "audio"} and media.startswith(b"\x1a\x45\xdf\xa3") and b"webm" in media[:4096]:
                 extension = "webm"
             elif media_type == "video" and media[4:8] == b"ftyp" and media[8:12] == b"qt  ":
                 extension = "mov"
-            elif media_type == "video" and media[4:8] == b"ftyp" and media[8:12] in {
+            elif media_type == "video" and media[4:8] == b"ftyp" and media[8:12] in (
                 b"isom", b"iso2", b"iso3", b"iso4", b"iso5", b"iso6", b"mp41", b"mp42", b"avc1", b"M4V ",
-            }:
+            ):
                 extension = "mp4"
             else:
                 raise ToolError({
