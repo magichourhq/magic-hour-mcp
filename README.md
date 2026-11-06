@@ -3,8 +3,10 @@
 OpenAPI-backed MCP server for Magic Hour image and video generation and editing,
 music generation, uploads, completion waiting and retrieval of existing audio projects.
 
-At startup, this server reads `docs/openapi.json` and builds MCP tools with
-`FastMCP.from_openapi()`. The OpenAPI spec supplies endpoint coverage, while
+At startup, this server builds MCP tools from the canonical `docs/openapi.json`
+with `FastMCP.from_openapi()`. Installed distributions bundle that snapshot inside
+the Python package, so startup does not require a repository checkout. The spec
+supplies endpoint coverage, while
 Magic Hour MCP policies add agent-facing guidance for async polling, uploads,
 and project downloads.
 
