@@ -1,5 +1,5 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import { useEffect, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 import { captureUiError, captureUiResult } from "./analytics";
 
 type MediaType = "image" | "video" | "audio" | "media";
@@ -11,7 +11,7 @@ type ResultState = {
   contextRevision: number;
   previewRevision: number;
   pendingRead: { id: string; projectType: string; contextRevision: number; action: ReadAction } | null;
-  feedback: { message: string; action: ReadAction } | null;
+  feedback: { message: string; action: ReadAction; label?: string } | null;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -159,7 +159,7 @@ function Preview({ projectId, type, url, name, status, message, revision, canRec
   };
   if (status !== "complete" || !url) {
     const failed = ["error", "canceled", "cancelled"].includes(status);
-    const heading = status === "timeout" ? "Waiting paused" : failed ? "Project unavailable" : "Waiting for result";
+    const heading = failed ? "Project unavailable" : "Waiting for result";
     return <Placeholder icon={failed ? "!" : "…"} heading={heading} message={message} />;
   }
   if (loadFailed) return <Placeholder icon={recovering ? "…" : "!"} heading={recovering ? "Loading your result" : "Preview unavailable"} message={recovering ? "Recovering your existing result." : canRecover ? "Try again, or use Download to get your result." : "Use Download to get your result."}
@@ -182,6 +182,7 @@ export default function App() {
   const [result, setResult] = useState<ResultState>({ toolOutput: undefined, selectedOutput: 0, contextRevision: 0, previewRevision: 0, pendingRead: null, feedback: null });
   const { toolOutput, selectedOutput, previewRevision, pendingRead, feedback } = result;
   const activeRead = useRef<ResultState["pendingRead"]>(null);
+  const [trackingRevision, setTrackingRevision] = useState(0);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [openingDraft, setOpeningDraft] = useState(false);
   const [draftFeedback, setDraftFeedback] = useState<string | null>(null);
@@ -243,6 +244,7 @@ export default function App() {
     && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
   const canReadProject = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
     && !["error", "canceled", "cancelled"].includes(status) && hostCapabilities?.serverTools);
+  const waitingForResult = ["waiting", "queued", "rendering", "processing", "pending", "timeout"].includes(status);
   const readBusyLabel = pendingRead?.action === "download" ? "Preparing download…"
     : pendingRead?.id !== projectId || pendingRead?.projectType !== project.project_type
       ? "Finishing check…" : status === "complete" ? "Loading your result…" : "Checking…";
@@ -250,7 +252,7 @@ export default function App() {
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled"].includes(status) ? "danger" : "warning";
-  const message = optionalText(project.message)
+  const message = (status === "timeout" ? "Your request is saved. You can return here for the result." : optionalText(project.message))
     ?? optionalText(project.error)
     ?? optionalText(record(project.error).message)
     ?? (tone === "danger" ? "Magic Hour could not complete this project." : "Magic Hour is preparing the result.");
@@ -340,6 +342,51 @@ export default function App() {
     return true;
   };
 
+  const trackProject = useEffectEvent(async (action: "resume" | "check" | "pause") => {
+    if (!canReadProject || (action !== "resume" && (!waitingForResult || feedback))) return "stop";
+    if (action === "pause") {
+      setResult((current) => ({ ...current, feedback: { message: "This is taking longer than expected. You can keep checking this result.", action: "status", label: "Continue checking" } }));
+      return "stop";
+    }
+    if (activeRead.current) return "busy";
+    await readProject();
+    return "checked";
+  });
+
+  useEffect(() => {
+    if (!canReadProject) return;
+    let disposed = false;
+    let generation = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let startedAt = 0;
+    const check = async (resume: boolean, currentGeneration: number) => {
+      if (disposed || currentGeneration !== generation || document.hidden) return;
+      if (Date.now() - startedAt >= 180_000) {
+        await trackProject("pause");
+        return;
+      }
+      const outcome = await trackProject(resume ? "resume" : "check");
+      if (disposed || currentGeneration !== generation || document.hidden || outcome === "stop") return;
+      timer = setTimeout(() => { void check(resume && outcome === "busy", currentGeneration); }, Date.now() - startedAt < 30_000 ? 2_000 : 10_000);
+    };
+    const visibilityChanged = () => {
+      generation += 1;
+      clearTimeout(timer);
+      if (!document.hidden) {
+        startedAt = Date.now();
+        void check(true, generation);
+      }
+    };
+    document.addEventListener("visibilitychange", visibilityChanged);
+    visibilityChanged();
+    return () => {
+      disposed = true;
+      generation += 1;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+    };
+  }, [projectId, project.project_type, canReadProject, trackingRevision]);
+
   const selectOutput = (index: number) => {
     activeRead.current = null;
     setResult((current) => ({ ...current, selectedOutput: index, pendingRead: null, feedback: null }));
@@ -409,15 +456,15 @@ export default function App() {
         )}
       </section>
       <section className="content">
-        {status !== "complete" && <span className="badge" data-tone={tone}>{capitalize(status)}</span>}
+        {status !== "complete" && <span className="badge" data-tone={tone}>{status === "timeout" ? "Waiting" : capitalize(status)}</span>}
         <h1>{name}</h1>
-        {canReadProject && status !== "complete" && <button className="action action-secondary check-status" type="button" disabled={pendingRead !== null} onClick={() => readProject()}>
+        {canReadProject && status !== "complete" && !waitingForResult && <button className="action action-secondary check-status" type="button" disabled={pendingRead !== null} onClick={() => setTrackingRevision((revision) => revision + 1)}>
           {pendingRead ? readBusyLabel : "Check status"}
         </button>}
         {status === "complete" && pendingRead && <p className="draft-feedback" role="status">{readBusyLabel}</p>}
         {feedback && <div className="draft-feedback" role="status">
           <p>{feedback.message}</p>
-          {(canReadProject || feedback.action === "download") && <button className="action action-secondary" type="button" disabled={pendingRead !== null} onClick={() => readProject(feedback.action)}>Try again</button>}
+          {(canReadProject || feedback.action === "download") && <button className="action action-secondary" type="button" disabled={pendingRead !== null} onClick={() => feedback.action === "status" ? setTrackingRevision((revision) => revision + 1) : void readProject(feedback.action)}>{feedback.label ?? "Try again"}</button>}
         </div>}
         {urls.length > 1 && type === "image" && <div className="output-thumbnails" role="group" aria-label="Image outputs">
           {urls.map((url, index) => <button key={url} className="output-thumbnail" type="button" aria-label={`Select image ${index + 1} of ${urls.length}`} aria-pressed={index === selectedOutput} onClick={() => selectOutput(index)}>
