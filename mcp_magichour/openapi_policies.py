@@ -27,7 +27,8 @@ API_TOOL_METADATA = {
         "get_account_info",
         "Get account info",
         "Returns credit balance and subscription details for the connected account. Use to inspect "
-        "account information before generation. Read-only; this is not a request-specific cost "
+        "account information before choosing generation settings. Use tier, not the subscription "
+        "name or credit balance, for plan access. Read-only; this is not a request-specific cost "
         "quote or model-eligibility check.",
     ),
     ("GET", "/v1/saved-items"): (
@@ -206,8 +207,11 @@ API_TOOL_METADATA = {
         "Edit image",
         "Edits one or more supplied images using a text prompt. For prompt-only creation use "
         "generate_image. Costs credits; returns a project id for wait_for_image_project. Model "
-        "eligibility depends on the account plan; the default model is not available on every "
-        "plan.",
+        "eligibility depends on the account plan. Read get_account_info first; do not assume an "
+        "API default is eligible. For a Free account with no requested model, "
+        "flux-2-klein at 640px with image_count=1 is an available option when it supports the "
+        "supplied inputs and requested edit. Check the current model's input limits; never drop "
+        "references or change an explicit model, resolution or count to fit this option.",
     ),
     ("POST", "/v1/ai-headshot-generator"): (
         "generate_headshot",
@@ -298,11 +302,17 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
     "/v1/image-to-video": {
         ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
         "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
+        "When no model was requested, use `default` rather than choosing a named premium model; "
+        "omit an unrequested resolution so the API resolves it for the account. "
+        "Preserve explicit settings and required input capabilities. "
         "Deprecated model values ending in `-audio` enable `audio`.",
     },
     "/v1/text-to-video": {
         ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
         "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
+        "When no model was requested, use `default` rather than choosing a named premium model; "
+        "omit an unrequested resolution so the API resolves it for the account. "
+        "Preserve explicit settings and required input capabilities. "
         "Deprecated model values ending in `-audio` enable `audio`.",
     },
     "/v1/ai-talking-photo": {
@@ -492,6 +502,13 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
                 "a specific model. This is the default behavior.",
                 "Uses the server-selected default model, which may change over time.",
             )
+        if path == "/v1/ai-image-generator":
+            guidance = (
+                "When the user has not requested a model, use `default` rather than selecting "
+                "a premium model. Preserve an explicit model. "
+            )
+            if not model.get("description", "").startswith(guidance):
+                model["description"] = guidance + model.get("description", "")
 
     asset_type = next((asset for tag, asset in PROJECT_TAG_TO_ASSET.items() if tag in tags), None)
 
@@ -522,6 +539,15 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         )
 
     if method == "POST" and asset_type and not is_estimate:
+        guidance = (
+            " Before choosing settings, read get_account_info and the current parameter "
+            "constraints. A listed model, resolution, duration or count is not necessarily "
+            "available together or on this account. Preserve explicit requirements and all "
+            "supplied inputs; explain a genuine block instead of submitting an incompatible "
+            "request. Account balance alone does not prove a request is affordable."
+        )
+        if guidance not in operation.get("description", ""):
+            operation["description"] = operation.get("description", "") + guidance
         wait_tool = PROJECT_WAIT_TOOL_BY_ASSET[asset_type]
         additions.append(
             f"Starts an async {asset_type} job; returns `id` and `credits_charged`. "
