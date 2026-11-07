@@ -31,9 +31,9 @@ from starlette.staticfiles import StaticFiles
 
 from .app_events import app_events
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
-from .mcp_errors import install_structured_tool_errors
+from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
-from .openapi_policies import GENERATION_ESTIMATE_PATHS, apply_magic_hour_policies, customize_openapi_component
+from .openapi_policies import GENERATION_ESTIMATE_PATHS, apply_magic_hour_policies, current_tool_replacements, customize_openapi_component
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
@@ -138,7 +138,8 @@ def build_api_client() -> httpx.AsyncClient:
 def create_mcp() -> FastMCP:
     """Create a server and API client for one application lifecycle."""
     spec_path = os.getenv("MAGIC_HOUR_OPENAPI_PATH", str(DEFAULT_OPENAPI_PATH))
-    spec = apply_magic_hour_policies(load_openapi_spec(spec_path))
+    source_spec = load_openapi_spec(spec_path)
+    spec = apply_magic_hour_policies(source_spec)
     client = build_api_client()
 
     @asynccontextmanager
@@ -168,8 +169,9 @@ def create_mcp() -> FastMCP:
 
     register_custom_tools(mcp)
     mcp.add_middleware(ToolCallLoggingMiddleware())
+    mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
-    install_structured_tool_errors(mcp)
+    install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
     return mcp
