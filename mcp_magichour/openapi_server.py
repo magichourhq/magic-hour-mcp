@@ -933,6 +933,11 @@ app = create_oauth_compatibility_app(
             lambda _: PlainTextResponse("muse-challenge=2daf19b3967b354cfdf13fdbe3fb7898eef3fceb54a5189958d4c7191490bc2b"),
             methods=["GET"],
         ),
+        Route(
+            "/.well-known/muse-challenge/b52883df2285b1e683d70716f09a866798053681c5047dcc2ee7feb6ce9b9bed",
+            lambda _: PlainTextResponse("muse-challenge=b52883df2285b1e683d70716f09a866798053681c5047dcc2ee7feb6ce9b9bed"),
+            methods=["GET"],
+        ),
         Route("/.well-known/openai-apps-challenge", lambda _: PlainTextResponse("DjJ2bzf2N6jgiX7_RSHQitVfWJD6AMQL6_-5B_QHKz0"), methods=["GET"]),
     ],
 )
