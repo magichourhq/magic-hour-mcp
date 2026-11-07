@@ -45,7 +45,18 @@ class APIErrorRecoveryMiddleware(Middleware):
                             break
                         recovery = {
                             "invalid_request": (400, "Correct the fields described by the API using the current tool schema. Preserve explicit settings; ask before changing them. Do not retry the unchanged request."),
-                            "insufficient_credits": (402, "Explain that the connected account lacks credits. Do not retry generation or purchase credits automatically."),
+                            "insufficient_credits": (
+                                402,
+                                "Explain that the connected account lacks credits. Show the user "
+                                "https://magichour.ai/pricing#credit-pack for one-time credit packs and "
+                                "https://magichour.ai/pricing for subscription plans. Ask them to purchase "
+                                "for the same connected Magic Hour account and return here to continue. "
+                                "A credit purchase does not unlock subscription-only models or resolutions. "
+                                "When the user asks to continue, refresh get_account_info and recheck the "
+                                "original request's eligibility; balance alone is not proof. Preserve supplied "
+                                "media and explicit settings. Do not purchase, change plans or retry "
+                                "generation automatically.",
+                            ),
                             "subscription_required": (402, "Explain that this request requires a subscription. Do not retry generation or change the subscription automatically."),
                             "plan_upgrade_required": (402, "Explain the API's plan restriction for this request. Ask before changing its model or settings; do not upgrade or retry automatically."),
                             "not_found": (404, "Check the existing resource ID and connected account. Do not create a replacement generation to recover a missing result."),
