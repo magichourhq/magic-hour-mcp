@@ -77,6 +77,7 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
     async def handle(request: mt.CallToolRequest) -> mt.ServerResult:
         tool = await mcp.get_tool(request.params.name)
         if tool is None:
+            message = f"Unknown tool: {request.params.name!r}"
             data: dict[str, object] = {
                 "type": "unknown_tool",
                 "next_action": (
@@ -92,8 +93,10 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
                     "Preserve supplied inputs and explicit settings; ask before changing them. "
                     "The obsolete call was not executed."
                 )
+                # Some clients expose only the error message to the agent.
+                message += f". Current tool: {replacement!r}. {data['next_action']}"
             raise _invalid_params(
-                f"Unknown tool: {request.params.name!r}",
+                message,
                 data,
             )
 
