@@ -451,6 +451,19 @@ def normalize_mcp_tool_name(operation_id: str) -> str:
     return normalized
 
 
+def current_tool_replacements(spec: dict[str, Any]) -> dict[str, str]:
+    replacements = {}
+    for path, methods in spec.get("paths", {}).items():
+        for method, operation in methods.items():
+            metadata = API_TOOL_METADATA.get((method.upper(), path))
+            if metadata and isinstance(operation, dict) and operation.get("operationId"):
+                operation_id = operation["operationId"]
+                for name in (operation_id, normalize_mcp_tool_name(operation_id)):
+                    if name != metadata[0]:
+                        replacements[name] = metadata[0]
+    return replacements
+
+
 def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]) -> None:
     tags = set(operation.get("tags") or [])
     additions: list[str] = []

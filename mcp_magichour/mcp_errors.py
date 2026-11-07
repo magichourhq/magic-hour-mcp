@@ -1,26 +1,100 @@
 from __future__ import annotations
 
+import json
+
+import httpx
 import jsonschema
 import mcp.types as mt
 from fastmcp import FastMCP
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import McpError
 
 
-def install_structured_tool_errors(mcp: FastMCP) -> None:
+class APIErrorRecoveryMiddleware(Middleware):
+    """Give canonical API rejections a recovery action without retrying requests."""
+
+    def __init__(self, api_base_url: httpx.URL) -> None:
+        self.api_origin = api_base_url.copy_with(path="/", query=None, fragment=None)
+        self.api_path = api_base_url.path.rstrip("/") + "/v1/"
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        try:
+            return await call_next(context)
+        except Exception as error:
+            cause = error
+            while cause is not None:
+                if isinstance(cause, httpx.HTTPStatusError):
+                    request = cause.request
+                    if (
+                        request.url.copy_with(path="/", query=None, fragment=None) == self.api_origin
+                        and request.url.path.startswith(self.api_path)
+                    ):
+                        try:
+                            body = cause.response.json()
+                        except ValueError:
+                            break
+                        if not isinstance(body, dict):
+                            break
+                        code = body.get("code")
+                        if not isinstance(code, str):
+                            break
+                        recovery = {
+                            "invalid_request": (400, "Correct the fields described by the API using the current tool schema. Preserve explicit settings; ask before changing them. Do not retry the unchanged request."),
+                            "insufficient_credits": (402, "Explain that the connected account lacks credits. Do not retry generation or purchase credits automatically."),
+                            "subscription_required": (402, "Explain that this request requires a subscription. Do not retry generation or change the subscription automatically."),
+                            "plan_upgrade_required": (402, "Explain the API's plan restriction for this request. Ask before changing its model or settings; do not upgrade or retry automatically."),
+                            "not_found": (404, "Check the existing resource ID and connected account. Do not create a replacement generation to recover a missing result."),
+                            "unprocessable_entity": (422, "Correct the values described by the API. Preserve the user's explicit model, references and settings; ask before changing them. Do not retry the unchanged request."),
+                            "internal_server_error": (500, "For a creation request, acceptance may be uncertain: recover its existing project ID before any new create. For retrieval, retry using the same project ID. Do not automatically retry creation."),
+                        }.get(code)
+                        message = body.get("message")
+                        if recovery and recovery[0] == cause.response.status_code and isinstance(message, str):
+                            # Keep only the API's public error contract, not raw validation
+                            # objects, request arguments or response headers.
+                            payload = {"error": {
+                                "code": code,
+                                "message": message,
+                                "http_status": cause.response.status_code,
+                                "next_action": recovery[1],
+                            }}
+                            return ToolResult(
+                                content=json.dumps(payload), structured_content=payload, is_error=True,
+                            )
+                # Attachment helpers suppress their cause but retain context. Their
+                # source/upload host errors must not be classified as API rejections.
+                cause = cause.__cause__ or cause.__context__
+            raise
+
+
+def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[str, str] | None = None) -> None:
     handler = mcp._mcp_server.request_handlers[mt.CallToolRequest]
 
     async def handle(request: mt.CallToolRequest) -> mt.ServerResult:
         tool = await mcp.get_tool(request.params.name)
         if tool is None:
+            data: dict[str, object] = {
+                "type": "unknown_tool",
+                "next_action": (
+                    "Refresh tools/list and choose the current tool that matches the intended task. "
+                    "Do not invent an alias or retry the obsolete name."
+                ),
+            }
+            replacement = (tool_name_replacements or {}).get(request.params.name)
+            if replacement and await mcp.get_tool(replacement) is not None:
+                data["current_tool"] = replacement
+                data["next_action"] = (
+                    f"Read {replacement}'s current tools/list schema and call it if it matches the user's intent. "
+                    "Preserve supplied inputs and explicit settings; ask before changing them. "
+                    "The obsolete call was not executed."
+                )
             raise _invalid_params(
                 f"Unknown tool: {request.params.name!r}",
-                {
-                    "type": "unknown_tool",
-                    "next_action": (
-                        "Refresh tools/list and choose the current tool that matches the intended task. "
-                        "Do not invent an alias or retry the obsolete name."
-                    ),
-                },
+                data,
             )
 
         # OpenAPI-generated schemas omit additionalProperties; an unknown arg on a
