@@ -57,13 +57,6 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 - `client.v1.files.upload_urls.create(...)`, `client.v1.face_detection.create(...)` / `.get(id=...)`.
 - Sync `Client` and async `AsyncClient` have the same methods. Use `AsyncClient` inside an async MCP server such as FastMCP.
 
-## Voice presets
-
-- Select one of Magic Hour’s approved preset voices.
-- MCP accepts only exact `voice_name` strings in `APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`; the main product and public API are unchanged.
-- An empty allowlist omits AI Voice Generator entirely from MCP. Adding verified generic/non-celebrity API names enables only those presets on the next deployment.
-- AI Voice Cloner is excluded from MCP discovery and calls.
-
 ## Magic Hour's documentation MCP
 
 Magic Hour hosts `https://docs.magichour.ai/mcp` for documentation and code snippets. It does not execute API calls or expose action tools. This repo provides the separate action MCP server that calls the Magic Hour API.
@@ -113,6 +106,8 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | DELETE | `/v1/image-projects/{id}` | Image Projects | Delete image |
 | POST | `/v1/photo-colorizer` | Image Projects | Photo Colorizer |
 | POST | `/v1/ai-music-generator` | Audio Projects | AI Music Generator |
+| POST | `/v1/ai-voice-cloner` | Audio Projects | AI Voice Cloner |
+| POST | `/v1/ai-voice-generator` | Audio Projects | AI Voice Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
 | GET | `/v1/account` | Account | Get account details |
@@ -722,7 +717,7 @@ Create meme
 - `name` (string, optional): The name of the meme.
 - `style` (object, required):
   - `topic` (string, required): The topic of the meme.
-  - `template` (string, required) enum=['Random']: Select a random meme template.
+  - `template` (string, required) enum=[101 values, e.g. ['Random', 'Drake Hotline Bling', 'Galaxy Brain', 'Two Buttons', "Gru's Plan", 'Tuxedo Winnie The Pooh'], ...]: To use our templates, pass in one of the enum values.
   - `searchWeb` (boolean, optional) default=False: Whether to search the web for meme content.
 
 **Response 200:**
@@ -880,6 +875,39 @@ AI Music Generator
   - `prompt` (string, required): Describe the song, including genre, mood, and instruments.
   - `instrumental` (boolean, optional) default=False: Generate music without vocals. When true, lyrics is ignored.
   - `lyrics` (string, optional): Custom lyrics. Omit or leave blank for AI-generated lyrics when instrumental is false.
+
+**Response 200:**
+- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
+
+#### POST /v1/ai-voice-cloner
+`operationId: ai_voice_cloner_create_audio`
+
+AI Voice Cloner
+
+
+**Request Body:**
+- `name` (string, optional) default=Voice Cloner - dateTime: Give your audio a custom name for easy identification.
+- `assets` (object, required): Provide the assets for voice cloning.
+  - `audio_file_path` (string, required): The audio used to clone the voice. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+- `style` (object, required):
+  - `prompt` (string, required): Text used to generate speech from the cloned voice. The character limit is 5000 characters.
+
+**Response 200:**
+- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
+
+#### POST /v1/ai-voice-generator
+`operationId: ai_voice_generator_create_audio`
+
+AI Voice Generator
+
+
+**Request Body:**
+- `name` (string, optional) default=Voice Generator - dateTime: Give your audio a custom name for easy identification.
+- `style` (object, required): The content used to generate speech.
+  - `prompt` (string, required): Text used to generate speech. The character limit is 5000 characters.
+  - `voice_name` (string, required) enum=[1261 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Available voices: Elon Musk, Mark Zuckerberg, Joe Rogan, Barack Obama, Morgan Freeman, Kanye West, Donald Trump, Joe Biden, Kim Kardashian, Taylor Swift, James Earl Jones, Samuel L....
 
 **Response 200:**
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.

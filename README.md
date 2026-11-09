@@ -213,20 +213,8 @@ reliable. Upload bytes from the caller or a dedicated upload bridge; the hosted
 MCP server never reads caller-supplied local filesystem paths. Browser chat needs
 a separate upload UI or bridge; see `docs/future-chat-ui-handoff.md`.
 
-## MCP voice presets
+## MCP voice and meme tools
 
-AI Voice Generator exposes and accepts only exact API `voice_name` strings in
-`APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`. Populate that tuple
-with verified approved generic/non-celebrity presets to enable the tool on the
-next deployment. No existing upstream voice is assumed safe. An empty allowlist
-omits Voice Generator from tool discovery and calls. Voice Cloner is always
-excluded from MCP.
-
-The MCP policy removes upstream voice descriptions, defaults, examples and SDK
-snippets at startup and when regenerating `docs/api-reference.md`. Daily OpenAPI
-syncs cannot expand the allowlist. Do not edit `docs/openapi.json` to set MCP
-voices: it remains the unmodified upstream API snapshot. The main Magic Hour
-product and the public API are unchanged.
-
-MCP Meme Generator exposes only the generic `Random` template option, keeping
-public-figure template names out of its schema.
+Voice Generator uses the voice presets in the Magic Hour API schema. Voice Cloner
+takes an audio sample and text. Use your own voice or a voice you have permission
+to clone. Meme Generator accepts the templates listed in its tool schema.
