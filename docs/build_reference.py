@@ -3,7 +3,7 @@ import json, re
 from mcp_magichour.openapi_policies import apply_magic_hour_policies
 
 d = json.load(open('docs/openapi.json', encoding='utf-8'))
-# Apply review-facing voice/template policies without rewriting unrelated entries.
+# Keep the voice and meme reference entries aligned with MCP tool metadata.
 mcp_paths = apply_magic_hour_policies(d)['paths']
 for path in ('/v1/ai-voice-generator', '/v1/ai-voice-cloner', '/v1/ai-meme-generator'):
     if path in mcp_paths:
@@ -126,13 +126,6 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 - `client.v1.image_projects`, `.video_projects`, and `.audio_projects` each have `.get(id=...)`, `.delete(id=...)`, and `.check_result(id=..., wait_for_completion, download_outputs, download_directory)`.
 - `client.v1.files.upload_urls.create(...)`, `client.v1.face_detection.create(...)` / `.get(id=...)`.
 - Sync `Client` and async `AsyncClient` have the same methods. Use `AsyncClient` inside an async MCP server such as FastMCP.
-""")
-
-out.append("## Voice presets\n")
-out.append("""- Select one of Magic Hour’s approved preset voices.
-- MCP accepts only exact `voice_name` strings in `APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`; the main product and public API are unchanged.
-- An empty allowlist omits AI Voice Generator entirely from MCP. Adding verified generic/non-celebrity API names enables only those presets on the next deployment.
-- AI Voice Cloner is excluded from MCP discovery and calls.
 """)
 
 out.append("## Magic Hour's documentation MCP\n")
