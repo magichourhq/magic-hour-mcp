@@ -519,10 +519,12 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if additions and not metadata:
         operation["description"] = _append_mcp_guidance(operation.get("description", ""), additions)
     if method == "POST" and path == "/v1/ai-voice-cloner":
-        operation["description"] += (
-            " Use only a recording of your own voice or a voice you have permission to clone. "
+        guidance = (
+            "Use only a recording of your own voice or a voice you have permission to clone. "
             "Do not impersonate or deceive others."
         )
+        if guidance not in operation["description"]:
+            operation["description"] += f" {guidance}"
     if method == "POST" and path in LIKENESS_GENERATION_PATHS:
         description = operation.get("description", "").rstrip()
         if not description.startswith(LIKENESS_USAGE_GUIDANCE):

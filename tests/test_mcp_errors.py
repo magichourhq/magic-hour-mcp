@@ -7,15 +7,6 @@ from mcp_magichour.openapi_server import app
 
 
 class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
-    async def test_excluded_voice_tools_cannot_be_called(self):
-        for name in ("ai_voice_generator_create_audio", "ai_voice_cloner_create_audio"):
-            with self.subTest(name=name):
-                payload = await self.call_tool(name, {
-                    "style": {"prompt": "Hello", "voice_name": "Unapproved preset"},
-                })
-                self.assertEqual(payload["error"]["code"], -32602)
-                self.assertEqual(payload["error"]["message"], f"Unknown tool: {name!r}")
-
     async def call_tool(self, name: str, arguments: dict, *, authorized: bool = True) -> dict:
         headers = {"Accept": "application/json, text/event-stream"}
         if authorized:
@@ -67,6 +58,18 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_bad_arguments_return_structured_json_rpc_errors(self):
         cases = [
+            (
+                "unknown voice preset",
+                "ai_voice_generator_create_audio",
+                {"style": {"prompt": "Hello", "voice_name": "unknown-test-preset"}},
+                "is not one of",
+            ),
+            (
+                "missing voice sample",
+                "ai_voice_cloner_create_audio",
+                {"style": {"prompt": "Hello"}},
+                "'assets' is a required property",
+            ),
             ("missing required parameter", "wait_for_video_project", {}, "'id' is a required property"),
             ("wrong parameter type", "wait_for_video_project", {"id": 123}, "not of type 'string'"),
             ("unexpected parameter", "ping", {"unexpected": True}, "was unexpected"),
