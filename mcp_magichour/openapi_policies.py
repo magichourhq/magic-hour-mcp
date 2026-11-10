@@ -491,6 +491,12 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         )
         if guidance not in operation.get("description", ""):
             operation["description"] = operation.get("description", "") + guidance
+        if metadata and _operation_mentions_file_path(operation):
+            operation["description"] += (
+                " For attached ChatGPT files, upload with upload_chatgpt_media and pass its "
+                "returned file_path. Reuse existing Magic Hour paths only from the connected "
+                "account. Do not pass a filename, chat-local path or file ID as a file path."
+            )
         wait_tool = PROJECT_WAIT_TOOL_BY_ASSET[asset_type]
         additions.append(
             f"Starts an async {asset_type} job; returns `id` and `credits_charged`. "
