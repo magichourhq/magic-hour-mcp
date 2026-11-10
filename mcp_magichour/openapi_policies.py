@@ -408,6 +408,12 @@ def current_tool_replacements(spec: dict[str, Any]) -> dict[str, str]:
                 for name in (operation_id, normalize_mcp_tool_name(operation_id)):
                     if name != metadata[0]:
                         replacements[name] = metadata[0]
+    # These published names predate the current OpenAPI name normalization
+    # and the workflow guide is a custom tool, so neither is found above.
+    replacements.update({
+        "account_retrieve": API_TOOL_METADATA[("GET", "/v1/account")][0],
+        "workflow_guide_retrieve": "get_workflow_guide",
+    })
     return replacements
 
 
