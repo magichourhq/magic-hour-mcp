@@ -26,6 +26,8 @@ class OpenApiAuthLoggingTests(unittest.IsolatedAsyncioTestCase):
                     "X-Vercel-Id": "iad1::secret",
                     "Origin": "https://claude.ai",
                     "Cookie": "session=secret",
+                    "CF-Connecting-IP": "203.0.113.7",
+                    "True-Client-IP": "203.0.113.7",
                 },
             )
             forwarded = next(BearerPassthroughAuth().auth_flow(request))
@@ -37,6 +39,8 @@ class OpenApiAuthLoggingTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("x-vercel-id", forwarded.headers)
             self.assertNotIn("origin", forwarded.headers)
             self.assertNotIn("cookie", forwarded.headers)
+            self.assertNotIn("cf-connecting-ip", forwarded.headers)
+            self.assertNotIn("true-client-ip", forwarded.headers)
 
             await send({"type": "http.response.start", "status": 200, "headers": []})
             await send({"type": "http.response.body", "body": b""})
