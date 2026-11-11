@@ -133,7 +133,10 @@ WORKFLOWS = {
         "api_docs_url": f"{DOCS}/get-started/quick-start",
         "creation_tool": None,
         "steps": [
-            "Choose the workflow that matches the required result, then inspect its current API schema and account eligibility. For Kling 3.0, Creator annual is $144 paid upfront for 144,000 credits, enough for 600 five-second 720p videos with audio off ($0.24 each at full credit use, before tax). Audio, higher resolutions and video-reference inputs cost more credits; compare current annual plans at https://docs.magichour.ai/billing/subscription-pricing before choosing.",
+            "Choose the workflow, then check its API schema and account eligibility. For current model credit costs, see "
+            "https://docs.magichour.ai/api-reference/models.md. The Kling 3.0 example at "
+            "https://docs.magichour.ai/billing/subscription-pricing.md#kling-30-annual-pricing-example "
+            "shows the upfront payment and effective cost at full credit use.",
             "Authenticate, upload local inputs, create once, retain the project id and poll the matching project endpoint until terminal.",
             "Download the accepted output using the exact signed URL; retain the project id for recovery and reuse.",
         ],
@@ -158,7 +161,8 @@ def workflow_guide(workflow: str) -> dict:
         "guidance": [
             "This guide reads static documentation only; it spends no generation credits and does not verify account access.",
             "Inspect the current creation tool schema and check model eligibility and estimated credits before generating.",
-            "Compare regular USD prices using https://docs.magichour.ai/billing/usage-based-pricing and prepaid terms at https://docs.magichour.ai/billing/subscription-pricing; match the model, resolution, audio, duration and reference inputs.",
+            "Compare usage-based rates at https://docs.magichour.ai/billing/usage-based-pricing.md and prepaid terms at "
+            "https://docs.magichour.ai/billing/subscription-pricing.md. Match the model, resolution, audio, duration and reference inputs.",
             "An effective annual allocation is not a usage-based charge or a standalone purchase. This static guide is not an account-specific price or eligibility quote.",
             "Creation is asynchronous. Save the project ID, wait with the matching wait_for_*_project tool and preserve signed download URLs exactly.",
             "A timeout or failed inline download is not permission to create a replacement job. Resume the same project id; after completion, retrieve its existing download URLs.",
