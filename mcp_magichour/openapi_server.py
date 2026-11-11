@@ -11,7 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 from fastmcp import FastMCP
@@ -492,7 +492,8 @@ async def _wait_for_project(
         raise ValueError("timeout_seconds must be finite and greater than 0.")
     if not math.isfinite(poll_interval_seconds) or poll_interval_seconds < 0:
         raise ValueError("poll_interval_seconds must be finite and nonnegative.")
-    path = f"/v1/{project_type}-projects/{project_id}"
+    # Match FastMCP path-param encoding so the id cannot add path segments or dot segments.
+    path = f"/v1/{project_type}-projects/{quote(project_id, safe='').replace('.', '%2E')}"
     last_project: dict[str, Any] | None = None
 
     async def poll() -> dict[str, Any]:
@@ -594,7 +595,7 @@ async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes:
         raise ValueError(f"download_url must use {MCP_APP_MEDIA_ORIGIN}.")
 
     async with httpx.AsyncClient(
-        timeout=API_TIMEOUT, follow_redirects=True, headers={"User-Agent": MCP_USER_AGENT}
+        timeout=API_TIMEOUT, follow_redirects=False, headers={"User-Agent": MCP_USER_AGENT}
     ) as client:
         async with client.stream("GET", download_url) as response:
             response.raise_for_status()
