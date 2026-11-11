@@ -76,17 +76,18 @@ API_TOOL_METADATA = {
     ("POST", "/v1/ai-talking-photo"): (
         "create_talking_photo",
         "Create talking photo",
-        "Animates a still portrait so it speaks an existing audio recording. Use with a portrait "
-        "photo and an audio file; text alone is not accepted and this tool does not synthesize "
-        "speech. Starts a background job that costs credits; returns a project id for "
-        "wait_for_video_project.",
+        "Use a still portrait and an existing speech recording to make the portrait speak. "
+        "A written script needs audio first. For a prepared ad image and written script, use "
+        "create_spoken_ad_video. For existing video and replacement audio, use "
+        "create_lip_sync_video. Starts a background job that costs credits; returns a project id "
+        "for wait_for_video_project.",
     ),
     ("POST", "/v1/ai-ugc-ad"): (
         "create_spoken_ad_video",
         "Create spoken ad video",
-        "Creates a creator-style spoken ad video from a prepared image and a text script. Use when "
-        "the image is ready and the dialogue should be generated from text. Starts a background "
-        "job that costs credits; returns a project id for wait_for_video_project.",
+        "Use a prepared image and a written script to generate a spoken ad with synthesized "
+        "dialogue. For a still portrait and an existing speech recording, use create_talking_photo. "
+        "Starts a background job that costs credits; returns a project id for wait_for_video_project.",
     ),
     ("POST", "/v1/ai-video-editor"): (
         "edit_video",
@@ -146,16 +147,18 @@ API_TOOL_METADATA = {
     ("POST", "/v1/image-to-video"): (
         "create_video_from_image",
         "Create video from image",
-        "Animates a supplied image into a video using motion instructions and available model "
-        "options. Starts a background job that costs credits; returns a project id for "
-        "wait_for_video_project.",
+        "Use a still image as the first frame and describe what should move. For a portrait "
+        "speaking to an existing recording, use create_talking_photo. For a prepared ad image "
+        "and written script, use create_spoken_ad_video. Starts a background job that costs "
+        "credits; returns a project id for wait_for_video_project.",
     ),
     ("POST", "/v1/lip-sync"): (
         "create_lip_sync_video",
         "Create lip sync video",
-        "Adjusts an existing video's lip movements to match supplied replacement audio. For a "
-        "still portrait plus audio, use create_talking_photo. Starts a background job that costs "
-        "credits; returns a project id for wait_for_video_project.",
+        "Use existing video and replacement audio to match the speaker's lip movements to "
+        "the recording. For a still portrait and existing speech recording, use "
+        "create_talking_photo. Starts a background job that costs credits; returns a project id "
+        "for wait_for_video_project.",
     ),
     ("POST", "/v1/text-to-video"): (
         "create_video_from_text",
