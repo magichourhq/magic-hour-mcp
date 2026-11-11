@@ -67,11 +67,25 @@ class APIErrorRecoveryMiddleware(Middleware):
                         if recovery and recovery[0] == cause.response.status_code and isinstance(message, str):
                             # Keep only the API's public error contract, not raw validation
                             # objects, request arguments or response headers.
+                            next_action = recovery[1]
+                            if code == "unprocessable_entity" and _has_local_asset_path(context.message.arguments):
+                                next_action += (
+                                    " Local sandbox paths such as /mnt/data/... are not uploaded API assets; "
+                                    "this server cannot read the client's sandbox. For a native image attachment, "
+                                    "call upload_chatgpt_image(image=<attachment>); for video or audio, call "
+                                    "upload_chatgpt_media with the attachment in file and media_type set to video "
+                                    "or audio to match the attachment. "
+                                    "Replace each local asset path with that upload's returned file_path. "
+                                    "Pass the real attachment, not its local path or a bare file ID. If no "
+                                    "downloadable attachment is available, ask the user to reattach it through "
+                                    "the client's file picker. Do not invent download URLs or file IDs. "
+                                    "Do not automatically retry generation."
+                                )
                             payload = {"error": {
                                 "code": code,
                                 "message": message,
                                 "http_status": cause.response.status_code,
-                                "next_action": recovery[1],
+                                "next_action": next_action,
                             }}
                             return ToolResult(
                                 content=json.dumps(payload), structured_content=payload, is_error=True,
@@ -80,6 +94,23 @@ class APIErrorRecoveryMiddleware(Middleware):
                 # source/upload host errors must not be classified as API rejections.
                 cause = cause.__cause__ or cause.__context__
             raise
+
+
+def _has_local_asset_path(value: object) -> bool:
+    if isinstance(value, dict):
+        for field, item in value.items():
+            if field == "file_path" or field.endswith(("_file_path", "_file_paths")):
+                paths = item if isinstance(item, list) else [item]
+                if any(
+                    isinstance(path, str) and path.startswith(("/", "./", "../", "~/", "file:", "sandbox:"))
+                    for path in paths
+                ):
+                    return True
+            if _has_local_asset_path(item):
+                return True
+    elif isinstance(value, list):
+        return any(_has_local_asset_path(item) for item in value)
+    return False
 
 
 def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[str, str] | None = None) -> None:
