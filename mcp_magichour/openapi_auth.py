@@ -64,6 +64,8 @@ class BearerPassthroughAuth(httpx.Auth):
             if name.lower() not in _UPSTREAM_ALLOWED_HEADERS:
                 del request.headers[name]
         request.headers["Authorization"] = current_authorization_header()
+        # Server-generated, so API logs can be joined with MCP request logs.
+        request.headers["X-Request-Id"] = _request_id.get()
         yield request
 
 
