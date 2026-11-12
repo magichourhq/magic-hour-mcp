@@ -10,7 +10,7 @@ from base64 import b64encode
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -262,7 +262,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
         description='Checks that the Magic Hour server is reachable. Use for connectivity troubleshooting; it does not validate API credentials or account access. Makes no media or project changes.',
         annotations=ToolAnnotations(title="Ping", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
     )
-    def ping() -> str:
+    def ping() -> Annotated[str, Field(description=(
+        "The value 'pong' confirms MCP server liveness only, not API credentials, "
+        "account access or upstream API health."
+    ))]:
         return "pong"
 
     @mcp.tool(
