@@ -171,7 +171,8 @@ API_TOOL_METADATA = {
         "restyle_video",
         "Restyle video",
         "Restyles an existing video clip with an art-style preset or a custom prompt. Supports "
-        "v1/v2 presets, not v3. Starts a background job that costs credits; returns a project id "
+        "v1/v2/v3 presets; v3 requires a supplied reference image and positive source-video "
+        "width and height. Starts a background job that costs credits; returns a project id "
         "for wait_for_video_project.",
     ),
     ("GET", "/v1/image-projects/{id}"): (
@@ -302,6 +303,11 @@ API_TOOL_METADATA = {
 
 # Reviewer-facing parameter copy describes selection without ranking models.
 GENERATION_PARAMETER_DESCRIPTIONS = {
+    "/v1/ai-video-editor": {
+        ("style",): "Instructions describing the changes to make to the source video.",
+        ("references", "[]", "name"): "Reference label without @. Use @name in style.prompt to "
+        "refer to this file; labels must be unique ignoring case.",
+    },
     "/v1/image-to-video": {
         ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
         "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
@@ -311,6 +317,9 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         "Deprecated model values ending in `-audio` enable `audio`.",
     },
     "/v1/text-to-video": {
+        ("style",): "Instructions describing the video to generate.",
+        ("references", "[]", "name"): "Reference label without @. Use @name in style.prompt to "
+        "refer to this file; labels must be unique ignoring case.",
         ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
         "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
         "When no model was requested, use `default` rather than choosing a named premium model; "
@@ -322,6 +331,30 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         ("style", "generation_mode"): "Controls motion style. `realistic` animates the supplied portrait; "
         "`prompted` also accepts a scene prompt. Deprecated aliases remain supported: `pro` and "
         "`stable` select `realistic`; `standard` and `expressive` select `prompted`.",
+    },
+    "/v1/ai-ugc-ad": {
+        ("assets",): "Prepared image to animate into the spoken ad. The script is supplied separately.",
+    },
+    "/v1/ai-gif-generator": {
+        ("style",): "Text instructions for the animation's subject, appearance and motion.",
+    },
+    "/v1/ai-image-editor": {
+        ("style",): "Text instructions describing the edits to make to the supplied images.",
+    },
+    "/v1/ai-headshot-generator": {
+        ("style",): "Optional headshot appearance instructions. Omit the prompt for the API's default style.",
+    },
+    "/v1/ai-meme-generator": {
+        ("style",): "Meme topic, template and whether to search the web for content.",
+    },
+    "/v1/ai-qr-code-generator": {
+        ("style",): "Visual art style for the QR code image.",
+    },
+    "/v1/ai-music-generator": {
+        ("style",): "Song description, vocal or instrumental choice, and optional custom lyrics.",
+    },
+    "/v1/ai-voice-cloner": {
+        ("style",): "Text to speak in the supplied voice, with language and speech-speed options.",
     },
     "/v1/lip-sync": {
         ("style", "generation_mode"): "Select the lip-sync mode. `lite` costs 1 credit per video frame. "
@@ -343,11 +376,9 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         "`face_mappings`.",
     },
     "/v1/video-to-video": {
-        ("style", "version"): "Select restyling version `v1` or `v2`. `default` uses the selected art "
-        "style's default version. Some styles default to v3, which this API does not support. "
-        "For `Studio Ghibli`, explicitly set `version` to `v2` for its supported preset.",
-        ("style", "model"): "Select a listed rendering model for the art style. `default` uses the "
-        "selected art style's default model.",
+        ("style",): "Art preset, rendering version, model and prompt controls for restyling the video.",
+        ("style", "art_style"): "Art-style preset to apply to the source video. The preset determines "
+        "the default rendering version, model and prompt; check their compatibility before generation.",
         ("style", "prompt_type"): "`default` uses the art style's preset prompt and ignores `prompt`. "
         "`custom` uses the supplied `prompt`; v1 still adds its LoRA prompt to apply the art style. "
         "`append_default` appends the preset prompt to the supplied `prompt`.",
@@ -436,9 +467,23 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         for property_path, description in GENERATION_PARAMETER_DESCRIPTIONS[path].items():
             parameter = properties.get(property_path[0], {})
             for name in property_path[1:]:
-                parameter = parameter.get("properties", {}).get(name, {})
+                parameter = (
+                    parameter.get("items", {}) if name == "[]"
+                    else parameter.get("properties", {}).get(name, {})
+                )
             if parameter:
                 parameter["description"] = description
+
+    # A documented default is evidence that callers can omit this label. Do not
+    # send the OpenAPI default's literal "dateTime" placeholder to the API.
+    name_parameter = properties.get("name", {})
+    request_schema = (
+        operation.get("requestBody", {}).get("content", {}).get("application/json", {}).get("schema", {})
+    )
+    if method == "POST" and "default" in name_parameter and "name" not in request_schema.get("required", []):
+        name_parameter["description"] = (
+            "Optional project name for identifying this output. Omit to use the API's default project name."
+        )
 
     if method == "POST" and path in {"/v1/ai-image-editor", "/v1/ai-image-generator"}:
         model = properties.get("model", {})

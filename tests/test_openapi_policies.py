@@ -64,13 +64,20 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertEqual(spec, original)
 
     def test_restored_tools_preserve_api_input_schemas(self):
+        def without_descriptions(value):
+            if isinstance(value, dict):
+                return {key: without_descriptions(item) for key, item in value.items() if key != "description"}
+            if isinstance(value, list):
+                return [without_descriptions(item) for item in value]
+            return value
+
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         updated = apply_magic_hour_policies(spec)
         for path in ("/v1/ai-voice-generator", "/v1/ai-voice-cloner", "/v1/ai-meme-generator"):
             with self.subTest(path=path):
                 self.assertEqual(
-                    updated["paths"][path]["post"]["requestBody"],
-                    spec["paths"][path]["post"]["requestBody"],
+                    without_descriptions(updated["paths"][path]["post"]["requestBody"]),
+                    without_descriptions(spec["paths"][path]["post"]["requestBody"]),
                 )
         cloner = updated["paths"]["/v1/ai-voice-cloner"]["post"]
         self.assertIn("a voice you have permission to clone", cloner["description"])
