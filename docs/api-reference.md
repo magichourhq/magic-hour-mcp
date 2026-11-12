@@ -451,7 +451,7 @@ Image-to-Video
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
-  - `prompt` (string, optional): The prompt used for the video.
+  - `prompt` (string, optional): The prompt used for the video. Maximum length depends on the model that runs, in characters:
 - `assets` (object, required): Provide the assets for image-to-video.
   - `image_file_path` (string, required): The path of the image file. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `end_image_file_path` (string, optional): The image to use as the last frame of the video.
@@ -492,12 +492,12 @@ Text-to-Video
 **Request Body:**
 - `name` (string, optional) default=Text To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Provide `aspect_ratio` to set the video’s aspect ratio. Determines the aspect ratio of the output video.
+- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `model` (string, optional) enum=[25 values, e.g. ['default', 'minimax-h3', 'kling-4.0', 'kling-3.0', 'ltx-2.5', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required):
-  - `prompt` (string, required): The prompt used for the video.
+  - `prompt` (string, required): The prompt used for the video. Maximum length depends on the model that runs, in characters:
 - `references` (array, optional): Name references without @ and refer to them as @name in style.prompt. Names must be unique, ignoring case. Maximum 50 references total. Omit for no references.
   items:
     - `name` (string, required):
@@ -667,7 +667,7 @@ AI Image Editor
 **Request Body:**
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
-- `model` (string, optional) enum=[15 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'nano-banana-2', 'flux-2-klein', 'nano-banana-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[15 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'flux-2-klein', 'nano-banana-pro', 'seedream-v5-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required):
@@ -689,7 +689,7 @@ AI Image Generator
 **Request Body:**
 - `name` (string, optional) default=Ai Image - dateTime: Give your image a custom name for easy identification.
 - `image_count` (integer, required) range=[1,16]: Number of images to generate. Maximum varies by model.
-- `model` (string, optional) enum=[17 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[17 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2.1'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): The art style to use for image generation.
