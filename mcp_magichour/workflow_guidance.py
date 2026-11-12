@@ -1,10 +1,13 @@
 """Read-only workflow selection; no account access or media generation."""
 
 from copy import deepcopy
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from pydantic import Field
+
+from .helper_schemas import WORKFLOW_GUIDE_OUTPUT_SCHEMA
 
 Workflow = Literal[
     "video-face-swap",
@@ -175,16 +178,17 @@ def register_workflow_guidance(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_workflow_guide",
         title="Choose a media workflow",
+        output_schema=WORKFLOW_GUIDE_OUTPUT_SCHEMA,
         description=(
             'Returns required inputs, ordered steps, example requests and review criteria for '
             'eight supported Magic Hour workflows. Use when planning a generation, not to run one. '
             'Requires authentication but does not check account eligibility or spend credits.'
         ),
         annotations=ToolAnnotations(
-            readOnlyHint=True, destructiveHint=False, openWorldHint=False
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
         ),
     )
-    def get_workflow_guide(workflow: Workflow) -> dict:
+    def get_workflow_guide(workflow: Annotated[Workflow, Field(description="Choose the workflow matching the task and supplied inputs. Returns static planning guidance, not an account eligibility or cost quote.")]) -> dict:
         return workflow_guide(workflow)
 
     @mcp.resource(
