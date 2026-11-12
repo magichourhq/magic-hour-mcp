@@ -34,7 +34,13 @@ from .helper_schemas import PROJECT_WAIT_OUTPUT_SCHEMA
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
-from .openapi_policies import GENERATION_ESTIMATE_PATHS, apply_magic_hour_policies, current_tool_replacements, customize_openapi_component
+from .openapi_policies import (
+    GENERATION_ESTIMATE_PATHS,
+    PROJECT_CONTENT_BLOCK_GUIDANCE,
+    apply_magic_hour_policies,
+    current_tool_replacements,
+    customize_openapi_component,
+)
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
     MCP_APP_ASSET_PATH,
@@ -717,6 +723,10 @@ async def _project_to_tool_result(
 
     structured_content = _project_structured_content_for_agent(project)
     structured_content["project_type"] = project_type
+    error = project.get("error")
+    if status == "error" and isinstance(error, dict) and error.get("code") == "nsfw":
+        content.append(TextContent(type="text", text=PROJECT_CONTENT_BLOCK_GUIDANCE))
+        structured_content["message"] = PROJECT_CONTENT_BLOCK_GUIDANCE
     return ToolResult(content=content, structured_content=structured_content)
 
 
