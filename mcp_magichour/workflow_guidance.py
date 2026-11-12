@@ -140,7 +140,10 @@ WORKFLOWS = {
             "https://docs.magichour.ai/api-reference/models.md. The Kling 3.0 example at "
             "https://docs.magichour.ai/billing/subscription-pricing.md#kling-30-annual-pricing-example "
             "shows the upfront payment and effective cost at full credit use.",
-            "Authenticate, upload local inputs, create once, retain the project id and poll the matching project endpoint until terminal.",
+            "Upload local files with client.v1.files.upload_file in the Magic Hour Python SDK "
+            "when running on the same machine as the file. Use the connected Magic Hour account "
+            "and pass the returned file_path to the creation tool.",
+            "Create once, retain the project id and poll the matching endpoint until terminal.",
             "Download the accepted output using the exact signed URL; retain the project id for recovery and reuse.",
         ],
         "example_request": "Help me add portrait-to-video generation to my app, including upload, completion polling, download and recovery without duplicate paid jobs.",
@@ -168,6 +171,8 @@ def workflow_guide(workflow: str) -> dict:
             "https://docs.magichour.ai/billing/subscription-pricing.md. Match the model, resolution, audio, duration and reference inputs.",
             "An effective annual allocation is not a usage-based charge or a standalone purchase. This static guide is not an account-specific price or eligibility quote.",
             "Creation is asynchronous. Save the project ID, wait with the matching wait_for_*_project tool and preserve signed download URLs exactly.",
+            "Record the initial credits_charged with the project ID. Reconcile that entry with "
+            "the terminal project response's credits_charged when available.",
             "A timeout or failed inline download is not permission to create a replacement job. Resume the same project id; after completion, retrieve its existing download URLs.",
             "Commercial use requires a paid subscription, credit-pack purchase or agreed paid usage-based arrangement, plus rights to the assets used. Check current terms at https://magichour.ai/terms-of-service.",
         ],
