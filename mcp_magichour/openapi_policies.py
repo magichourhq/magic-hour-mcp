@@ -624,7 +624,7 @@ def customize_openapi_component(route: Any, component: Any) -> None:
         component.annotations = ToolAnnotations(
             title=component.title,
             readOnlyHint=read_only,
-            idempotentHint=True if is_estimate else None,
+            idempotentHint=read_only or method == "DELETE",
             # Only project deletion removes data; generation creates new projects.
             destructiveHint=method == "DELETE",
             openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL|searchWeb\b", repr(component.parameters))),

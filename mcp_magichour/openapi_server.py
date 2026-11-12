@@ -20,7 +20,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, ToolAnnotations
+from mcp.types import BlobResourceContents, EmbeddedResource, Icon, TextContent, ToolAnnotations
 from pydantic import BaseModel, Field
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -30,6 +30,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .app_events import app_events
+from .helper_schemas import PROJECT_WAIT_OUTPUT_SCHEMA
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
@@ -58,6 +59,7 @@ DEFAULT_OPENAPI_PATH = Path(__file__).with_name("openapi.json")
 if not DEFAULT_OPENAPI_PATH.is_file():
     DEFAULT_OPENAPI_PATH = Path(__file__).resolve().parent.parent / "docs" / "openapi.json"
 FAVICON_PATH = Path(__file__).with_name("favicon.ico")
+LOGO_PATH = Path(__file__).with_name("logo.png")
 API_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0, write=60.0, pool=10.0)
 API_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
 API_RETRIES = 2
@@ -85,6 +87,9 @@ CHATGPT_STORAGE_HOSTS = frozenset({
     "oaisdmntprwestus3.blob.core.windows.net",
 })
 MCP_SERVER_NAME = "magic-hour"
+MCP_SERVER_TITLE = "Magic Hour"
+MCP_WEBSITE_URL = "https://docs.magichour.ai/integration/model-context-protocol"
+MCP_SERVER_ICONS = [Icon(src="https://mcp.magichour.ai/logo.png", mimeType="image/png", sizes=["256x256"])]
 MCP_SERVER_VERSION = "0.1.0"
 MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
 MCP_SERVER_INSTRUCTIONS = """
@@ -111,6 +116,7 @@ Choose video from inputs:
 - Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
   """.strip()
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
+MCP_CLIENT_CONFIG_PATHS = ("/mcp.json", "/.well-known/mcp.json")
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images and video, generate music and speech, clone voices, and retrieve existing audio projects."
 MCP_SERVER_URL = "https://mcp.magichour.ai/"
@@ -118,10 +124,10 @@ TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 
 
 class ChatGPTFile(BaseModel):
-    download_url: str
-    file_id: str
-    mime_type: str = ""
-    file_name: str = ""
+    download_url: str = Field(description="Exact HTTPS download URL supplied for the native ChatGPT attachment, including its signed query.")
+    file_id: str = Field(description="Native ChatGPT file identifier paired with download_url; not a local filesystem path.")
+    mime_type: str = Field(default="", description="Attachment MIME type, when supplied by ChatGPT.")
+    file_name: str = Field(default="", description="Original attachment filename, when supplied by ChatGPT.")
 
 
 def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
@@ -159,6 +165,8 @@ def create_mcp() -> FastMCP:
         lifespan=api_client_lifespan,
         name=MCP_SERVER_NAME,
         version=MCP_SERVER_VERSION,
+        website_url=MCP_WEBSITE_URL,
+        icons=MCP_SERVER_ICONS,
         instructions=MCP_SERVER_INSTRUCTIONS,
         route_maps=[
             *[
@@ -197,7 +205,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         meta={"openai/fileParams": ["image"]},
         annotations=ToolAnnotations(
             title="Upload attached image", readOnlyHint=False,
-            destructiveHint=False, openWorldHint=True,
+            destructiveHint=False, idempotentHint=False, openWorldHint=True,
         ),
     )
     async def upload_chatgpt_image(
@@ -223,12 +231,12 @@ def register_custom_tools(mcp: FastMCP) -> None:
         meta={"openai/fileParams": ["file"]},
         annotations=ToolAnnotations(
             title="Upload attached media", readOnlyHint=False,
-            destructiveHint=False, openWorldHint=True,
+            destructiveHint=False, idempotentHint=False, openWorldHint=True,
         ),
     )
     async def upload_chatgpt_media(
-        file: ChatGPTFile,
-        media_type: ProjectType,
+        file: Annotated[ChatGPTFile, Field(description="Native ChatGPT attachment object containing download_url and file_id.")],
+        media_type: Annotated[ProjectType, Field(description="Actual input attachment kind: image, video or audio, not the desired output kind.")],
     ) -> dict[str, str]:
         return await _upload_chatgpt_file(file, media_type)
 
@@ -260,7 +268,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="ping",
         title="Ping",
         description='Checks that the Magic Hour server is reachable. Use for connectivity troubleshooting; it does not validate API credentials or account access. Makes no media or project changes.',
-        annotations=ToolAnnotations(title="Ping", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=ToolAnnotations(title="Ping", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     def ping() -> Annotated[str, Field(description=(
         "The value 'pong' confirms MCP server liveness only, not API credentials, "
@@ -285,14 +293,15 @@ def register_custom_tools(mcp: FastMCP) -> None:
             },
         },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
-        annotations=ToolAnnotations(title="Wait for Video Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        output_schema=PROJECT_WAIT_OUTPUT_SCHEMA,
+        annotations=ToolAnnotations(title="Wait for Video Project", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     async def wait_for_video_project(
-        id: str,
-        poll_interval_seconds: float = 2.0,
-        timeout_seconds: float = 300.0,
-        include_inline_downloads: bool = False,
-        max_inline_downloads: int = 0,
+        id: Annotated[str, Field(description="Existing project ID returned by the matching creation tool. Reuse this ID after a wait timeout.")],
+        poll_interval_seconds: Annotated[float, Field(description="Seconds between status checks. Must be finite and nonnegative; values below 0.5 use 0.5 seconds.")] = 2.0,
+        timeout_seconds: Annotated[float, Field(description="Maximum seconds for this wait call, finite and greater than zero. Timeout does not cancel the project or start another generation.")] = 300.0,
+        include_inline_downloads: Annotated[bool, Field(description="Reserved for compatibility. Video waits return download links, never inline video, regardless of this value.")] = False,
+        max_inline_downloads: Annotated[int, Field(description="Reserved for compatibility. Video waits do not inline downloads; leave at zero.")] = 0,
     ) -> ToolResult:
         return await _wait_for_project_result(
             "video",
@@ -320,15 +329,16 @@ def register_custom_tools(mcp: FastMCP) -> None:
             },
         },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
-        annotations=ToolAnnotations(title="Wait for Image Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        output_schema=PROJECT_WAIT_OUTPUT_SCHEMA,
+        annotations=ToolAnnotations(title="Wait for Image Project", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     async def wait_for_image_project(
-        id: str,
-        poll_interval_seconds: float = 2.0,
-        timeout_seconds: float = 180.0,
-        include_inline_downloads: bool = True,
-        max_inline_downloads: int = 4,
-        max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
+        id: Annotated[str, Field(description="Existing project ID returned by the matching creation tool. Reuse this ID after a wait timeout.")],
+        poll_interval_seconds: Annotated[float, Field(description="Seconds between status checks. Must be finite and nonnegative; values below 0.5 use 0.5 seconds.")] = 2.0,
+        timeout_seconds: Annotated[float, Field(description="Maximum seconds for this wait call, finite and greater than zero. Timeout does not cancel the project or start another generation.")] = 180.0,
+        include_inline_downloads: Annotated[bool, Field(description="Whether to include image or audio previews for completed projects. Download URLs remain available if preview fetching fails.")] = True,
+        max_inline_downloads: Annotated[int, Field(description="Maximum number of previews to include. Zero or negative disables previews; previews share an 8 MiB total limit.")] = 4,
+        max_bytes_per_download: Annotated[int, Field(description="Positive maximum raw bytes per preview, capped by the remaining 8 MiB total budget. Larger outputs remain available by URL.")] = DEFAULT_MEDIA_FETCH_MAX_BYTES,
     ) -> ToolResult:
         return await _wait_for_project_result(
             "image",
@@ -357,15 +367,16 @@ def register_custom_tools(mcp: FastMCP) -> None:
             },
         },
         app=AppConfig(resource_uri=MCP_APP_VIEW_URI),
-        annotations=ToolAnnotations(title="Wait for Audio Project", readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        output_schema=PROJECT_WAIT_OUTPUT_SCHEMA,
+        annotations=ToolAnnotations(title="Wait for Audio Project", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     async def wait_for_audio_project(
-        id: str,
-        poll_interval_seconds: float = 2.0,
-        timeout_seconds: float = 180.0,
-        include_inline_downloads: bool = True,
-        max_inline_downloads: int = 4,
-        max_bytes_per_download: int = DEFAULT_MEDIA_FETCH_MAX_BYTES,
+        id: Annotated[str, Field(description="Existing project ID returned by the matching creation tool. Reuse this ID after a wait timeout.")],
+        poll_interval_seconds: Annotated[float, Field(description="Seconds between status checks. Must be finite and nonnegative; values below 0.5 use 0.5 seconds.")] = 2.0,
+        timeout_seconds: Annotated[float, Field(description="Maximum seconds for this wait call, finite and greater than zero. Timeout does not cancel the project or start another generation.")] = 180.0,
+        include_inline_downloads: Annotated[bool, Field(description="Whether to include image or audio previews for completed projects. Download URLs remain available if preview fetching fails.")] = True,
+        max_inline_downloads: Annotated[int, Field(description="Maximum number of previews to include. Zero or negative disables previews; previews share an 8 MiB total limit.")] = 4,
+        max_bytes_per_download: Annotated[int, Field(description="Positive maximum raw bytes per preview, capped by the remaining 8 MiB total budget. Larger outputs remain available by URL.")] = DEFAULT_MEDIA_FETCH_MAX_BYTES,
     ) -> ToolResult:
         return await _wait_for_project_result(
             "audio",
@@ -397,9 +408,12 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
         name=tool_name,
         title=title,
         description=description,
-        annotations=ToolAnnotations(title=title, readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=ToolAnnotations(title=title, readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
-    async def fetch_download(download_url: str, max_bytes: int = DEFAULT_MEDIA_FETCH_MAX_BYTES):
+    async def fetch_download(
+        download_url: Annotated[str, Field(description="Exact HTTPS URL from a completed project’s downloads or exact_download_urls. Preserve all query parameters; must use the configured Magic Hour media host.")],
+        max_bytes: Annotated[int, Field(description="Positive maximum raw download bytes. The server caps this at 8388608 bytes (8 MiB); use the original URL directly for larger files.")] = DEFAULT_MEDIA_FETCH_MAX_BYTES,
+    ):
         data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
         return _media_content(media_type, data, mime_type, source_uri=download_url)
 
@@ -877,6 +891,18 @@ async def favicon(_: Request) -> FileResponse:
     return FileResponse(FAVICON_PATH, media_type="image/x-icon")
 
 
+async def logo(_: Request) -> FileResponse:
+    return FileResponse(LOGO_PATH, media_type="image/png")
+
+
+async def mcp_client_config(_: Request) -> JSONResponse:
+    """Public, credential-free connection configuration for MCP clients."""
+    return JSONResponse(
+        {"mcpServers": {MCP_SERVER_NAME: {"type": "http", "url": MCP_SERVER_URL}}},
+        headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600"},
+    )
+
+
 async def mcp_app_http_view(_: Request) -> HTMLResponse:
     return HTMLResponse(
         read_mcp_app_html(),
@@ -889,6 +915,9 @@ async def mcp_server_card(_: Request) -> JSONResponse:
     return JSONResponse(
         {
             "name": MCP_SERVER_NAME,
+            "title": MCP_SERVER_TITLE,
+            "websiteUrl": MCP_WEBSITE_URL,
+            "icons": [icon.model_dump(mode="json", by_alias=True, exclude_none=True) for icon in MCP_SERVER_ICONS],
             "description": MCP_SERVER_DESCRIPTION,
             "version": MCP_SERVER_VERSION,
             "serverUrl": MCP_SERVER_URL,
@@ -932,6 +961,8 @@ app = create_oauth_compatibility_app(
     public_routes=[
         Route("/app/events", app_events, methods=["POST", "OPTIONS"]),
         Route("/favicon.ico", favicon, methods=["GET"]),
+        Route("/logo.png", logo, methods=["GET"]),
+        *[Route(path, mcp_client_config, methods=["GET"]) for path in MCP_CLIENT_CONFIG_PATHS],
         Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
         Mount(MCP_APP_ASSET_PATH, app=mcp_app_assets),
         Route(MCP_SERVER_CARD_PATH, mcp_server_card, methods=["GET"]),

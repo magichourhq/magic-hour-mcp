@@ -106,6 +106,12 @@ Agents can discover the hosted server card at:
 https://mcp.magichour.ai/.well-known/mcp/server-card.json
 ```
 
+Credential-free client connection configs are also public at `/mcp.json` and
+`/.well-known/mcp.json`. These contain only the hosted endpoint, never an API key.
+Tool calls still require OAuth or a bearer API key. The handshake advertises the
+setup documentation and a packaged 256px icon; the server card also supplies its
+human-readable title and description.
+
 Environment variables:
 
 ```sh

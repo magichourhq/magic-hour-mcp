@@ -1,4 +1,5 @@
 import json
+import struct
 import re
 import unittest
 from html import escape
@@ -18,6 +19,10 @@ from mcp_magichour.openapi_server import (
     MCP_APP_VIEW_PATH,
     MCP_APP_VIEW_URI,
     MCP_SERVER_CARD_PATH,
+    MCP_CLIENT_CONFIG_PATHS,
+    MCP_SERVER_ICONS,
+    MCP_SERVER_TITLE,
+    MCP_WEBSITE_URL,
     MCP_SERVER_DESCRIPTION,
     MCP_SERVER_NAME,
     MCP_SERVER_URL,
@@ -178,6 +183,9 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         card = response.json()
         self.assertEqual(card["name"], MCP_SERVER_NAME)
         self.assertEqual(card["description"], MCP_SERVER_DESCRIPTION)
+        self.assertEqual(card["title"], MCP_SERVER_TITLE)
+        self.assertEqual(card["websiteUrl"], MCP_WEBSITE_URL)
+        self.assertEqual(card["icons"][0]["sizes"], ["256x256"])
         self.assertEqual(card["version"], MCP_SERVER_VERSION)
         self.assertEqual(MCP_SERVER_URL, "https://mcp.magichour.ai/")
         self.assertEqual(card["serverUrl"], MCP_SERVER_URL)
@@ -197,6 +205,24 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.headers["access-control-allow-origin"], "*")
         self.assertEqual(response.headers["access-control-allow-methods"], "GET")
         self.assertNotIn("www-authenticate", response.headers)
+
+    async def test_client_configs_and_icon_are_public_without_credentials(self):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="https://mcp.example",
+        ) as client:
+            for path in MCP_CLIENT_CONFIG_PATHS:
+                with self.subTest(path=path):
+                    response = await client.get(path)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.json(), {"mcpServers": {MCP_SERVER_NAME: {"type": "http", "url": MCP_SERVER_URL}}})
+                    self.assertNotIn("www-authenticate", response.headers)
+                    self.assertEqual(response.headers["access-control-allow-origin"], "*")
+                    self.assertNotIn("Authorization", response.text)
+            icon = await client.get("/logo.png")
+        self.assertEqual(icon.status_code, 200)
+        self.assertEqual(icon.headers["content-type"], "image/png")
+        self.assertEqual(icon.content[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(struct.unpack(">II", icon.content[16:24]), (256, 256))
 
     async def test_glama_verification_is_public(self):
         async with httpx.AsyncClient(
@@ -233,7 +259,11 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         initialize_result = self.result(initialized)
         self.assertEqual(
             initialize_result["serverInfo"],
-            {"name": MCP_SERVER_NAME, "version": MCP_SERVER_VERSION},
+            {
+                "name": MCP_SERVER_NAME, "version": MCP_SERVER_VERSION,
+                "websiteUrl": MCP_WEBSITE_URL,
+                "icons": [icon.model_dump(mode="json", by_alias=True, exclude_none=True) for icon in MCP_SERVER_ICONS],
+            },
         )
         self.assertEqual(initialize_result["instructions"], EXPECTED_MCP_SERVER_INSTRUCTIONS)
 
