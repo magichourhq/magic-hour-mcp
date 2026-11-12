@@ -20,6 +20,12 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
     "audio": "wait_for_audio_project",
 }
 
+PROJECT_CONTENT_BLOCK_GUIDANCE = (
+    "Say the project was blocked by a content check. Use a specific reason only when "
+    "the API provides one. If the reason is unavailable, say so. Do not automatically "
+    "retry or reword the blocked request."
+)
+
 # MCP-facing metadata is keyed by the canonical API route. The HTTP contract
 # and synced OpenAPI source remain unchanged.
 API_TOOL_METADATA = {
@@ -557,7 +563,8 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if method == "GET" and path in PROJECT_DETAIL_PATHS:
         additions.append(
             "Use this after a create tool to poll job status. When status is `complete`, surface the `downloads` "
-            "URLs to the user; if status is `error`, surface the error message."
+            "URLs to the user. When status is `error`, surface the error message. "
+            "If `error.code` is `nsfw`, follow this guidance. " + PROJECT_CONTENT_BLOCK_GUIDANCE
         )
         additions.append(
             "Each `downloads[n].url` is already the full signed download URL. Use it exactly as returned. "
