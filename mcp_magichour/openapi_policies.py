@@ -215,7 +215,9 @@ API_TOOL_METADATA = {
         "API default is eligible. For a Free account with no requested model, "
         "flux-2-klein at 640px with image_count=1 is an available option when it supports the "
         "supplied inputs and requested edit. Check the current model's input limits; never drop "
-        "references or change an explicit model, resolution or count to fit this option.",
+        "references or change an explicit model, resolution or count to fit this option. "
+        "For sprite sheets, call get_workflow_guide with workflow=sprite-sheets to plan a "
+        "small pilot and review the animation before scaling the batch.",
     ),
     ("POST", "/v1/ai-headshot-generator"): (
         "generate_headshot",

@@ -12,6 +12,7 @@ from .helper_schemas import WORKFLOW_GUIDE_OUTPUT_SCHEMA
 Workflow = Literal[
     "video-face-swap",
     "image-editor",
+    "sprite-sheets",
     "image-to-video",
     "video-generator",
     "lip-sync",
@@ -53,6 +54,31 @@ WORKFLOWS = {
         "example_request": "Turn this portrait into a cinematic space-pilot scene. Preserve my face and keep the framing vertical for a short video.",
         "follow_up": "Animate the accepted still with create_video_from_image rather than recreating its identity from a text prompt.",
         "review": "Check identity, unchanged regions, anatomy and requested edits. Model and resolution eligibility depend on the account.",
+    },
+    "sprite-sheets": {
+        "title": "Pilot a pixel-art sprite sheet",
+        "input": "A small grid of source poses, its row and column order, the target sprite size, and an approved style reference if available.",
+        "product_url": f"{SITE}/products/ai-image-editor",
+        "api_docs_url": f"{DOCS}/api-reference/image-projects/ai-image-editor",
+        "creation_tool": "edit_image",
+        "steps": [
+            "Start with one character and one short walk cycle. Pass the source grid first and "
+            "the approved style reference second. Specify the grid dimensions, pose order, character "
+            "size and facing direction. If using a solid background for removal, choose a color "
+            "absent from the sprite.",
+            "Reuse an uploaded reference's file_path across edits. For an approved redraw with "
+            "an accessible direct image URL, pass the complete URL unchanged as a reference while "
+            "it is valid. Check that its file extension is supported.",
+            "If no model was specified, try gpt-image-2 explicitly when the account supports it "
+            "and the user approves the cost. Check get_account_info and the current tool schema. "
+            "Keep any model the user explicitly chose.",
+            "Call edit_image for the pilot, record the returned id and credits_charged, "
+            "then use wait_for_image_project. Check the result in motion at the final in-game "
+            "size before asking for approval to spend credits on the rest.",
+        ],
+        "example_request": "Redraw this four-frame front walk cycle in the style of the second reference. Keep the 2×2 grid, frame order, facing direction and character size.",
+        "follow_up": "Stop if the cycle fails review. Clean up the pixel grid, palette and transparency locally if needed. Fix an individual frame in the source artwork and keep accepted frames intact.",
+        "review": "Check the grid and pose order, consistent face and height, alternating feet, and clean edges at the target size. Generated sheets can drift between frames.",
     },
     "image-to-video": {
         "title": "Animate a product photo, portrait or scene",
@@ -181,7 +207,7 @@ def register_workflow_guidance(mcp: FastMCP) -> None:
         output_schema=WORKFLOW_GUIDE_OUTPUT_SCHEMA,
         description=(
             'Returns required inputs, ordered steps, example requests and review criteria for '
-            'eight supported Magic Hour workflows. Use when planning a generation, not to run one. '
+            'supported Magic Hour workflows. Use when planning a generation, not to run one. '
             'Requires authentication but does not check account eligibility or spend credits.'
         ),
         annotations=ToolAnnotations(

@@ -129,7 +129,7 @@ MAGIC_HOUR_API_BASE_URL=https://api.sideko.dev/v1/mock/magichour/magic-hour/late
 
 ## Read-only workflow guidance
 
-`get_workflow_guide` accepts `video-face-swap`, `image-editor`, `image-to-video`,
+`get_workflow_guide` accepts `video-face-swap`, `image-editor`, `sprite-sheets`, `image-to-video`,
 `video-generator`, `lip-sync`, `ugc-ads`, `talking-photo` or `media-apis`. It returns
 inputs, product and API documentation URLs, exact creation-tool names, ordered
 steps, example requests, follow-up edits and review criteria. It makes no API
@@ -140,6 +140,11 @@ read `magic-hour://workflows/{workflow}`. UGC uses `create_spoken_ad_video` with
 prepared image, script and supported duration; image composition is a separate
 Image Editor call. Keep the returned project ID and use `wait_for_video_project`
 to retrieve the finished file.
+
+For pixel art, use the `sprite-sheets` guide before generating a batch. Start
+with one walk cycle and try GPT Image 2 if your account supports it and the
+cost fits your budget. Play the result at its in-game size to check the face,
+scale and alternating steps before spending credits on the rest.
 
 For example, ask for `image-to-video` to animate an approved product photo directly,
 review the finished clip and reuse it for a later edit. Edit the still only when
