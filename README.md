@@ -58,6 +58,16 @@ provides source images, requests, all attempts and downloadable results. It
 compares models through Magic Hour and does not establish a provider-quality
 winner or human acceptance of the clips.
 
+## Upload files from a local agent
+
+If your agent can run Python where the file is stored, call
+`client.v1.files.upload_file("path/to/file.png")` from the
+[Magic Hour Python SDK](https://docs.magichour.ai/integration/inputs-and-outputs#sdk-upload-simplified).
+Use a client authenticated for the same Magic Hour account as the MCP connection.
+Pass the returned `file_path` to the generation tool and save it for reuse.
+Hosted MCP clients can use native attachment tools where available, or request a
+presigned URL with `get_upload_urls` and upload the file bytes from the client.
+
 ## Credits and data
 
 MCP generations use Magic Hour account credits. You can buy a [one-time credit pack](https://magichour.ai/pricing) without a subscription; unused credits never expire. Packs include applicable watermark-free exports and commercial use, subject to the [Terms](https://magichour.ai/terms-of-service) and rights in your source content. They do not unlock subscription-only model or resolution access.
@@ -174,7 +184,9 @@ API key as the access token, which this server passes through to the API. Produc
 Notes:
 
 - FastMCP generates endpoint tools from OpenAPI at startup.
-- Creation tools return `id` and `credits_charged` immediately.
+- Creation tools return `id` and the initial `credits_charged`. Record them together,
+  then reconcile that entry with `credits_charged` from the terminal project
+  response when available.
 - OpenAPI `operationId` values are normalized to descriptive snake_case tool names.
 - The shared `/v1/files/upload-urls` endpoint is named `get_upload_urls`. It accepts `video`, `audio`, and `image` items.
 - Use `wait_for_*_project` to poll jobs. Use `exact_download_urls` exactly as
