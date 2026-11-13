@@ -727,7 +727,7 @@ Create meme
 
 **Request Body:**
 - `name` (string, optional): The name of the meme.
-- `style` (object, required):
+- `style` (object, required): Meme topic, template and whether to search the web for content.
   - `topic` (string, required): The topic of the meme.
   - `template` (string, required) enum=[101 values, e.g. ['Random', 'Drake Hotline Bling', 'Galaxy Brain', 'Two Buttons', "Gru's Plan", 'Tuxedo Winnie The Pooh'], ...]: To use our templates, pass in one of the enum values.
   - `searchWeb` (boolean, optional) default=False: Whether to search the web for meme content.
@@ -899,10 +899,10 @@ AI Voice Cloner
 
 
 **Request Body:**
-- `name` (string, optional) default=Voice Cloner - dateTime: Give your audio a custom name for easy identification.
+- `name` (string, optional) default=Voice Cloner - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.
 - `assets` (object, required): Provide the assets for voice cloning.
   - `audio_file_path` (string, required): The audio used to clone the voice. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
-- `style` (object, required):
+- `style` (object, required): Text to speak in the supplied voice, with language and speech-speed options.
   - `language` (string, optional) enum=[82 values, e.g. ['auto', 'chinese', 'english', 'japanese', 'korean', 'german'], ...] default=auto: Spoken language. Use a canonical lowercase language name, or auto to detect the language from the text. Defaults to auto.
   - `speed` (number, optional) default=1 range=[0.75,1.3]: Speech speed multiplier, from 0.75 to 1.30 inclusive. Defaults to 1 (normal speed).
   - `prompt` (string, required): Text used to generate speech from the cloned voice. The character limit is 5000 characters.
@@ -918,7 +918,7 @@ AI Voice Generator
 
 
 **Request Body:**
-- `name` (string, optional) default=Voice Generator - dateTime: Give your audio a custom name for easy identification.
+- `name` (string, optional) default=Voice Generator - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.
 - `style` (object, required): The content used to generate speech.
   - `prompt` (string, required): Text used to generate speech. The character limit is 5000 characters.
   - `voice_name` (string, required) enum=[1745 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Use the `id` of a voice returned by `GET /v1/voices`.
