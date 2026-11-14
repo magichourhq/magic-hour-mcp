@@ -253,6 +253,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         mime_type=MCP_APP_MIME_TYPE,
         meta={
             "openai/widgetDomain": MCP_APP_ORIGIN,
+            "openai/widgetCSP": {"redirect_domains": [MCP_APP_MEDIA_ORIGIN]},
             "openai/widgetDescription": (
                 "Displays Magic Hour project status, generated image, video, or audio previews, "
                 "download controls, and expandable generation details, including errors or canceled projects. "
