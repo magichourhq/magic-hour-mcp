@@ -26,6 +26,8 @@ PROJECT_CONTENT_BLOCK_GUIDANCE = (
     "retry or reword the blocked request."
 )
 
+IMAGE_TO_VIDEO_TOOL = "create_video_from_image"
+
 # MCP-facing metadata is keyed by the canonical API route. The HTTP contract
 # and synced OpenAPI source remain unchanged.
 API_TOOL_METADATA = {
@@ -151,7 +153,7 @@ API_TOOL_METADATA = {
         "id for wait_for_video_project.",
     ),
     ("POST", "/v1/image-to-video"): (
-        "create_video_from_image",
+        IMAGE_TO_VIDEO_TOOL,
         "Create video from image",
         "Use a still image as the first frame and describe what should move. For a portrait "
         "speaking to an existing recording, use create_talking_photo. For a prepared ad image "
@@ -545,7 +547,14 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         )
         if guidance not in operation.get("description", ""):
             operation["description"] = operation.get("description", "") + guidance
-        if metadata and _operation_mentions_file_path(operation):
+        if path == "/v1/image-to-video":
+            operation["description"] += (
+                " For a ChatGPT photo, pass the attached file in image to use it as the first frame. "
+                "For existing assets, use assets.image_file_path. Supply only one starting image. "
+                "If the attachment is unavailable, ask the user to choose it again and keep "
+                "the requested settings."
+            )
+        elif metadata and _operation_mentions_file_path(operation):
             operation["description"] += (
                 " For attached ChatGPT files, upload with upload_chatgpt_media and pass its "
                 "returned file_path. Reuse existing Magic Hour paths only from the connected "

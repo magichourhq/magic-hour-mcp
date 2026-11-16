@@ -17,10 +17,11 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import CallNext, Middleware as ToolMiddleware, MiddlewareContext
 from fastmcp.server.providers.openapi import MCPType, RouteMap
-from fastmcp.tools.base import ToolResult
+from fastmcp.tools.base import Tool, ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import BlobResourceContents, EmbeddedResource, Icon, TextContent, ToolAnnotations
+from mcp.types import BlobResourceContents, CallToolRequestParams, EmbeddedResource, Icon, TextContent, ToolAnnotations
 from pydantic import BaseModel, Field
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -36,6 +37,7 @@ from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_erro
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import (
     GENERATION_ESTIMATE_PATHS,
+    IMAGE_TO_VIDEO_TOOL,
     PROJECT_CONTENT_BLOCK_GUIDANCE,
     apply_magic_hour_policies,
     current_tool_replacements,
@@ -136,6 +138,50 @@ class ChatGPTFile(BaseModel):
     file_name: str = Field(default="", description="Original attachment filename, when supplied by ChatGPT.")
 
 
+def _customize_openapi_tool(route: Any, component: Any) -> None:
+    customize_openapi_component(route, component)
+    if not isinstance(component, Tool) or component.name != IMAGE_TO_VIDEO_TOOL:
+        return
+
+    schema = component.parameters
+    schema["properties"]["image"] = {
+        **ChatGPTFile.model_json_schema(),
+        "additionalProperties": False,
+        "description": "The attached ChatGPT photo to use as the first frame. "
+        "If the file is unavailable, ask the user to choose it again and keep their video settings.",
+    }
+    schema["required"].remove("assets")
+    assets = schema["properties"]["assets"]
+    assets["required"].remove("image_file_path")
+    if not assets["required"]:
+        del assets["required"]
+    schema["anyOf"] = [
+        {"required": ["image"]},
+        {"required": ["assets"], "properties": {"assets": {"required": ["image_file_path"]}}},
+    ]
+    component.meta = {**(component.meta or {}), "openai/fileParams": ["image"]}
+
+
+class _ImageToVideoAttachmentMiddleware(ToolMiddleware):
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[CallToolRequestParams],
+        call_next: CallNext[CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        arguments = context.message.arguments or {}
+        if context.message.name != IMAGE_TO_VIDEO_TOOL or "image" not in arguments:
+            return await call_next(context)
+
+        assets = arguments.get("assets", {})
+        if "image_file_path" in assets:
+            raise ToolError("Choose one starting image. Supply the attached photo or an existing image path.")
+
+        uploaded = await _upload_chatgpt_file(ChatGPTFile.model_validate(arguments["image"]), "image")
+        arguments = {**arguments, "assets": {**assets, "image_file_path": uploaded["file_path"]}}
+        del arguments["image"]
+        return await call_next(context.copy(message=context.message.model_copy(update={"arguments": arguments})))
+
+
 def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
     with Path(path).open("r", encoding="utf-8") as spec_file:
         return json.load(spec_file)
@@ -182,13 +228,14 @@ def create_mcp() -> FastMCP:
             RouteMap(methods=["POST"], pattern=r".*", mcp_type=MCPType.TOOL, mcp_tags={"write-operation"}),
             RouteMap(pattern=r".*", mcp_type=MCPType.TOOL),
         ],
-        mcp_component_fn=customize_openapi_component,
+        mcp_component_fn=_customize_openapi_tool,
     )
 
     register_custom_tools(mcp)
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
+    mcp.add_middleware(_ImageToVideoAttachmentMiddleware())
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)

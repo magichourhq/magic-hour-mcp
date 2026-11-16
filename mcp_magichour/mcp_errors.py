@@ -10,6 +10,8 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import McpError
 
+from .openapi_policies import IMAGE_TO_VIDEO_TOOL
+
 
 class APIErrorRecoveryMiddleware(Middleware):
     """Give canonical API rejections a recovery action without retrying requests."""
@@ -161,6 +163,16 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
                     "file picker; do not invent a download URL.",
                     data,
                 ) from None
+            if request.params.name == IMAGE_TO_VIDEO_TOOL and (
+                data["field_path"][:1] == ["image"] or data["constraint"] == "anyOf"
+            ):
+                next_action = (
+                    "Choose the photo again using the ChatGPT attachment picker, "
+                    "or use an existing Magic Hour image path. Keep the requested video settings. "
+                    "Wait for a valid starting image before creating a video."
+                )
+                data["next_action"] = next_action
+                detail = f"The starting photo is missing or invalid. {next_action}"
             raise _invalid_params(
                 f"Invalid arguments for tool {request.params.name!r}: {detail}", data
             ) from None
