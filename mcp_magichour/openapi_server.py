@@ -14,14 +14,15 @@ from typing import Annotated, Any, Literal
 from urllib.parse import quote, urlparse
 
 import httpx
+import mcp.types as mt
 from fastmcp import FastMCP
 from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import CallNext, Middleware as ToolMiddleware, MiddlewareContext
 from fastmcp.server.providers.openapi import MCPType, RouteMap
-from fastmcp.tools.base import Tool, ToolResult
+from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import BlobResourceContents, CallToolRequestParams, EmbeddedResource, Icon, TextContent, ToolAnnotations
+from mcp.types import BlobResourceContents, EmbeddedResource, Icon, TextContent, ToolAnnotations
 from pydantic import BaseModel, Field
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -137,35 +138,6 @@ class ChatGPTFile(BaseModel):
     file_name: str = Field(default="", description="Original attachment filename, when supplied by ChatGPT.")
 
 
-def _customize_video_project_tool(route: Any, component: Any) -> None:
-    customize_openapi_component(route, component)
-    if isinstance(component, Tool) and component.name == "get_video_project":
-        component.meta = {
-            **(component.meta or {}),
-            "ui": {"resourceUri": MCP_APP_VIEW_URI},
-            "openai/toolInvocation": {
-                "invoking": "Opening your video project…",
-                "invoked": "Video project opened",
-            },
-        }
-
-
-class _VideoProjectCard(ToolMiddleware):
-    async def on_call_tool(
-        self,
-        context: MiddlewareContext[CallToolRequestParams],
-        call_next: CallNext[CallToolRequestParams, ToolResult],
-    ) -> ToolResult:
-        result = await call_next(context)
-        project = result.structured_content
-        if context.message.name == "get_video_project" and project and project.get("id"):
-            structured = _project_structured_content_for_agent(project)
-            if "downloads" in project:
-                structured["downloads"] = project["downloads"]
-            result.structured_content = {**structured, "project_type": "video"}
-        return result
-
-
 def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
     with Path(path).open("r", encoding="utf-8") as spec_file:
         return json.load(spec_file)
@@ -212,17 +184,17 @@ def create_mcp() -> FastMCP:
             RouteMap(methods=["POST"], pattern=r".*", mcp_type=MCPType.TOOL, mcp_tags={"write-operation"}),
             RouteMap(pattern=r".*", mcp_type=MCPType.TOOL),
         ],
-        mcp_component_fn=_customize_video_project_tool,
+        mcp_component_fn=customize_openapi_component,
     )
 
     register_custom_tools(mcp)
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
-    mcp.add_middleware(_VideoProjectCard())
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
+    mcp.add_middleware(_VideoProjectCard())
     return mcp
 
 
@@ -800,6 +772,22 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
             if isinstance(url, str) and url:
                 urls.append(url)
     return urls
+
+
+class _VideoProjectCard(ToolMiddleware):
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        result = await call_next(context)
+        project = result.structured_content
+        if context.message.name == "get_video_project" and project and project.get("id"):
+            structured = _project_structured_content_for_agent(project)
+            if "downloads" in project:
+                structured["downloads"] = project["downloads"]
+            result.structured_content = {**structured, "project_type": "video"}
+        return result
 
 
 def _project_structured_content_for_agent(project: dict[str, Any]) -> dict[str, Any]:

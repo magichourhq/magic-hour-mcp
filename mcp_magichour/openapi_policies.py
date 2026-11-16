@@ -20,6 +20,8 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
     "audio": "wait_for_audio_project",
 }
 
+MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
+
 PROJECT_CONTENT_BLOCK_GUIDANCE = (
     "Say the project was blocked by a content check. Use a specific reason only when "
     "the API provides one. If the reason is unavailable, say so. Do not automatically "
@@ -635,6 +637,15 @@ def customize_openapi_component(route: Any, component: Any) -> None:
             destructiveHint=method == "DELETE",
             openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL|searchWeb\b", repr(component.parameters))),
         )
+        if method == "GET" and path == "/v1/video-projects/{id}":
+            component.meta = {
+                **(component.meta or {}),
+                "ui": {"resourceUri": MCP_APP_VIEW_URI},
+                "openai/toolInvocation": {
+                    "invoking": "Opening your video project…",
+                    "invoked": "Video project opened",
+                },
+            }
 
     if is_estimate:
         tags.add("read-operation")
