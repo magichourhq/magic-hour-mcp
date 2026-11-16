@@ -70,8 +70,9 @@ API_TOOL_METADATA = {
     ("GET", "/v1/video-projects/{id}"): (
         "get_video_project",
         "Get video project",
-        "Returns a video project's status and, once complete, its download URLs. Use to check "
-        "progress with the id from a video create tool. Read-only.",
+        "Open a saved video in Magic Hour’s result card with Play and Download in ChatGPT. "
+        "Use when someone asks to see, play, download or reopen an existing video. "
+        "Pass the existing project ID. Read-only.",
     ),
     ("DELETE", "/v1/video-projects/{id}"): (
         "delete_video_project",
