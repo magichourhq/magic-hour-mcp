@@ -10,7 +10,7 @@ from base64 import b64encode
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -31,7 +31,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .app_events import app_events
-from .chatgpt_images import ChatGPTFile, add_chatgpt_image_inputs, prepare_chatgpt_images
+from .chatgpt_media import ChatGPTFile, ProjectType, add_chatgpt_media_inputs, prepare_chatgpt_media
 from .helper_schemas import PROJECT_WAIT_OUTPUT_SCHEMA
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_errors
@@ -59,8 +59,6 @@ from .project_result_app import (
 )
 from .tool_logging import ToolCallLoggingMiddleware
 from .workflow_guidance import register_workflow_guidance
-
-ProjectType = Literal["video", "image", "audio"]
 
 DEFAULT_API_BASE_URL = "https://api.magichour.ai"
 DEFAULT_OPENAPI_PATH = Path(__file__).with_name("openapi.json")
@@ -134,17 +132,17 @@ TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 def _customize_openapi_tool(route: Any, component: Any) -> None:
     customize_openapi_component(route, component)
     if isinstance(component, Tool):
-        add_chatgpt_image_inputs(component)
+        add_chatgpt_media_inputs(component)
 
 
-class _ChatGPTImageMiddleware(ToolMiddleware):
+class _ChatGPTMediaMiddleware(ToolMiddleware):
     async def on_call_tool(
         self,
         context: MiddlewareContext[CallToolRequestParams],
         call_next: CallNext[CallToolRequestParams, ToolResult],
     ) -> ToolResult:
         original = context.message.arguments or {}
-        arguments, uploads = prepare_chatgpt_images(context.message.name, original)
+        arguments, uploads = prepare_chatgpt_media(context.message.name, original)
         if not uploads:
             return await call_next(context)
 
@@ -152,16 +150,16 @@ class _ChatGPTImageMiddleware(ToolMiddleware):
         loop = asyncio.get_running_loop()
         deadline = loop.time() + 60
         try:
-            for target, slot, file in uploads:
-                identity = (file.file_id, file.download_url)
+            for target, slot, file, media_type in uploads:
+                identity = (media_type, file.file_id, file.download_url)
                 if identity not in uploaded_paths:
                     result = await asyncio.wait_for(
-                        _upload_chatgpt_file(file, "image"), timeout=deadline - loop.time()
+                        _upload_chatgpt_file(file, media_type), timeout=deadline - loop.time()
                     )
                     uploaded_paths[identity] = result["file_path"]
                 target[slot] = uploaded_paths[identity]
         except asyncio.TimeoutError:
-            raise ToolError("Image upload timed out. Choose the images again and keep the requested settings.") from None
+            raise ToolError("Attachment upload timed out. Attach the files again and keep the requested settings.") from None
         return await call_next(context.copy(message=context.message.model_copy(update={"arguments": arguments})))
 
 
@@ -218,7 +216,7 @@ def create_mcp() -> FastMCP:
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
-    mcp.add_middleware(_ChatGPTImageMiddleware())
+    mcp.add_middleware(_ChatGPTMediaMiddleware())
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
