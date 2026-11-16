@@ -47,20 +47,35 @@ class APIErrorRecoveryMiddleware(Middleware):
                             "invalid_request": (400, "Correct the fields described by the API using the current tool schema. Preserve explicit settings; ask before changing them. Do not retry the unchanged request."),
                             "insufficient_credits": (
                                 402,
-                                "Explain that the connected account lacks credits. Show the user "
-                                "https://magichour.ai/pricing#credit-pack for one-time credit packs and "
-                                "https://magichour.ai/pricing for subscription plans. Ask them to purchase "
-                                "for the same connected Magic Hour account and return here to continue. "
+                                "Explain that the connected account lacks credits. State the shortfall if the API reports it. "
+                                "Lead with [Add credits](https://magichour.ai/pricing#credit-pack) for a one-time purchase. "
+                                "If the user asks about a subscription, show https://magichour.ai/pricing. "
+                                "Ask them to use the same Magic Hour account and return here to continue. "
                                 "A credit purchase does not unlock subscription-only models or resolutions. "
                                 "When the user asks to continue, refresh get_account_info and recheck the "
                                 "original request's eligibility; balance alone is not proof. Preserve supplied "
                                 "media and explicit settings. Do not purchase, change plans or retry "
                                 "generation automatically.",
                             ),
-                            "subscription_required": (402, "Explain that this request requires a subscription. Do not retry generation or change the subscription automatically."),
-                            "plan_upgrade_required": (402, "Explain the API's plan restriction for this request. Ask before changing its model or settings; do not upgrade or retry automatically."),
+                            "subscription_required": (
+                                402,
+                                "Explain which part of the request requires a subscription if the API says. "
+                                "Offer [View plans](https://magichour.ai/pricing) and an option on the current plan "
+                                "if you can verify it. Name a plan only if verified to unlock the requested settings. "
+                                "Preserve the request. Ask before changing explicit settings, and wait for the user "
+                                "to continue after any plan change. Recheck eligibility and credits before submitting.",
+                            ),
+                            "plan_upgrade_required": (
+                                402,
+                                "Explain the specific model, duration or resolution limit reported by the API. "
+                                "Offer an option on the current plan if you can verify it. When a plan change can "
+                                "resolve the reported limit, offer [View plans](https://magichour.ai/pricing). "
+                                "Name a plan only if verified to unlock the requested settings. Preserve the request. "
+                                "Ask before changing explicit settings, and wait for the user to continue after any "
+                                "plan change. Recheck eligibility and credits before submitting.",
+                            ),
                             "not_found": (404, "Check the existing resource ID and connected account. Do not create a replacement generation to recover a missing result."),
-                            "unprocessable_entity": (422, "Correct the values described by the API. Preserve the user's explicit model, references and settings; ask before changing them. Do not retry the unchanged request."),
+                            "unprocessable_entity": (422, "Correct the values described by the API. Explain the constraint and offer a compatible model or setting if known. A subscription will not fix an unsupported model setting. Preserve the user's explicit model, references and settings; ask before changing them. Do not retry the unchanged request."),
                             "internal_server_error": (500, "For a creation request, acceptance may be uncertain: recover its existing project ID before any new create. For retrieval, retry using the same project ID. Do not automatically retry creation."),
                         }.get(code)
                         message = body.get("message")

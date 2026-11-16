@@ -315,10 +315,9 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         "refer to this file; labels must be unique ignoring case.",
     },
     "/v1/image-to-video": {
-        ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
-        "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
-        "When no model was requested, use `default` rather than choosing a named premium model; "
-        "omit an unrequested resolution so the API resolves it for the account. "
+        ("model",): "The video generation model. With `default`, the API chooses a model using the account plan, "
+        "resolution and duration. Use this option when no model was requested and it supports the intended "
+        "inputs and settings. Omit an unrequested resolution so the API resolves it for the account. "
         "Preserve explicit settings and required input capabilities. "
         "Deprecated model values ending in `-audio` enable `audio`.",
     },
@@ -326,10 +325,9 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         ("style",): "Instructions describing the video to generate.",
         ("references", "[]", "name"): "Reference label without @. Use @name in style.prompt to "
         "refer to this file; labels must be unique ignoring case.",
-        ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
-        "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
-        "When no model was requested, use `default` rather than choosing a named premium model; "
-        "omit an unrequested resolution so the API resolves it for the account. "
+        ("model",): "The video generation model. With `default`, the API chooses a model using the account plan, "
+        "resolution and duration. Use this option when no model was requested and it supports the intended "
+        "inputs and settings. Omit an unrequested resolution so the API resolves it for the account. "
         "Preserve explicit settings and required input capabilities. "
         "Deprecated model values ending in `-audio` enable `audio`.",
     },
