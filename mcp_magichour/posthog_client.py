@@ -19,7 +19,7 @@ from posthog.mcp import (
 from posthog.mcp.types import PostHogCaptureEvent
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from .openapi_policies import IMAGE_TO_VIDEO_TOOL
+from .chatgpt_images import image_attachment_fields
 
 
 AnalyticsEvent = Literal[
@@ -49,11 +49,13 @@ def _identify_request(_: object, extra: object) -> UserIdentity | None:
 
 def _redact_generation_attachment(event: PostHogCaptureEvent) -> PostHogCaptureEvent:
     properties = event.get("properties", {})
-    if properties.get("$mcp_tool_name") == IMAGE_TO_VIDEO_TOOL:
+    fields = image_attachment_fields(properties.get("$mcp_tool_name", ""))
+    if fields:
         parameters = properties.get("$mcp_parameters", {})
         arguments = parameters.get("request", {}).get("params", {}).get("arguments", {})
         if isinstance(arguments, dict):
-            arguments.pop("image", None)
+            for field in fields:
+                arguments.pop(field, None)
     return event
 
 

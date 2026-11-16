@@ -22,7 +22,7 @@ from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import Tool, ToolResult
 from fastmcp.utilities.types import Audio, Image
 from mcp.types import BlobResourceContents, CallToolRequestParams, EmbeddedResource, Icon, TextContent, ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import Field
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -31,13 +31,13 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .app_events import app_events
+from .chatgpt_images import ChatGPTFile, add_chatgpt_image_inputs, prepare_chatgpt_images
 from .helper_schemas import PROJECT_WAIT_OUTPUT_SCHEMA
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import (
     GENERATION_ESTIMATE_PATHS,
-    IMAGE_TO_VIDEO_TOOL,
     PROJECT_CONTENT_BLOCK_GUIDANCE,
     apply_magic_hour_policies,
     current_tool_replacements,
@@ -131,54 +131,37 @@ MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 
 
-class ChatGPTFile(BaseModel):
-    download_url: str = Field(description="Exact HTTPS download URL supplied for the native ChatGPT attachment, including its signed query.")
-    file_id: str = Field(description="Native ChatGPT file identifier paired with download_url; not a local filesystem path.")
-    mime_type: str = Field(default="", description="Attachment MIME type, when supplied by ChatGPT.")
-    file_name: str = Field(default="", description="Original attachment filename, when supplied by ChatGPT.")
-
-
 def _customize_openapi_tool(route: Any, component: Any) -> None:
     customize_openapi_component(route, component)
-    if not isinstance(component, Tool) or component.name != IMAGE_TO_VIDEO_TOOL:
-        return
-
-    schema = component.parameters
-    schema["properties"]["image"] = {
-        **ChatGPTFile.model_json_schema(),
-        "additionalProperties": False,
-        "description": "The attached ChatGPT photo to use as the first frame. "
-        "If the file is unavailable, ask the user to choose it again and keep their video settings.",
-    }
-    schema["required"].remove("assets")
-    assets = schema["properties"]["assets"]
-    assets["required"].remove("image_file_path")
-    if not assets["required"]:
-        del assets["required"]
-    schema["anyOf"] = [
-        {"required": ["image"]},
-        {"required": ["assets"], "properties": {"assets": {"required": ["image_file_path"]}}},
-    ]
-    component.meta = {**(component.meta or {}), "openai/fileParams": ["image"]}
+    if isinstance(component, Tool):
+        add_chatgpt_image_inputs(component)
 
 
-class _ImageToVideoAttachmentMiddleware(ToolMiddleware):
+class _ChatGPTImageMiddleware(ToolMiddleware):
     async def on_call_tool(
         self,
         context: MiddlewareContext[CallToolRequestParams],
         call_next: CallNext[CallToolRequestParams, ToolResult],
     ) -> ToolResult:
-        arguments = context.message.arguments or {}
-        if context.message.name != IMAGE_TO_VIDEO_TOOL or "image" not in arguments:
+        original = context.message.arguments or {}
+        arguments, uploads = prepare_chatgpt_images(context.message.name, original)
+        if not uploads:
             return await call_next(context)
 
-        assets = arguments.get("assets", {})
-        if "image_file_path" in assets:
-            raise ToolError("Choose one starting image. Supply the attached photo or an existing image path.")
-
-        uploaded = await _upload_chatgpt_file(ChatGPTFile.model_validate(arguments["image"]), "image")
-        arguments = {**arguments, "assets": {**assets, "image_file_path": uploaded["file_path"]}}
-        del arguments["image"]
+        uploaded_paths = {}
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 60
+        try:
+            for target, slot, file in uploads:
+                identity = (file.file_id, file.download_url)
+                if identity not in uploaded_paths:
+                    result = await asyncio.wait_for(
+                        _upload_chatgpt_file(file, "image"), timeout=deadline - loop.time()
+                    )
+                    uploaded_paths[identity] = result["file_path"]
+                target[slot] = uploaded_paths[identity]
+        except asyncio.TimeoutError:
+            raise ToolError("Image upload timed out. Choose the images again and keep the requested settings.") from None
         return await call_next(context.copy(message=context.message.model_copy(update={"arguments": arguments})))
 
 
@@ -235,7 +218,7 @@ def create_mcp() -> FastMCP:
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
-    mcp.add_middleware(_ImageToVideoAttachmentMiddleware())
+    mcp.add_middleware(_ChatGPTImageMiddleware())
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
