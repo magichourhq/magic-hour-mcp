@@ -668,7 +668,7 @@ AI Image Editor
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
 - `model` (string, optional) enum=[16 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'flux-2-klein', 'nano-banana-pro', 'seedream-v5-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
-- `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
+- `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`. Ignored for `krea-2` and `flux-2-klein` when an input image is provided; the output keeps the source image's aspect ratio.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required):
   - `prompt` (string, required): The prompt used to edit the image.
@@ -921,7 +921,7 @@ AI Voice Generator
 - `name` (string, optional) default=Voice Generator - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.
 - `style` (object, required): The content used to generate speech.
   - `prompt` (string, required): Text used to generate speech. The character limit is 5000 characters.
-  - `voice_name` (string, required) enum=[1745 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Use the `id` of a voice returned by `GET /v1/voices`.
+  - `voice_name` (string, required) enum=[1744 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Use the `id` of a voice returned by `GET /v1/voices`.
   - `language` (string, optional) enum=[82 values, e.g. ['auto', 'chinese', 'english', 'japanese', 'korean', 'german'], ...] default=auto: Spoken language. Use a canonical lowercase language name, or auto to detect the language from the text. Defaults to auto.
   - `speed` (number, optional) default=1 range=[0.75,1.3]: Speech speed multiplier, from 0.75 to 1.30 inclusive. Defaults to 1 (normal speed).
 
