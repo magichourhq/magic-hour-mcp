@@ -163,6 +163,10 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
         # OpenAPI-generated schemas omit additionalProperties; an unknown arg on a
         # parameterless GET would otherwise be sent upstream as a request body.
         schema = {"additionalProperties": False, **tool.parameters}
+        if request.params.arguments:
+            request.params.arguments = _parse_stringified_attachments(
+                request.params.name, request.params.arguments
+            )
         try:
             jsonschema.validate(request.params.arguments or {}, schema)
         except jsonschema.ValidationError as error:
@@ -205,6 +209,32 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
         return await handler(request)
 
     mcp._mcp_server.request_handlers[mt.CallToolRequest] = handle
+
+
+_UPLOAD_ATTACHMENT_FIELDS = {"upload_chatgpt_image": ["image"], "upload_chatgpt_media": ["file"]}
+
+
+def _parse_stringified_attachments(tool_name: str, arguments: dict[str, object]) -> dict[str, object]:
+    # Some clients send an attachment as a JSON-encoded string. Only JSON objects are
+    # decoded, so plain strings such as paths or URLs are left for normal validation.
+    def parse(value: object) -> object:
+        if isinstance(value, str) and value.lstrip().startswith("{"):
+            try:
+                parsed = json.loads(value)
+            except ValueError:
+                return value
+            if isinstance(parsed, dict):
+                return parsed
+        return value
+
+    fields = _UPLOAD_ATTACHMENT_FIELDS.get(tool_name) or attachment_fields(tool_name)
+    result = arguments
+    for field in fields:
+        value = arguments.get(field)
+        parsed = [parse(item) for item in value] if isinstance(value, list) else parse(value)
+        if parsed != value:
+            result = {**result, field: parsed}
+    return result
 
 
 def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str, object]]:
