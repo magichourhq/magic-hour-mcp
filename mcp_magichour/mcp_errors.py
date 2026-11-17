@@ -256,6 +256,7 @@ def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str
     ]
     constraint = error.validator
     expected: dict[str, object] = {}
+    allowed_text = ""
     next_action = (
         "Correct this field using the current tools/list schema. Preserve explicit requested settings; "
         "ask before changing them. Do not retry an unchanged creation request."
@@ -268,6 +269,11 @@ def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str
     elif constraint == "additionalProperties":
         expected["allowed_fields"] = list(error.schema.get("properties", {}))
         detail = "An argument was unexpected"
+        allowed = expected["allowed_fields"]
+        if allowed:
+            # Some clients expose only the error message to the agent.
+            names = ", ".join(allowed[:25]) + (f", and {len(allowed) - 25} more" if len(allowed) > 25 else "")
+            allowed_text = f" Allowed fields: {names}."
         next_action = (
             "Refresh tools/list and remove arguments outside the listed allowed fields. "
             "Do not silently rename or discard an explicitly requested setting."
@@ -293,7 +299,7 @@ def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str
         detail = f"The field does not satisfy {constraint!r}"
 
     field = "$" + "".join(f"[{part}]" if isinstance(part, int) else f".{part}" for part in path)
-    return f"{detail} at {field}.", {
+    return f"{detail} at {field}.{allowed_text}", {
         "type": "invalid_arguments",
         "field_path": path,
         "constraint": constraint,
