@@ -129,6 +129,29 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertIn("Direct public media URLs may work", description)
         self.assertIn("hotlinked URLs can fail", description)
 
+    def test_aspect_ratio_fields_say_to_choose_by_destination(self):
+        from mcp_magichour.openapi_policies import ASPECT_RATIO_GUIDANCE
+
+        spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
+        patched = apply_magic_hour_policies(spec)
+        expected_default = {
+            "/v1/text-to-video": "the video is 16:9",
+            "/v1/ai-image-generator": "the image is 1:1",
+            "/v1/ai-image-editor": "keep `auto`",
+        }
+        for path, default_note in expected_default.items():
+            with self.subTest(path=path):
+                original = spec["paths"][path]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["aspect_ratio"]
+                field = patched["paths"][path]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["aspect_ratio"]
+                self.assertTrue(field["description"].startswith(ASPECT_RATIO_GUIDANCE))
+                self.assertIn(default_note, field["description"])
+                # The API's own per-model support list is kept.
+                self.assertTrue(field["description"].endswith(original["description"]))
+                self.assertEqual(field["enum"], original["enum"])
+        for platform in ("9:16 for TikTok", "16:9 for YouTube", "1:1 for an Instagram", "ask"):
+            self.assertIn(platform, ASPECT_RATIO_GUIDANCE)
+        self.assertEqual(apply_magic_hour_policies(patched), patched)
+
     def test_custom_component_adds_group_tags(self):
         class Route:
             method = "POST"

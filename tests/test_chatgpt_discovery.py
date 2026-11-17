@@ -39,16 +39,16 @@ After creation, use matching wait_for_*_project with the returned id.
 For *_file_path, never send sandbox paths (/mnt/data/...). Upload native attachments with upload_chatgpt_image or upload_chatgpt_media; use returned file_path. PUT other local bytes via get_upload_urls. Public URLs must fetch raw bytes. Preserve signed URLs and query parameters; never append expiry metadata.
 Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
 On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
-On tier restrictions, explain the block; never retry unchanged or blindly remove fields. Ask before changing explicit model/resolution requirements.
+On tier restrictions, explain the block; never retry unchanged or blindly remove fields.
 
 Choose video from inputs:
 
 - Approved image -> create_video_from_image directly; edit only for a requested visual change or a source problem that prevents the shot.
 - Still portrait + audio -> create_talking_photo; text alone is not audio.
 - Existing video + replacement audio -> create_lip_sync_video.
-- Preserve an explicitly requested alternative provider.
-- Choose models from the current schema to match the requested inputs and settings, with verified account eligibility.
-- Preserve an explicitly requested model; explain unsupported settings before proposing a change.
+- Choose models from the current schema that fit the inputs, settings and verified account eligibility.
+- Set aspect_ratio by destination: 9:16 TikTok/Reels/Shorts/Stories, 16:9 YouTube/web/TV, 1:1 feed posts; else ask.
+- Preserve an explicitly requested model or provider; explain unsupported settings before proposing a change.
 - Include complete spoken sentences.
 - Use Text-to-Video when no supplied starting image is required.
 - Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.

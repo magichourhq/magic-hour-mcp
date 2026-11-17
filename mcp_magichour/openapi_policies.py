@@ -175,7 +175,8 @@ API_TOOL_METADATA = {
         "create_video_from_text",
         "Create video from text",
         "Generates a video from a text prompt, with optional supported reference inputs and model "
-        "settings. To animate an existing starting image, use create_video_from_image. Starts a "
+        "settings. Set aspect_ratio for where the video will be used, such as 9:16 for TikTok or "
+        "Reels. To animate an existing starting image, use create_video_from_image. Starts a "
         "background job that costs credits; returns a project id for wait_for_video_project.",
     ),
     ("POST", "/v1/video-to-video"): (
@@ -426,6 +427,17 @@ LIKENESS_GENERATION_PATHS = {
     "/v1/face-swap", "/v1/face-swap-photo", "/v1/head-swap", "/v1/body-swap",
     "/v1/lip-sync", "/v1/ai-talking-photo", "/v1/character-replace", "/v1/ai-clothes-changer",
 }
+ASPECT_RATIO_GUIDANCE = (
+    "Choose by where the output will be used: 9:16 for TikTok, Reels, Shorts, Stories or a "
+    "phone screen; 16:9 for YouTube, a website, slides or TV; 1:1 "
+    "for an Instagram or Facebook feed post or a profile picture. If the user names a use but "
+    "you can't tell its shape, ask. "
+)
+ASPECT_RATIO_DEFAULT_NOTE = {
+    "/v1/text-to-video": "Set this whenever the use is known; if omitted, the video is 16:9.",
+    "/v1/ai-image-generator": "Set this whenever the use is known; if omitted, the image is 1:1.",
+    "/v1/ai-image-editor": "With no new use or shape requested, keep `auto` to match the source image.",
+}
 LIKENESS_USAGE_GUIDANCE = (
     "Use only with the user's own likeness or content they are authorized to use. "
     "Do not use for impersonation, deception, sexual content, or content involving minors."
@@ -506,6 +518,13 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
             # Own paragraph, so the plan-wide limit is not read as part of a per-model list.
             base = end_seconds.get("description", "").rstrip()
             end_seconds["description"] = "\n\n".join(filter(None, [base, FREE_DURATION_GUIDANCE[path]]))
+
+    aspect_ratio = properties.get("aspect_ratio")
+    if method == "POST" and path in ASPECT_RATIO_DEFAULT_NOTE and isinstance(aspect_ratio, dict):
+        guidance = ASPECT_RATIO_GUIDANCE + ASPECT_RATIO_DEFAULT_NOTE[path]
+        description = aspect_ratio.get("description", "")
+        if not description.startswith(guidance):
+            aspect_ratio["description"] = f"{guidance}\n\n{description}" if description else guidance
 
     # A documented default is evidence that callers can omit this label. Do not
     # send the OpenAPI default's literal "dateTime" placeholder to the API.
