@@ -221,9 +221,10 @@ def _parse_stringified_attachments(tool_name: str, arguments: dict[str, object])
         if isinstance(value, str) and value.lstrip().startswith("{"):
             try:
                 parsed = json.loads(value)
-            except ValueError:
+            except (ValueError, RecursionError):
                 return value
-            if isinstance(parsed, dict):
+            # Attachment objects are flat; nested input is left for normal validation.
+            if isinstance(parsed, dict) and not any(isinstance(item, (dict, list)) for item in parsed.values()):
                 return parsed
         return value
 
