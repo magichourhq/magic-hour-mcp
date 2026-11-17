@@ -217,8 +217,6 @@ _UPLOAD_ATTACHMENT_FIELDS = {"upload_chatgpt_image": ["image"], "upload_chatgpt_
 def _parse_stringified_attachments(tool_name: str, arguments: dict[str, object]) -> dict[str, object]:
     # Some clients send an attachment as a JSON-encoded string. Only JSON objects are
     # decoded, so plain strings such as paths or URLs are left for normal validation.
-    upload_fields = _UPLOAD_ATTACHMENT_FIELDS.get(tool_name)
-
     def parse(value: object) -> object:
         if isinstance(value, str) and value.lstrip().startswith("{"):
             try:
@@ -226,15 +224,15 @@ def _parse_stringified_attachments(tool_name: str, arguments: dict[str, object])
             except (ValueError, RecursionError):
                 return value
             if isinstance(parsed, dict):
-                if upload_fields:
-                    # The upload tools ignore undeclared fields, as they do for native objects.
-                    parsed = {key: item for key, item in parsed.items() if not isinstance(item, (dict, list))}
-                # Attachment objects are flat; nested input is left for normal validation.
-                if not any(isinstance(item, (dict, list)) for item in parsed.values()):
-                    return parsed
+                # Attachment fields are flat strings. Emptying a nested value keeps validation
+                # the same as for a native object without carrying deep input onward.
+                return {
+                    key: type(item)() if isinstance(item, (dict, list)) else item
+                    for key, item in parsed.items()
+                }
         return value
 
-    fields = upload_fields or attachment_fields(tool_name)
+    fields = _UPLOAD_ATTACHMENT_FIELDS.get(tool_name) or attachment_fields(tool_name)
     result = arguments
     for field in fields:
         value = arguments.get(field)
