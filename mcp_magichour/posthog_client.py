@@ -16,7 +16,10 @@ from posthog.mcp import (
     get_request_headers,
     instrument,
 )
+from posthog.mcp.types import PostHogCaptureEvent
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from .chatgpt_media import attachment_fields
 
 
 AnalyticsEvent = Literal[
@@ -42,6 +45,18 @@ def _identify_request(_: object, extra: object) -> UserIdentity | None:
     if scheme.lower() != "bearer" or not token.strip():
         return None
     return UserIdentity(distinct_id=api_key_distinct_id(token.strip()))
+
+
+def _redact_generation_attachment(event: PostHogCaptureEvent) -> PostHogCaptureEvent:
+    properties = event.get("properties", {})
+    fields = attachment_fields(properties.get("$mcp_tool_name", ""))
+    if fields:
+        parameters = properties.get("$mcp_parameters", {})
+        arguments = parameters.get("request", {}).get("params", {}).get("arguments", {})
+        if isinstance(arguments, dict):
+            for field in fields:
+                arguments.pop(field, None)
+    return event
 
 
 def _is_debug() -> bool:
@@ -117,6 +132,7 @@ class Analytics:
                 MCPAnalyticsOptions(
                     context=False,
                     identify=_identify_request,
+                    before_send=_redact_generation_attachment,
                     logger=logger.info,
                 ),
             )

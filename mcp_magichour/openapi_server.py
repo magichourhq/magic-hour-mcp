@@ -10,7 +10,7 @@ from base64 import b64encode
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -20,10 +20,10 @@ from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import CallNext, Middleware as ToolMiddleware, MiddlewareContext
 from fastmcp.server.providers.openapi import MCPType, RouteMap
-from fastmcp.tools.base import ToolResult
+from fastmcp.tools.base import Tool, ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import BlobResourceContents, EmbeddedResource, Icon, TextContent, ToolAnnotations
-from pydantic import BaseModel, Field
+from mcp.types import BlobResourceContents, CallToolRequestParams, EmbeddedResource, Icon, TextContent, ToolAnnotations
+from pydantic import Field
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -32,6 +32,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .app_events import app_events
+from .chatgpt_media import ChatGPTFile, ProjectType, add_chatgpt_media_inputs, prepare_chatgpt_media
 from .helper_schemas import PROJECT_WAIT_OUTPUT_SCHEMA
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
 from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_errors
@@ -59,8 +60,6 @@ from .project_result_app import (
 )
 from .tool_logging import ToolCallLoggingMiddleware
 from .workflow_guidance import register_workflow_guidance
-
-ProjectType = Literal["video", "image", "audio"]
 
 DEFAULT_API_BASE_URL = "https://api.magichour.ai"
 DEFAULT_OPENAPI_PATH = Path(__file__).with_name("openapi.json")
@@ -131,11 +130,38 @@ MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
 
 
-class ChatGPTFile(BaseModel):
-    download_url: str = Field(description="Exact HTTPS download URL supplied for the native ChatGPT attachment, including its signed query.")
-    file_id: str = Field(description="Native ChatGPT file identifier paired with download_url; not a local filesystem path.")
-    mime_type: str = Field(default="", description="Attachment MIME type, when supplied by ChatGPT.")
-    file_name: str = Field(default="", description="Original attachment filename, when supplied by ChatGPT.")
+def _customize_openapi_tool(route: Any, component: Any) -> None:
+    customize_openapi_component(route, component)
+    if isinstance(component, Tool):
+        add_chatgpt_media_inputs(component)
+
+
+class _ChatGPTMediaMiddleware(ToolMiddleware):
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[CallToolRequestParams],
+        call_next: CallNext[CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        original = context.message.arguments or {}
+        arguments, uploads = prepare_chatgpt_media(context.message.name, original)
+        if not uploads:
+            return await call_next(context)
+
+        uploaded_paths = {}
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 60
+        try:
+            for target, slot, file, media_type in uploads:
+                identity = (media_type, file.file_id, file.download_url)
+                if identity not in uploaded_paths:
+                    result = await asyncio.wait_for(
+                        _upload_chatgpt_file(file, media_type), timeout=deadline - loop.time()
+                    )
+                    uploaded_paths[identity] = result["file_path"]
+                target[slot] = uploaded_paths[identity]
+        except asyncio.TimeoutError:
+            raise ToolError("Attachment upload timed out. Attach the files again and keep the requested settings.") from None
+        return await call_next(context.copy(message=context.message.model_copy(update={"arguments": arguments})))
 
 
 def load_openapi_spec(path: str | os.PathLike[str] = DEFAULT_OPENAPI_PATH) -> dict[str, Any]:
@@ -184,13 +210,14 @@ def create_mcp() -> FastMCP:
             RouteMap(methods=["POST"], pattern=r".*", mcp_type=MCPType.TOOL, mcp_tags={"write-operation"}),
             RouteMap(pattern=r".*", mcp_type=MCPType.TOOL),
         ],
-        mcp_component_fn=customize_openapi_component,
+        mcp_component_fn=_customize_openapi_tool,
     )
 
     register_custom_tools(mcp)
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
+    mcp.add_middleware(_ChatGPTMediaMiddleware())
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)

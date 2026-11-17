@@ -7,6 +7,8 @@ from typing import Any
 from fastmcp.tools.base import Tool
 from mcp.types import ToolAnnotations
 
+from .chatgpt_media import attachment_fields
+
 
 PROJECT_TAG_TO_ASSET = {
     "Video Projects": "video",
@@ -546,7 +548,7 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         )
         if guidance not in operation.get("description", ""):
             operation["description"] = operation.get("description", "") + guidance
-        if metadata and _operation_mentions_file_path(operation):
+        if metadata and _operation_mentions_file_path(operation) and not attachment_fields(metadata[0]):
             operation["description"] += (
                 " For attached ChatGPT files, upload with upload_chatgpt_media and pass its "
                 "returned file_path. Reuse existing Magic Hour paths only from the connected "

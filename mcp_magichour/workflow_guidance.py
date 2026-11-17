@@ -91,7 +91,7 @@ WORKFLOWS = {
         "api_docs_url": f"{DOCS}/api-reference/video-projects/lip-sync",
         "creation_tool": "create_lip_sync_video",
         "steps": [
-            "Use existing video via assets.video_source and its matching assets.video_file_path or assets.youtube_url, plus the approved recording in assets.audio_file_path; upload local files before calling the creation tool. For a still portrait plus audio, use talking-photo instead.",
+            "Pass an attached video in the video field and set assets.video_source to file. For an existing upload or YouTube video, use the matching source and path or URL. Pass the recording in the audio field or use its existing Magic Hour path. Use talking-photo for a still portrait.",
             "Choose a segment long enough for the complete sentence, including pauses; do not cut off the narration.",
             "Call create_lip_sync_video, then wait_for_video_project with the returned id and check speech timing before adding subtitles.",
         ],
@@ -123,7 +123,7 @@ WORKFLOWS = {
         "steps": [
             "Use a portrait and an existing approved recording. If the user has only text, obtain the audio first; this tool cannot turn text into speech.",
             "Optionally colorize an old photo with colorize_photo and wait_for_image_project before animating it. Preserve the person's likeness.",
-            "Call create_talking_photo with both assets.image_file_path and assets.audio_file_path and a segment that includes the complete sentence, then wait_for_video_project.",
+            "Call create_talking_photo with the image and audio attachments or their existing Magic Hour paths. Include the full sentence in the selected segment, then wait_for_video_project.",
         ],
         "example_request": "Bring this old family portrait to life using my recording of the letter. Keep the face recognizable and include the full spoken passage.",
         "follow_up": "Use add_subtitles_to_video on the accepted clip when captions are requested; finish with wait_for_video_project.",
