@@ -394,6 +394,23 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
     },
 }
 
+# Observed from API 402 plan_upgrade_required errors; no published source. The API enforces the cap.
+_FREE_CAP_TAIL = (
+    "enforced by the API and may change. When the user gave no duration, choose one within it. "
+    "Keep an explicitly requested longer one, explain the Free limit and ask before changing it."
+)
+FREE_DURATION_GUIDANCE = {
+    "/v1/text-to-video": "Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
+    "/v1/image-to-video": "Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
+    "/v1/audio-to-video": "Free plans are currently limited to 15 seconds of output, " + _FREE_CAP_TAIL,
+    "/v1/ai-video-editor": "Free plans are currently limited to 10 seconds of clip "
+    "(`end_seconds` minus `start_seconds`), " + _FREE_CAP_TAIL
+    + " Do not default to the source video's full length.",
+    "/v1/character-replace": "Free plans are currently limited to 10 seconds of clip "
+    "(`end_seconds` minus `start_seconds`), " + _FREE_CAP_TAIL
+    + " Do not default to the source video's full length.",
+}
+
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 GENERATION_ESTIMATE_PATHS = (
     "/v1/estimate",
@@ -482,6 +499,13 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
                 )
             if parameter:
                 parameter["description"] = description
+
+    if method == "POST" and path in FREE_DURATION_GUIDANCE:
+        end_seconds = properties.get("end_seconds", {})
+        if end_seconds and FREE_DURATION_GUIDANCE[path] not in end_seconds.get("description", ""):
+            # Own paragraph, so the plan-wide limit is not read as part of a per-model list.
+            base = end_seconds.get("description", "").rstrip()
+            end_seconds["description"] = "\n\n".join(filter(None, [base, FREE_DURATION_GUIDANCE[path]]))
 
     # A documented default is evidence that callers can omit this label. Do not
     # send the OpenAPI default's literal "dateTime" placeholder to the API.
