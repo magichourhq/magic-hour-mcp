@@ -14,9 +14,11 @@ from typing import Annotated, Any, Literal
 from urllib.parse import quote, urlparse
 
 import httpx
+import mcp.types as mt
 from fastmcp import FastMCP
 from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import CallNext, Middleware as ToolMiddleware, MiddlewareContext
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.types import Audio, Image
@@ -192,6 +194,7 @@ def create_mcp() -> FastMCP:
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
+    mcp.add_middleware(_VideoProjectCard())
     return mcp
 
 
@@ -287,11 +290,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="wait_for_video_project",
         title="Wait for Video Project",
         description=(
-            'Polls a video project until it completes, errors, is canceled or times out. Use with '
-            'the id returned by a video create tool. Read-only; returns download URLs when '
-            'complete. After a timeout, resume with the same id rather than creating another '
-            'generation. Use signed download URLs exactly as returned. Does not inline video '
-            'content.'
+            "Open Magic Hour’s video player and Download button in ChatGPT. Use after creating a "
+            "video to wait for it, or resume a saved video after a timeout with the same project "
+            "ID. Read-only. When complete, show the result card rather than building a player "
+            "or attaching the raw video. Use signed download URLs unchanged."
         ),
         meta={
             "openai/toolInvocation": {
@@ -410,6 +412,12 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
         "configured Magic Hour media host. Read-only; limited to 8 MiB, or a smaller requested "
         "max_bytes. Use the signed URL directly for larger files."
     )
+    if media_type == "video":
+        description += (
+            " For playback or downloads in ChatGPT, open Magic Hour’s result card with "
+            "get_video_project or wait_for_video_project using the existing project ID. "
+            "This tool returns file bytes for clients that explicitly need them."
+        )
 
     @mcp.tool(
         name=tool_name,
@@ -764,6 +772,22 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
             if isinstance(url, str) and url:
                 urls.append(url)
     return urls
+
+
+class _VideoProjectCard(ToolMiddleware):
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        result = await call_next(context)
+        project = result.structured_content
+        if context.message.name == "get_video_project" and project and project.get("id"):
+            structured = _project_structured_content_for_agent(project)
+            if "downloads" in project:
+                structured["downloads"] = project["downloads"]
+            result.structured_content = {**structured, "project_type": "video"}
+        return result
 
 
 def _project_structured_content_for_agent(project: dict[str, Any]) -> dict[str, Any]:
