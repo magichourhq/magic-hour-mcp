@@ -290,10 +290,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
         name="wait_for_video_project",
         title="Wait for Video Project",
         description=(
-            "Open Magic Hour’s video player and Download button in ChatGPT. Use after creating a "
-            "video to wait for it, or resume a saved video after a timeout with the same project "
-            "ID. Read-only. When complete, show the result card rather than building a player "
-            "or attaching the raw video. Use signed download URLs unchanged."
+            "Polls an existing video project until it completes, fails, is canceled, or times out. "
+            "Read-only. After a timeout, use the same project ID to resume checking. "
+            "Use signed download URLs unchanged. In ChatGPT, show Magic Hour's result card "
+            "for playback and download when the video completes."
         ),
         meta={
             "openai/toolInvocation": {
