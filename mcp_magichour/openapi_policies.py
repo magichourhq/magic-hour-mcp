@@ -400,13 +400,13 @@ _FREE_CAP_TAIL = (
     "Keep an explicitly requested longer one, explain the Free limit and ask before changing it."
 )
 FREE_DURATION_GUIDANCE = {
-    "/v1/text-to-video": " Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
-    "/v1/image-to-video": " Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
-    "/v1/audio-to-video": " Free plans are currently limited to 15 seconds of output, " + _FREE_CAP_TAIL,
-    "/v1/ai-video-editor": " Free plans are currently limited to 10 seconds of clip "
+    "/v1/text-to-video": "Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
+    "/v1/image-to-video": "Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
+    "/v1/audio-to-video": "Free plans are currently limited to 15 seconds of output, " + _FREE_CAP_TAIL,
+    "/v1/ai-video-editor": "Free plans are currently limited to 10 seconds of clip "
     "(`end_seconds` minus `start_seconds`), " + _FREE_CAP_TAIL
     + " Do not default to the source video's full length.",
-    "/v1/character-replace": " Free plans are currently limited to 10 seconds of clip "
+    "/v1/character-replace": "Free plans are currently limited to 10 seconds of clip "
     "(`end_seconds` minus `start_seconds`), " + _FREE_CAP_TAIL
     + " Do not default to the source video's full length.",
 }
@@ -503,10 +503,9 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if method == "POST" and path in FREE_DURATION_GUIDANCE:
         end_seconds = properties.get("end_seconds", {})
         if end_seconds and FREE_DURATION_GUIDANCE[path] not in end_seconds.get("description", ""):
+            # Own paragraph, so the plan-wide limit is not read as part of a per-model list.
             base = end_seconds.get("description", "").rstrip()
-            if base and base[-1] not in ".!?":
-                base += "."
-            end_seconds["description"] = base + FREE_DURATION_GUIDANCE[path]
+            end_seconds["description"] = "\n\n".join(filter(None, [base, FREE_DURATION_GUIDANCE[path]]))
 
     # A documented default is evidence that callers can omit this label. Do not
     # send the OpenAPI default's literal "dateTime" placeholder to the API.
