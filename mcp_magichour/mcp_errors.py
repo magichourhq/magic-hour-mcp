@@ -10,7 +10,7 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import McpError
 
-from .chatgpt_images import image_attachment_fields
+from .chatgpt_media import attachment_fields
 
 
 class APIErrorRecoveryMiddleware(Middleware):
@@ -88,7 +88,8 @@ class APIErrorRecoveryMiddleware(Middleware):
                             if code == "unprocessable_entity" and _has_local_asset_path(context.message.arguments):
                                 next_action += (
                                     " Local sandbox paths such as /mnt/data/... are not uploaded API assets; "
-                                    "this server cannot read the client's sandbox. For a native image attachment, "
+                                    "this server cannot read the client's sandbox. Remove the local path and use the "
+                                    "tool's named attachment field if it supports the file. Otherwise, for a native image attachment, "
                                     "call upload_chatgpt_image(image=<attachment>); for video or audio, call "
                                     "upload_chatgpt_media with the attachment in file and media_type set to video "
                                     "or audio to match the attachment. "
@@ -165,7 +166,16 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
         try:
             jsonschema.validate(request.params.arguments or {}, schema)
         except jsonschema.ValidationError as error:
-            detail, data = _validation_detail(error)
+            file_fields = attachment_fields(request.params.name)
+            detail_error = error
+            if file_fields and error.validator == "anyOf":
+                # Preserve the missing-assets error for clients still using file paths.
+                detail_error = next(
+                    (option for option in error.context
+                     if option.validator == "required" and option.validator_value == ["assets"]),
+                    error,
+                )
+            detail, data = _validation_detail(detail_error)
             if request.params.name in {"upload_chatgpt_image", "upload_chatgpt_media"}:
                 field = "image" if request.params.name == "upload_chatgpt_image" else "file"
                 raise _invalid_params(
@@ -178,14 +188,13 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
                     "file picker; do not invent a download URL.",
                     data,
                 ) from None
-            image_fields = image_attachment_fields(request.params.name)
-            if image_fields and (
-                any(field in image_fields for field in data["field_path"][:1])
-                or data["constraint"] in {"anyOf", "oneOf"}
+            if file_fields and (
+                any(field in file_fields for field in data["field_path"][:1])
+                or error.validator in {"anyOf", "oneOf"}
             ):
                 next_action = (
-                    "Choose the image again using the ChatGPT attachment picker, "
-                    "or use an existing Magic Hour image path. Keep the requested settings."
+                    "Choose the file again using the ChatGPT attachment picker, "
+                    "or use an existing Magic Hour file path. Keep the requested settings."
                 )
                 data["next_action"] = next_action
                 detail = f"{detail} {next_action}"
