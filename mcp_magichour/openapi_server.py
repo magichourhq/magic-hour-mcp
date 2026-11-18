@@ -472,7 +472,10 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
             data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
         except InlineMediaTooLargeError:
             return ToolResult(content=[
-                TextContent(type="text", text="This file is too large for an inline preview. Download the original result."),
+                TextContent(
+                    type="text",
+                    text=f"This file is too large for an inline preview. Download the original result.\n{download_url}",
+                ),
                 ResourceLink(type="resource_link", uri=download_url, name=f"Download original {media_type}"),
             ])
         return _media_content(media_type, data, mime_type, source_uri=download_url)
