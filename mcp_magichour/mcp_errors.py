@@ -127,6 +127,9 @@ class UnsupportedResolutionMiddleware(Middleware):
         models = self.rules.get(context.message.name)
         arguments = context.message.arguments or {}
         model, resolution = arguments.get("model") or "default", arguments.get("resolution")
+        # The API selects the default editor model for the caller's plan.
+        if context.message.name == "edit_image" and model == "default":
+            return await call_next(context)
         if (
             models
             and isinstance(model, str) and model in models
@@ -157,9 +160,10 @@ class UnsupportedResolutionMiddleware(Middleware):
                 "closest_lower_resolution": lower[-1] if lower else None,
                 "closest_higher_resolution": higher[0] if higher else None,
                 "next_action": (
-                    f"Tell the user {name} can't make {resolution} and give them these choices: "
+                    f"Tell the user {name} can't make {resolution}. Verify the account can use "
+                    "each model at its proposed resolution before offering these choices: "
                     + "; ".join(options)
-                    + ". Ask which they want before generating. Check the account can use the model."
+                    + ". Ask which they want before generating."
                 ),
             }}
             return ToolResult(content=json.dumps(payload), structured_content=payload, is_error=True)

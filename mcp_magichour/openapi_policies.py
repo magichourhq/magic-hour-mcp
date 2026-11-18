@@ -564,14 +564,17 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         default_resolutions = _per_model_resolutions(
             properties.get("resolution", {}).get("description", "")
         ).get(default_model)
-        resolution_guidance = (
-            "If the user asks for a resolution, pick a model whose supported resolutions include it. "
-            + (
+        resolution_guidance = "If the user asks for a resolution, pick a model whose supported resolutions include it. "
+        if path == "/v1/ai-image-editor":
+            resolution_guidance += (
+                f"`default` is {default_model} on paid plans. "
+                "The API chooses and validates the default model for the account's plan. "
+            )
+        elif default_resolutions:
+            resolution_guidance += (
                 f"`default` is {default_model}, which supports only {', '.join(sorted_resolutions(default_resolutions))}; "
                 "for anything higher, choose a model that lists it. "
-                if default_resolutions else ""
             )
-        )
         if resolution_guidance not in model.get("description", ""):
             model["description"] = resolution_guidance + model.get("description", "")
         if path == "/v1/ai-image-generator":
