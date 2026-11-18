@@ -57,13 +57,6 @@ client = Client(token=API_KEY)         # or environment=Environment.MOCK_SERVER 
 - `client.v1.files.upload_urls.create(...)`, `client.v1.face_detection.create(...)` / `.get(id=...)`.
 - Sync `Client` and async `AsyncClient` have the same methods. Use `AsyncClient` inside an async MCP server such as FastMCP.
 
-## Voice presets
-
-- Select one of Magic Hour’s approved preset voices.
-- MCP accepts only exact `voice_name` strings in `APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`; the main product and public API are unchanged.
-- An empty allowlist omits AI Voice Generator entirely from MCP. Adding verified generic/non-celebrity API names enables only those presets on the next deployment.
-- AI Voice Cloner is excluded from MCP discovery and calls.
-
 ## Magic Hour's documentation MCP
 
 Magic Hour hosts `https://docs.magichour.ai/mcp` for documentation and code snippets. It does not execute API calls or expose action tools. This repo provides the separate action MCP server that calls the Magic Hour API.
@@ -113,8 +106,11 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | DELETE | `/v1/image-projects/{id}` | Image Projects | Delete image |
 | POST | `/v1/photo-colorizer` | Image Projects | Photo Colorizer |
 | POST | `/v1/ai-music-generator` | Audio Projects | AI Music Generator |
+| POST | `/v1/ai-voice-cloner` | Audio Projects | AI Voice Cloner |
+| POST | `/v1/ai-voice-generator` | Audio Projects | AI Voice Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
+| GET | `/v1/voices` | Audio Projects | List voices |
 | GET | `/v1/account` | Account | Get account details |
 
 ## Per-endpoint detail
@@ -154,6 +150,9 @@ Get face detection details
   items:
     - `path` (string, required): The path to the face image. This should be used in face swap photo/video API calls as `.assets.face_mappings.original_face`
     - `url` (string, required): The url to the face image. This is used to render the image in your applications.
+- `error` (object, required): Why the face detection failed. Present only when `status` is `error`; `null` otherwise.
+  - `message` (string, required): Details on the reason why a failure happened.
+  - `code` (string, required): An error code to indicate why a failure happened.
 
 #### POST /v1/files/upload-urls
 `operationId: videoAssets.generatePresignedUrl`
@@ -233,7 +232,7 @@ AI UGC Ad Generator
 **Request Body:**
 - `assets` (object, required):
   - `image_file_path` (string, required): Prepared image to animate. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
-- `script` (string, required): The words the actor should speak. Character limits apply after trimming: * kling-3.0: 2304 characters. * ltx-2.5: 1804 characters. * veo3.1: 2500 characters. LTX and Kling dialogue wrappers count toward their model...
+- `script` (string, required): The words the actor should speak. Character limits apply after trimming: * kling-3.0: 2304 characters. * ltx-2.5: 3804 characters. * veo3.1: 2500 characters. LTX and Kling dialogue wrappers count toward their model...
 - `end_seconds` (number, required) range=[1,None]: Video duration in seconds. Supported values by model: * kling-3.0: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 seconds. * ltx-2.5: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 seconds. * veo3.1:...
 - `model` (string, optional) enum=['kling-3.0', 'ltx-2.5', 'veo3.1']: Defaults to kling-3.0 on paid plans and ltx-2.5 on free plans.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p']: Defaults to 720p on paid plans and 480p on free plans. Unsupported model/resolution combinations and resolutions unavailable for your plan are rejected.
@@ -251,11 +250,15 @@ AI Video Editor
 **Request Body:**
 - `name` (string, optional) default=Video Editor - dateTime: Give your video a custom name for easy identification.
 - `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
-- `end_seconds` (number, required) range=[0.1,None]: End time of your clip in seconds. Must be greater than `start_seconds`. Allowed duration depends on model: `gemini-omni-1.1`: 3-10s, `wan-3.0`: 2-15s, `ltx-2.5`: 0.5-60s (30s at 1080p).
-- `model` (string, optional) enum=['gemini-omni-1.1', 'wan-3.0', 'ltx-2.5', 'gemini-omni', 'ltx-2.3']: Editing model. Defaults to LTX 2.5 for free tier and `gemini-omni-1.1` for paid. `wan-3.0` requires a paid tier. `gemini-omni` is deprecated; use `gemini-omni-1.1` instead.
-- `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output resolution. Defaults to `480p` for free tier and `720p` for paid. Supported per model: `gemini-omni-1.1`: 720p, 1080p; `wan-3.0`: 480p, 720p, 1080p; `ltx-2.5`: 480p, 720p, 1080p.
+- `end_seconds` (number, required) range=[0.1,None]: End time of your clip in seconds. Must be greater than `start_seconds`. Allowed duration depends on model: `gemini-omni-1.2`: 3-15s, `wan-3.0`: 2-15s, `ltx-2.5`: 0.5-60s (30s at 1080p), `kling-4.0`: 3-30s.
+- `model` (string, optional) enum=['gemini-omni-1.1', 'gemini-omni-1.2', 'wan-3.0', 'ltx-2.5', 'kling-4.0', 'gemini-omni', 'ltx-2.3']: The AI model to use for video editing. Defaults to `ltx-2.5` on free tiers and `gemini-omni-1.2` on paid tiers.
+- `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Output resolution. Defaults to `480p` for free tier and `720p` for paid. Supported per model: `gemini-omni-1.2`: 360p, 720p, 1080p, 4k; `wan-3.0`: 480p, 720p, 1080p; `ltx-2.5`: 480p, 720p, 1080p; `kling-4.0`: 720p,...
 - `style` (object, required):
   - `prompt` (string, required): The prompt used to edit the video.
+- `references` (array, optional): Name references without @ and refer to them as @name in style.prompt. Names must be unique, ignoring case. Maximum 10 references total. Omit for no references.
+  items:
+    - `name` (string, required):
+    - `file_path` (string, required): This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 - `assets` (object, required): Provide the assets for video editing.
   - `video_file_path` (string, required): The video to edit. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
 
@@ -396,13 +399,13 @@ Character Replace
   - `image_file_path` (string, required): Reference character image used as the replacement or animation target. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the...
 - `style` (object, optional): Optional style controls for replace vs animate mode and subject selection.
   - `mode` (string, optional) enum=['replace', 'animate']: Processing mode. `replace` swaps the detected subject with your reference character. `animate` transfers motion from the video onto your character image.
-  - `prompt` (string, optional): Optional direction. Supported by kling-3.0, minimax-h3.
+  - `prompt` (string, optional): Optional direction. Supported by kling-3.0, minimax-h3. For MiniMax H3 in replace mode, ignored and not saved when `selection_mode` is `point`; applies only to automatic person selection.
   - `selection_mode` (string, optional) enum=['auto', 'point']: How to locate the subject in the source video. `auto` detects a person automatically. `point` uses your `points` to mark the subject and is supported by `wan-animate`, `minimax-h3`. `minimax-h3` subject `points` are...
   - `points` (array, optional): On-frame markers for manual subject selection. Required when `selection_mode` is `point`. Ignored when `selection_mode` is `auto` or omitted. Rejected for models without subject selection (supported by `wan-animate`,...
     items:
       - `position_x` (integer, required) range=[0,None]: Horizontal pixel coordinate in the source video frame at `time_seconds`, measured from the left edge.
       - `position_y` (integer, required) range=[0,None]: Vertical pixel coordinate in the source video frame at `time_seconds`, measured from the top edge.
-      - `time_seconds` (number, required) range=[0,None]: Timestamp on the source video timeline in seconds. Uses the same clock as `start_seconds` and `end_seconds`.
+      - `time_seconds` (number, required) range=[0,None]: Timestamp on the source video timeline in seconds. Uses the same clock as `start_seconds` and `end_seconds`. For MiniMax H3 manual replacement, `start_seconds <= time_seconds < end_seconds`.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -444,11 +447,11 @@ Image-to-Video
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `model` (string, optional) enum=[24 values, e.g. ['default', 'minimax-h3', 'kling-4.0', 'kling-3.0', 'ltx-2.5', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[25 values, e.g. ['default', 'minimax-h3', 'kling-4.0', 'kling-3.0', 'ltx-2.5', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, optional): Attributed used to dictate the style of the output
-  - `prompt` (string, optional): The prompt used for the video.
+  - `prompt` (string, optional): The prompt used for the video. Maximum length depends on the model that runs, in characters:
 - `assets` (object, required): Provide the assets for image-to-video.
   - `image_file_path` (string, required): The path of the image file. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `end_image_file_path` (string, optional): The image to use as the last frame of the video.
@@ -489,13 +492,13 @@ Text-to-Video
 **Request Body:**
 - `name` (string, optional) default=Text To Video - dateTime: Give your video a custom name for easy identification.
 - `end_seconds` (number, required) range=[1,60]: The total duration of the output video in seconds. Supported durations depend on the chosen model:
-- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Provide `aspect_ratio` to set the video’s aspect ratio. Determines the aspect ratio of the output video.
+- `aspect_ratio` (string, optional) enum=['16:9', '9:16', '1:1']: Determines the aspect ratio of the output video.
 - `resolution` (string, optional) enum=['360p', '480p', '720p', '1080p', '4k']: Controls the output video resolution. Defaults to `720p` on paid tiers and `480p` on free tiers.
-- `model` (string, optional) enum=[24 values, e.g. ['default', 'minimax-h3', 'kling-4.0', 'kling-3.0', 'ltx-2.5', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
+- `model` (string, optional) enum=[25 values, e.g. ['default', 'minimax-h3', 'kling-4.0', 'kling-3.0', 'ltx-2.5', 'wan-2.2'], ...] default=default: The AI model to use for video generation.
 - `audio` (boolean, optional): Whether to include audio in the video. Defaults to `false` if not specified.
 - `style` (object, required):
-  - `prompt` (string, required): The prompt used for the video.
-- `references` (array, optional): Reference media for video generation. Name references without @ and refer to them as @name in style.prompt. Maximum 10 references total.
+  - `prompt` (string, required): The prompt used for the video. Maximum length depends on the model that runs, in characters:
+- `references` (array, optional): Name references without @ and refer to them as @name in style.prompt. Names must be unique, ignoring case. Maximum 50 references total. Omit for no references.
   items:
     - `name` (string, required):
     - `file_path` (string, required): This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
@@ -551,17 +554,21 @@ Video-to-Video
 - `name` (string, optional) default=Video To Video - dateTime: Give your video a custom name for easy identification.
 - `start_seconds` (number, required) range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
+- `height` (integer, optional): Source video height in integer pixels. Required and positive for v3; ignored for v1/v2.
+- `fps` (number, optional) default=30 range=[1,None]: Source video FPS for v3 frame limits and estimated credits. Defaults to 30; final charges settle to rendered frames.
+- `width` (integer, optional): Source video width in integer pixels. Required and positive for v3; ignored for v1/v2.
 - `fps_resolution` (string, optional) enum=['FULL', 'HALF'] default=HALF: Determines whether the resulting video will have the same frame per second as the original video, or half. * `FULL` - the result video will have the same FPS as the input video * `HALF` - the result video will have half...
 - `style` (object, required):
-  - `art_style` (string, required) enum=[75 values, e.g. ['Minecraft', 'Watercolor', 'Pixel', 'Retro Sci-Fi', 'Lego', 'Origami'], ...]:
-  - `version` (string, optional) enum=['v1', 'v2', 'default'] default=default: * `v1` - more detail, closer prompt adherence, and frame-by-frame previews. * `v2` - faster, more consistent, and less noisy. * `default` - use the selected art style's default version. Some art styles default to v3,...
+  - `art_style` (string, required) enum=[417 values, e.g. ['WWI Soldier', 'Minecraft', 'Watercolor', 'Chalkboard', 'Pixel', 'Rick & Morty'], ...]:
+  - `version` (string, optional) enum=['v1', 'v2', 'v3', 'default'] default=default: * `v1` - more detail, closer prompt adherence, and frame-by-frame previews. * `v2` - faster, more consistent, and less noisy. * `v3` - consistent styling guided by a caller-supplied reference image. Requires...
   - `prompt_type` (string, optional) enum=['default', 'custom', 'append_default'] default=default: * `default` - Use the default recommended prompt for the art style. * `custom` - Only use the prompt passed in the API. Note: for v1, lora prompt will still be auto added to apply the art style properly. *...
   - `prompt` (string, optional): The prompt used for the video. Prompt is required if `prompt_type` is `custom` or `append_default`. If `prompt_type` is `default`, then the `prompt` value passed will be ignored.
-  - `model` (string, optional) enum=['Dreamshaper', 'Absolute Reality', 'Flat 2D Anime', 'Soft Anime', 'Kaywaii', 'Western Anime', '3D Anime', 'default'] default=default: * `Dreamshaper` - a good all-around model that works for both animations as well as realism. * `Absolute Reality` - better at realism, but you'll often get similar results with Dreamshaper as well. * `Flat 2D Anime` -...
+  - `model` (string, optional) enum=[9 values, e.g. ['Dreamshaper', 'Absolute Reality', 'Flat 2D Anime', 'Soft Anime', 'Kaywaii', 'Western Anime'], ...] default=default: * `Dreamshaper` - a good all-around model that works for both animations as well as realism. * `Absolute Reality` - better at realism, but you'll often get similar results with Dreamshaper as well. * `Flat 2D Anime` -...
 - `assets` (object, required): Provide the assets for video-to-video. For video, The `video_source` field determines whether `video_file_path` or `youtube_url` field is used
   - `video_source` (string, required) enum=['file', 'youtube']: Choose your video source.
   - `video_file_path` (string, optional): Your video file. Required if `video_source` is `file`. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `youtube_url` (string, optional): YouTube URL (required if `video_source` is `youtube`).
+  - `initial_image_path` (string, optional): Required for v3: an uploaded reference image path, or a completed image output owned by you. The caller supplies this image; the API does not generate it.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
@@ -660,8 +667,8 @@ AI Image Editor
 **Request Body:**
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
-- `model` (string, optional) enum=[15 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'nano-banana-2', 'flux-2-klein', 'nano-banana-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
-- `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`.
+- `model` (string, optional) enum=[16 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'flux-2-klein', 'nano-banana-pro', 'seedream-v5-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
+- `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`. Ignored for `krea-2` and `flux-2-klein` when an input image is provided; the output keeps the source image's aspect ratio.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required):
   - `prompt` (string, required): The prompt used to edit the image.
@@ -682,7 +689,7 @@ AI Image Generator
 **Request Body:**
 - `name` (string, optional) default=Ai Image - dateTime: Give your image a custom name for easy identification.
 - `image_count` (integer, required) range=[1,16]: Number of images to generate. Maximum varies by model.
-- `model` (string, optional) enum=[16 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[18 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2.1'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): The art style to use for image generation.
@@ -720,9 +727,9 @@ Create meme
 
 **Request Body:**
 - `name` (string, optional): The name of the meme.
-- `style` (object, required):
+- `style` (object, required): Meme topic, template and whether to search the web for content.
   - `topic` (string, required): The topic of the meme.
-  - `template` (string, required) enum=['Random']: Select a random meme template.
+  - `template` (string, required) enum=[101 values, e.g. ['Random', 'Drake Hotline Bling', 'Galaxy Brain', 'Two Buttons', "Gru's Plan", 'Tuxedo Winnie The Pooh'], ...]: To use our templates, pass in one of the enum values.
   - `searchWeb` (boolean, optional) default=False: Whether to search the web for meme content.
 
 **Response 200:**
@@ -885,6 +892,43 @@ AI Music Generator
 - `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
 
+#### POST /v1/ai-voice-cloner
+`operationId: ai_voice_cloner_create_audio`
+
+AI Voice Cloner
+
+
+**Request Body:**
+- `name` (string, optional) default=Voice Cloner - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.
+- `assets` (object, required): Provide the assets for voice cloning.
+  - `audio_file_path` (string, required): The audio used to clone the voice. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
+- `style` (object, required): Text to speak in the supplied voice, with language and speech-speed options.
+  - `language` (string, optional) enum=[82 values, e.g. ['auto', 'chinese', 'english', 'japanese', 'korean', 'german'], ...] default=auto: Spoken language. Use a canonical lowercase language name, or auto to detect the language from the text. Defaults to auto.
+  - `speed` (number, optional) default=1 range=[0.75,1.3]: Speech speed multiplier, from 0.75 to 1.30 inclusive. Defaults to 1 (normal speed).
+  - `prompt` (string, required): Text used to generate speech from the cloned voice. The character limit is 5000 characters.
+
+**Response 200:**
+- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
+
+#### POST /v1/ai-voice-generator
+`operationId: ai_voice_generator_create_audio`
+
+AI Voice Generator
+
+
+**Request Body:**
+- `name` (string, optional) default=Voice Generator - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.
+- `style` (object, required): The content used to generate speech.
+  - `prompt` (string, required): Text used to generate speech. The character limit is 5000 characters.
+  - `voice_name` (string, required) enum=[1744 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Use the `id` of a voice returned by `GET /v1/voices`.
+  - `language` (string, optional) enum=[82 values, e.g. ['auto', 'chinese', 'english', 'japanese', 'korean', 'german'], ...] default=auto: Spoken language. Use a canonical lowercase language name, or auto to detect the language from the text. Defaults to auto.
+  - `speed` (number, optional) default=1 range=[0.75,1.3]: Speech speed multiplier, from 0.75 to 1.30 inclusive. Defaults to 1 (normal speed).
+
+**Response 200:**
+- `id` (string, required): Unique ID of the audio. Use it with the [Get audio Project API](https://docs.magichour.ai/api-reference/audio-projects/get-audio-details) to fetch status and downloads.
+- `credits_charged` (integer, required): The amount of credits deducted from your account to generate the audio. We charge credits right when the request is made.
+
 #### GET /v1/audio-projects/{id}
 `operationId: audioProjects.getDetails`
 
@@ -916,3 +960,21 @@ Delete audio
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the audio project. This value is returned by all of the POST APIs that create an audio.
+
+#### GET /v1/voices
+`operationId: voices.list`
+
+List voices
+
+**Path Parameters:**
+- `limit` (query, optional): Maximum number of voices to return. Defaults to 20.
+- `cursor` (query, optional): Opaque pagination cursor from the previous response's next_cursor.
+
+**Response 200:**
+- `voices` (array, required):
+  items:
+    - `id` (string, required): Unique ID of the voice. Pass it as `style.voice_name` when generating speech. Names are not unique, so use the ID.
+    - `name` (string, required): Display name of the voice.
+    - `avatar_url` (string, required): URL of the voice's avatar image, or null when the voice has no avatar.
+    - `preview_url` (string, required): URL of an audio sample of the voice.
+- `next_cursor` (string, required): Cursor for the next page, or null when there are no more voices.

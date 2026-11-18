@@ -10,6 +10,8 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import McpError
 
+from .chatgpt_media import attachment_fields
+
 
 class APIErrorRecoveryMiddleware(Middleware):
     """Give canonical API rejections a recovery action without retrying requests."""
@@ -47,31 +49,61 @@ class APIErrorRecoveryMiddleware(Middleware):
                             "invalid_request": (400, "Correct the fields described by the API using the current tool schema. Preserve explicit settings; ask before changing them. Do not retry the unchanged request."),
                             "insufficient_credits": (
                                 402,
-                                "Explain that the connected account lacks credits. Show the user "
-                                "https://magichour.ai/pricing#credit-pack for one-time credit packs and "
-                                "https://magichour.ai/pricing for subscription plans. Ask them to purchase "
-                                "for the same connected Magic Hour account and return here to continue. "
+                                "Explain that the connected account lacks credits. State the shortfall if the API reports it. "
+                                "Lead with [Add credits](https://magichour.ai/pricing#credit-pack) for a one-time purchase. "
+                                "If the user asks about a subscription, show https://magichour.ai/pricing. "
+                                "Ask them to use the same Magic Hour account and return here to continue. "
                                 "A credit purchase does not unlock subscription-only models or resolutions. "
                                 "When the user asks to continue, refresh get_account_info and recheck the "
                                 "original request's eligibility; balance alone is not proof. Preserve supplied "
                                 "media and explicit settings. Do not purchase, change plans or retry "
                                 "generation automatically.",
                             ),
-                            "subscription_required": (402, "Explain that this request requires a subscription. Do not retry generation or change the subscription automatically."),
-                            "plan_upgrade_required": (402, "Explain the API's plan restriction for this request. Ask before changing its model or settings; do not upgrade or retry automatically."),
+                            "subscription_required": (
+                                402,
+                                "Explain which part of the request requires a subscription if the API says. "
+                                "Offer [View plans](https://magichour.ai/pricing) and an option on the current plan "
+                                "if you can verify it. Name a plan only if verified to unlock the requested settings. "
+                                "Preserve the request. Ask before changing explicit settings, and wait for the user "
+                                "to continue after any plan change. Recheck eligibility and credits before submitting.",
+                            ),
+                            "plan_upgrade_required": (
+                                402,
+                                "Explain the specific model, duration or resolution limit reported by the API. "
+                                "Offer an option on the current plan if you can verify it. When a plan change can "
+                                "resolve the reported limit, offer [View plans](https://magichour.ai/pricing). "
+                                "Name a plan only if verified to unlock the requested settings. Preserve the request. "
+                                "Ask before changing explicit settings, and wait for the user to continue after any "
+                                "plan change. Recheck eligibility and credits before submitting.",
+                            ),
                             "not_found": (404, "Check the existing resource ID and connected account. Do not create a replacement generation to recover a missing result."),
-                            "unprocessable_entity": (422, "Correct the values described by the API. Preserve the user's explicit model, references and settings; ask before changing them. Do not retry the unchanged request."),
+                            "unprocessable_entity": (422, "Correct the values described by the API. Explain the constraint and offer a compatible model or setting if known. A subscription will not fix an unsupported model setting. Preserve the user's explicit model, references and settings; ask before changing them. Do not retry the unchanged request."),
                             "internal_server_error": (500, "For a creation request, acceptance may be uncertain: recover its existing project ID before any new create. For retrieval, retry using the same project ID. Do not automatically retry creation."),
                         }.get(code)
                         message = body.get("message")
                         if recovery and recovery[0] == cause.response.status_code and isinstance(message, str):
                             # Keep only the API's public error contract, not raw validation
                             # objects, request arguments or response headers.
+                            next_action = recovery[1]
+                            if code == "unprocessable_entity" and _has_local_asset_path(context.message.arguments):
+                                next_action += (
+                                    " Local sandbox paths such as /mnt/data/... are not uploaded API assets; "
+                                    "this server cannot read the client's sandbox. Remove the local path and use the "
+                                    "tool's named attachment field if it supports the file. Otherwise, for a native image attachment, "
+                                    "call upload_chatgpt_image(image=<attachment>); for video or audio, call "
+                                    "upload_chatgpt_media with the attachment in file and media_type set to video "
+                                    "or audio to match the attachment. "
+                                    "Replace each local asset path with that upload's returned file_path. "
+                                    "Pass the real attachment, not its local path or a bare file ID. If no "
+                                    "downloadable attachment is available, ask the user to reattach it through "
+                                    "the client's file picker. Do not invent download URLs or file IDs. "
+                                    "Do not automatically retry generation."
+                                )
                             payload = {"error": {
                                 "code": code,
                                 "message": message,
                                 "http_status": cause.response.status_code,
-                                "next_action": recovery[1],
+                                "next_action": next_action,
                             }}
                             return ToolResult(
                                 content=json.dumps(payload), structured_content=payload, is_error=True,
@@ -80,6 +112,23 @@ class APIErrorRecoveryMiddleware(Middleware):
                 # source/upload host errors must not be classified as API rejections.
                 cause = cause.__cause__ or cause.__context__
             raise
+
+
+def _has_local_asset_path(value: object) -> bool:
+    if isinstance(value, dict):
+        for field, item in value.items():
+            if field == "file_path" or field.endswith(("_file_path", "_file_paths")):
+                paths = item if isinstance(item, list) else [item]
+                if any(
+                    isinstance(path, str) and path.startswith(("/", "./", "../", "~/", "file:", "sandbox:"))
+                    for path in paths
+                ):
+                    return True
+            if _has_local_asset_path(item):
+                return True
+    elif isinstance(value, list):
+        return any(_has_local_asset_path(item) for item in value)
+    return False
 
 
 def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[str, str] | None = None) -> None:
@@ -114,21 +163,45 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
         # OpenAPI-generated schemas omit additionalProperties; an unknown arg on a
         # parameterless GET would otherwise be sent upstream as a request body.
         schema = {"additionalProperties": False, **tool.parameters}
+        if request.params.arguments:
+            request.params.arguments = _parse_stringified_attachments(
+                request.params.name, request.params.arguments
+            )
         try:
             jsonschema.validate(request.params.arguments or {}, schema)
         except jsonschema.ValidationError as error:
-            detail, data = _validation_detail(error)
+            file_fields = attachment_fields(request.params.name)
+            detail_error = error
+            if file_fields and error.validator == "anyOf":
+                # Preserve the missing-assets error for clients still using file paths.
+                detail_error = next(
+                    (option for option in error.context
+                     if option.validator == "required" and option.validator_value == ["assets"]),
+                    error,
+                )
+            detail, data = _validation_detail(detail_error)
             if request.params.name in {"upload_chatgpt_image", "upload_chatgpt_media"}:
                 field = "image" if request.params.name == "upload_chatgpt_image" else "file"
                 raise _invalid_params(
-                    f"Invalid attachment input for {request.params.name!r}. Pass the native attachment "
-                    f"in {field!r}; direct MCP callers need a file object with download_url and file_id "
+                    f"Invalid attachment input for {request.params.name!r}: {detail} "
+                    f"Pass the native attachment in {field!r}; direct MCP callers need a file object "
+                    "with download_url and file_id "
                     "(optional mime_type and file_name), not a bare file ID, filename or local path. "
                     + ("Set media_type to image, video or audio. " if field == "file" else "")
                     + "If the client did not supply a downloadable file, reattach it through the client's "
                     "file picker; do not invent a download URL.",
                     data,
                 ) from None
+            if file_fields and (
+                any(field in file_fields for field in data["field_path"][:1])
+                or error.validator in {"anyOf", "oneOf"}
+            ):
+                next_action = (
+                    "Choose the file again using the ChatGPT attachment picker, "
+                    "or use an existing Magic Hour file path. Keep the requested settings."
+                )
+                data["next_action"] = next_action
+                detail = f"{detail} {next_action}"
             raise _invalid_params(
                 f"Invalid arguments for tool {request.params.name!r}: {detail}", data
             ) from None
@@ -136,6 +209,37 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
         return await handler(request)
 
     mcp._mcp_server.request_handlers[mt.CallToolRequest] = handle
+
+
+_UPLOAD_ATTACHMENT_FIELDS = {"upload_chatgpt_image": ["image"], "upload_chatgpt_media": ["file"]}
+
+
+def _parse_stringified_attachments(tool_name: str, arguments: dict[str, object]) -> dict[str, object]:
+    # Some clients send an attachment as a JSON-encoded string. Only JSON objects are
+    # decoded, so plain strings such as paths or URLs are left for normal validation.
+    def parse(value: object) -> object:
+        if isinstance(value, str) and value.lstrip().startswith("{"):
+            try:
+                parsed = json.loads(value)
+            except (ValueError, RecursionError):
+                return value
+            if isinstance(parsed, dict):
+                # Attachment fields are flat strings. Emptying a nested value keeps validation
+                # the same as for a native object without carrying deep input onward.
+                return {
+                    key: type(item)() if isinstance(item, (dict, list)) else item
+                    for key, item in parsed.items()
+                }
+        return value
+
+    fields = _UPLOAD_ATTACHMENT_FIELDS.get(tool_name) or attachment_fields(tool_name)
+    result = arguments
+    for field in fields:
+        value = arguments.get(field)
+        parsed = [parse(item) for item in value] if isinstance(value, list) else parse(value)
+        if parsed != value:
+            result = {**result, field: parsed}
+    return result
 
 
 def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str, object]]:
@@ -152,6 +256,7 @@ def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str
     ]
     constraint = error.validator
     expected: dict[str, object] = {}
+    allowed_text = ""
     next_action = (
         "Correct this field using the current tools/list schema. Preserve explicit requested settings; "
         "ask before changing them. Do not retry an unchanged creation request."
@@ -164,6 +269,11 @@ def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str
     elif constraint == "additionalProperties":
         expected["allowed_fields"] = list(error.schema.get("properties", {}))
         detail = "An argument was unexpected"
+        allowed = expected["allowed_fields"]
+        if allowed:
+            # Some clients expose only the error message to the agent.
+            names = ", ".join(allowed[:25]) + (f", and {len(allowed) - 25} more" if len(allowed) > 25 else "")
+            allowed_text = f" Allowed fields: {names}."
         next_action = (
             "Refresh tools/list and remove arguments outside the listed allowed fields. "
             "Do not silently rename or discard an explicitly requested setting."
@@ -189,7 +299,7 @@ def _validation_detail(error: jsonschema.ValidationError) -> tuple[str, dict[str
         detail = f"The field does not satisfy {constraint!r}"
 
     field = "$" + "".join(f"[{part}]" if isinstance(part, int) else f".{part}" for part in path)
-    return f"{detail} at {field}.", {
+    return f"{detail} at {field}.{allowed_text}", {
         "type": "invalid_arguments",
         "field_path": path,
         "constraint": constraint,

@@ -7,6 +7,8 @@ from typing import Any
 from fastmcp.tools.base import Tool
 from mcp.types import ToolAnnotations
 
+from .chatgpt_media import attachment_fields
+
 
 PROJECT_TAG_TO_ASSET = {
     "Video Projects": "video",
@@ -19,6 +21,14 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
     "image": "wait_for_image_project",
     "audio": "wait_for_audio_project",
 }
+
+MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
+
+PROJECT_CONTENT_BLOCK_GUIDANCE = (
+    "Say the project was blocked by a content check. Use a specific reason only when "
+    "the API provides one. If the reason is unavailable, say so. Do not automatically "
+    "retry or reword the blocked request."
+)
 
 # MCP-facing metadata is keyed by the canonical API route. The HTTP contract
 # and synced OpenAPI source remain unchanged.
@@ -64,8 +74,9 @@ API_TOOL_METADATA = {
     ("GET", "/v1/video-projects/{id}"): (
         "get_video_project",
         "Get video project",
-        "Returns a video project's status and, once complete, its download URLs. Use to check "
-        "progress with the id from a video create tool. Read-only.",
+        "Open a saved video in Magic Hour’s result card with Play and Download in ChatGPT. "
+        "Use when someone asks to see, play, download or reopen an existing video. "
+        "Pass the existing project ID. Read-only.",
     ),
     ("DELETE", "/v1/video-projects/{id}"): (
         "delete_video_project",
@@ -76,17 +87,18 @@ API_TOOL_METADATA = {
     ("POST", "/v1/ai-talking-photo"): (
         "create_talking_photo",
         "Create talking photo",
-        "Animates a still portrait so it speaks an existing audio recording. Use with a portrait "
-        "photo and an audio file; text alone is not accepted and this tool does not synthesize "
-        "speech. Starts a background job that costs credits; returns a project id for "
-        "wait_for_video_project.",
+        "Use a still portrait and an existing speech recording to make the portrait speak. "
+        "A written script needs audio first. For a prepared ad image and written script, use "
+        "create_spoken_ad_video. For existing video and replacement audio, use "
+        "create_lip_sync_video. Starts a background job that costs credits; returns a project id "
+        "for wait_for_video_project.",
     ),
     ("POST", "/v1/ai-ugc-ad"): (
         "create_spoken_ad_video",
         "Create spoken ad video",
-        "Creates a creator-style spoken ad video from a prepared image and a text script. Use when "
-        "the image is ready and the dialogue should be generated from text. Starts a background "
-        "job that costs credits; returns a project id for wait_for_video_project.",
+        "Use a prepared image and a written script to generate a spoken ad with synthesized "
+        "dialogue. For a still portrait and an existing speech recording, use create_talking_photo. "
+        "Starts a background job that costs credits; returns a project id for wait_for_video_project.",
     ),
     ("POST", "/v1/ai-video-editor"): (
         "edit_video",
@@ -146,16 +158,18 @@ API_TOOL_METADATA = {
     ("POST", "/v1/image-to-video"): (
         "create_video_from_image",
         "Create video from image",
-        "Animates a supplied image into a video using motion instructions and available model "
-        "options. Starts a background job that costs credits; returns a project id for "
-        "wait_for_video_project.",
+        "Use a still image as the first frame and describe what should move. For a portrait "
+        "speaking to an existing recording, use create_talking_photo. For a prepared ad image "
+        "and written script, use create_spoken_ad_video. Starts a background job that costs "
+        "credits; returns a project id for wait_for_video_project.",
     ),
     ("POST", "/v1/lip-sync"): (
         "create_lip_sync_video",
         "Create lip sync video",
-        "Adjusts an existing video's lip movements to match supplied replacement audio. For a "
-        "still portrait plus audio, use create_talking_photo. Starts a background job that costs "
-        "credits; returns a project id for wait_for_video_project.",
+        "Use existing video and replacement audio to match the speaker's lip movements to "
+        "the recording. For a still portrait and existing speech recording, use "
+        "create_talking_photo. Starts a background job that costs credits; returns a project id "
+        "for wait_for_video_project.",
     ),
     ("POST", "/v1/text-to-video"): (
         "create_video_from_text",
@@ -168,7 +182,8 @@ API_TOOL_METADATA = {
         "restyle_video",
         "Restyle video",
         "Restyles an existing video clip with an art-style preset or a custom prompt. Supports "
-        "v1/v2 presets, not v3. Starts a background job that costs credits; returns a project id "
+        "v1/v2/v3 presets; v3 requires a supplied reference image and positive source-video "
+        "width and height. Starts a background job that costs credits; returns a project id "
         "for wait_for_video_project.",
     ),
     ("GET", "/v1/image-projects/{id}"): (
@@ -299,19 +314,25 @@ API_TOOL_METADATA = {
 
 # Reviewer-facing parameter copy describes selection without ranking models.
 GENERATION_PARAMETER_DESCRIPTIONS = {
+    "/v1/ai-video-editor": {
+        ("style",): "Instructions describing the changes to make to the source video.",
+        ("references", "[]", "name"): "Reference label without @. Use @name in style.prompt to "
+        "refer to this file; labels must be unique ignoring case.",
+    },
     "/v1/image-to-video": {
-        ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
-        "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
-        "When no model was requested, use `default` rather than choosing a named premium model; "
-        "omit an unrequested resolution so the API resolves it for the account. "
+        ("model",): "The video generation model. With `default`, the API chooses a model using the account plan, "
+        "resolution and duration. Use this option when no model was requested and it supports the intended "
+        "inputs and settings. Omit an unrequested resolution so the API resolves it for the account. "
         "Preserve explicit settings and required input capabilities. "
         "Deprecated model values ending in `-audio` enable `audio`.",
     },
     "/v1/text-to-video": {
-        ("model",): "The video generation model. With `default`, paid tiers use `kling-3.0` and Free uses "
-        "`ltx-2.5`. Duration, resolution, audio and reference support depend on the selected model. "
-        "When no model was requested, use `default` rather than choosing a named premium model; "
-        "omit an unrequested resolution so the API resolves it for the account. "
+        ("style",): "Instructions describing the video to generate.",
+        ("references", "[]", "name"): "Reference label without @. Use @name in style.prompt to "
+        "refer to this file; labels must be unique ignoring case.",
+        ("model",): "The video generation model. With `default`, the API chooses a model using the account plan, "
+        "resolution and duration. Use this option when no model was requested and it supports the intended "
+        "inputs and settings. Omit an unrequested resolution so the API resolves it for the account. "
         "Preserve explicit settings and required input capabilities. "
         "Deprecated model values ending in `-audio` enable `audio`.",
     },
@@ -319,6 +340,30 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         ("style", "generation_mode"): "Controls motion style. `realistic` animates the supplied portrait; "
         "`prompted` also accepts a scene prompt. Deprecated aliases remain supported: `pro` and "
         "`stable` select `realistic`; `standard` and `expressive` select `prompted`.",
+    },
+    "/v1/ai-ugc-ad": {
+        ("assets",): "Prepared image to animate into the spoken ad. The script is supplied separately.",
+    },
+    "/v1/ai-gif-generator": {
+        ("style",): "Text instructions for the animation's subject, appearance and motion.",
+    },
+    "/v1/ai-image-editor": {
+        ("style",): "Text instructions describing the edits to make to the supplied images.",
+    },
+    "/v1/ai-headshot-generator": {
+        ("style",): "Optional headshot appearance instructions. Omit the prompt for the API's default style.",
+    },
+    "/v1/ai-meme-generator": {
+        ("style",): "Meme topic, template and whether to search the web for content.",
+    },
+    "/v1/ai-qr-code-generator": {
+        ("style",): "Visual art style for the QR code image.",
+    },
+    "/v1/ai-music-generator": {
+        ("style",): "Song description, vocal or instrumental choice, and optional custom lyrics.",
+    },
+    "/v1/ai-voice-cloner": {
+        ("style",): "Text to speak in the supplied voice, with language and speech-speed options.",
     },
     "/v1/lip-sync": {
         ("style", "generation_mode"): "Select the lip-sync mode. `lite` costs 1 credit per video frame. "
@@ -340,15 +385,30 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
         "`face_mappings`.",
     },
     "/v1/video-to-video": {
-        ("style", "version"): "Select restyling version `v1` or `v2`. `default` uses the selected art "
-        "style's default version. Some styles default to v3, which this API does not support. "
-        "For `Studio Ghibli`, explicitly set `version` to `v2` for its supported preset.",
-        ("style", "model"): "Select a listed rendering model for the art style. `default` uses the "
-        "selected art style's default model.",
+        ("style",): "Art preset, rendering version, model and prompt controls for restyling the video.",
+        ("style", "art_style"): "Art-style preset to apply to the source video. The preset determines "
+        "the default rendering version, model and prompt; check their compatibility before generation.",
         ("style", "prompt_type"): "`default` uses the art style's preset prompt and ignores `prompt`. "
         "`custom` uses the supplied `prompt`; v1 still adds its LoRA prompt to apply the art style. "
         "`append_default` appends the preset prompt to the supplied `prompt`.",
     },
+}
+
+# Observed from API 402 plan_upgrade_required errors; no published source. The API enforces the cap.
+_FREE_CAP_TAIL = (
+    "enforced by the API and may change. When the user gave no duration, choose one within it. "
+    "Keep an explicitly requested longer one, explain the Free limit and ask before changing it."
+)
+FREE_DURATION_GUIDANCE = {
+    "/v1/text-to-video": "Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
+    "/v1/image-to-video": "Free plans are currently limited to 10 seconds, " + _FREE_CAP_TAIL,
+    "/v1/audio-to-video": "Free plans are currently limited to 15 seconds of output, " + _FREE_CAP_TAIL,
+    "/v1/ai-video-editor": "Free plans are currently limited to 10 seconds of clip "
+    "(`end_seconds` minus `start_seconds`), " + _FREE_CAP_TAIL
+    + " Do not default to the source video's full length.",
+    "/v1/character-replace": "Free plans are currently limited to 10 seconds of clip "
+    "(`end_seconds` minus `start_seconds`), " + _FREE_CAP_TAIL
+    + " Do not default to the source video's full length.",
 }
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
@@ -362,10 +422,6 @@ GENERATION_ESTIMATE_PATHS = (
 PROJECT_DETAIL_PATHS = {f"/v1/{asset}-projects/{{id}}" for asset in PROJECT_TAG_TO_ASSET.values()}
 GENERIC_ACTION_REPLACEMENTS = {"do": "perform", "get": "retrieve", "run": "execute"}
 
-# Populate only with verified generic/non-celebrity API voice_name strings.
-# Empty means no voice is approved; omit Voice Generator entirely from MCP.
-APPROVED_VOICE_NAMES: tuple[str, ...] = ()
-VOICE_PRESET_DESCRIPTION = "Select one of Magic Hour’s approved preset voices."
 LIKENESS_GENERATION_PATHS = {
     "/v1/face-swap", "/v1/face-swap-photo", "/v1/head-swap", "/v1/body-swap",
     "/v1/lip-sync", "/v1/ai-talking-photo", "/v1/character-replace", "/v1/ai-clothes-changer",
@@ -380,74 +436,15 @@ def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
     """Return an OpenAPI copy with MCP-specific guidance added by group policy."""
     spec = deepcopy(openapi_spec)
     paths = spec.get("paths", {})
-    paths.pop("/v1/ai-voice-cloner", None)
-    if not APPROVED_VOICE_NAMES:
-        paths.pop("/v1/ai-voice-generator", None)
-
     for path, path_item in paths.items():
         for method, operation in path_item.items():
             if method.lower() not in HTTP_METHODS or not isinstance(operation, dict):
                 continue
-            if path == "/v1/ai-voice-generator" and method.lower() == "post":
-                _apply_voice_generator_policy(operation)
-            if path == "/v1/ai-meme-generator" and method.lower() == "post":
-                # Keep public-figure template names out of the reviewer-facing
-                # schema. Random is the existing generic API template option.
-                properties = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
-                properties["style"]["properties"]["template"] = {
-                    "type": "string",
-                    "enum": ["Random"],
-                    "description": "Select a random meme template.",
-                }
             if operation_id := operation.get("operationId"):
                 operation["operationId"] = normalize_mcp_tool_name(operation_id)
             _apply_operation_policy(path=path, method=method.upper(), operation=operation)
 
     return spec
-
-
-def _apply_voice_generator_policy(operation: dict[str, Any]) -> None:
-    # Synced descriptions, defaults and examples may recommend unapproved voices
-    # anywhere in this operation, including nested schemas and SDK snippets.
-    def remove_upstream_copy(value: Any) -> None:
-        if isinstance(value, dict):
-            if "description" in value:
-                value["description"] = ""
-            for key in ("example", "examples", "default", "title", "externalDocs", "x-codeSamples"):
-                value.pop(key, None)
-            for child in value.values():
-                remove_upstream_copy(child)
-        elif isinstance(value, list):
-            for child in value:
-                remove_upstream_copy(child)
-
-    remove_upstream_copy(operation)
-    operation["summary"] = "AI Voice Generator"
-    operation["description"] = (
-        f"Generate speech from text. {VOICE_PRESET_DESCRIPTION} "
-        "Each character costs 0.1 credits. The cost is rounded up to the nearest whole number."
-    )
-    # Require the known input shape: fail startup rather than expose a changed
-    # upstream schema without this policy. Replace the whole voice schema so
-    # future enum/const/combinator changes cannot bypass the allowlist.
-    schema = operation["requestBody"]["content"]["application/json"]["schema"]
-    properties = schema["properties"]
-    style = properties["style"]
-    if "voice_name" not in style["properties"]:
-        raise ValueError("Upstream Voice Generator schema is missing voice_name")
-    schema["required"] = list(dict.fromkeys([*schema.get("required", []), "style"]))
-    style["required"] = list(dict.fromkeys([*style.get("required", []), "voice_name"]))
-    properties["name"]["description"] = "Give your audio a custom name for easy identification."
-    style["description"] = "The content used to generate speech."
-    style["properties"]["prompt"]["description"] = "Text used to generate speech. The character limit is 1000 characters."
-    style["properties"]["voice_name"] = {
-        "type": "string",
-        "enum": list(APPROVED_VOICE_NAMES),
-        "description": VOICE_PRESET_DESCRIPTION,
-    }
-    output = operation["responses"]["200"]["content"]["application/json"]["schema"]["properties"]
-    output["id"]["description"] = "Unique ID of the generated audio project."
-    output["credits_charged"]["description"] = "Credits charged for audio generation."
 
 
 def normalize_mcp_tool_name(operation_id: str) -> str:
@@ -471,6 +468,12 @@ def current_tool_replacements(spec: dict[str, Any]) -> dict[str, str]:
                 for name in (operation_id, normalize_mcp_tool_name(operation_id)):
                     if name != metadata[0]:
                         replacements[name] = metadata[0]
+    # These published names predate the current OpenAPI name normalization
+    # and the workflow guide is a custom tool, so neither is found above.
+    replacements.update({
+        "account_retrieve": API_TOOL_METADATA[("GET", "/v1/account")][0],
+        "workflow_guide_retrieve": "get_workflow_guide",
+    })
     return replacements
 
 
@@ -490,9 +493,30 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         for property_path, description in GENERATION_PARAMETER_DESCRIPTIONS[path].items():
             parameter = properties.get(property_path[0], {})
             for name in property_path[1:]:
-                parameter = parameter.get("properties", {}).get(name, {})
+                parameter = (
+                    parameter.get("items", {}) if name == "[]"
+                    else parameter.get("properties", {}).get(name, {})
+                )
             if parameter:
                 parameter["description"] = description
+
+    if method == "POST" and path in FREE_DURATION_GUIDANCE:
+        end_seconds = properties.get("end_seconds", {})
+        if end_seconds and FREE_DURATION_GUIDANCE[path] not in end_seconds.get("description", ""):
+            # Own paragraph, so the plan-wide limit is not read as part of a per-model list.
+            base = end_seconds.get("description", "").rstrip()
+            end_seconds["description"] = "\n\n".join(filter(None, [base, FREE_DURATION_GUIDANCE[path]]))
+
+    # A documented default is evidence that callers can omit this label. Do not
+    # send the OpenAPI default's literal "dateTime" placeholder to the API.
+    name_parameter = properties.get("name", {})
+    request_schema = (
+        operation.get("requestBody", {}).get("content", {}).get("application/json", {}).get("schema", {})
+    )
+    if method == "POST" and "default" in name_parameter and "name" not in request_schema.get("required", []):
+        name_parameter["description"] = (
+            "Optional project name for identifying this output. Omit to use the API's default project name."
+        )
 
     if method == "POST" and path in {"/v1/ai-image-editor", "/v1/ai-image-generator"}:
         model = properties.get("model", {})
@@ -548,6 +572,12 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         )
         if guidance not in operation.get("description", ""):
             operation["description"] = operation.get("description", "") + guidance
+        if metadata and _operation_mentions_file_path(operation) and not attachment_fields(metadata[0]):
+            operation["description"] += (
+                " For attached ChatGPT files, upload with upload_chatgpt_media and pass its "
+                "returned file_path. Reuse existing Magic Hour paths only from the connected "
+                "account. Do not pass a filename, chat-local path or file ID as a file path."
+            )
         wait_tool = PROJECT_WAIT_TOOL_BY_ASSET[asset_type]
         additions.append(
             f"Starts an async {asset_type} job; returns `id` and `credits_charged`. "
@@ -560,7 +590,8 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if method == "GET" and path in PROJECT_DETAIL_PATHS:
         additions.append(
             "Use this after a create tool to poll job status. When status is `complete`, surface the `downloads` "
-            "URLs to the user; if status is `error`, surface the error message."
+            "URLs to the user. When status is `error`, surface the error message. "
+            "If `error.code` is `nsfw`, follow this guidance. " + PROJECT_CONTENT_BLOCK_GUIDANCE
         )
         additions.append(
             "Each `downloads[n].url` is already the full signed download URL. Use it exactly as returned. "
@@ -581,6 +612,13 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
 
     if additions and not metadata:
         operation["description"] = _append_mcp_guidance(operation.get("description", ""), additions)
+    if method == "POST" and path == "/v1/ai-voice-cloner":
+        guidance = (
+            "Use only a recording of your own voice or a voice you have permission to clone. "
+            "Do not impersonate or deceive others."
+        )
+        if guidance not in operation["description"]:
+            operation["description"] += f" {guidance}"
     if method == "POST" and path in LIKENESS_GENERATION_PATHS:
         description = operation.get("description", "").rstrip()
         if not description.startswith(LIKENESS_USAGE_GUIDANCE):
@@ -620,11 +658,20 @@ def customize_openapi_component(route: Any, component: Any) -> None:
         component.annotations = ToolAnnotations(
             title=component.title,
             readOnlyHint=read_only,
-            idempotentHint=True if is_estimate else None,
+            idempotentHint=read_only or method == "DELETE",
             # Only project deletion removes data; generation creates new projects.
             destructiveHint=method == "DELETE",
             openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL|searchWeb\b", repr(component.parameters))),
         )
+        if method == "GET" and path == "/v1/video-projects/{id}":
+            component.meta = {
+                **(component.meta or {}),
+                "ui": {"resourceUri": MCP_APP_VIEW_URI},
+                "openai/toolInvocation": {
+                    "invoking": "Opening your video project…",
+                    "invoked": "Video project opened",
+                },
+            }
 
     if is_estimate:
         tags.add("read-operation")

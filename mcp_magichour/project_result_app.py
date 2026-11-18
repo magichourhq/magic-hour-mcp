@@ -6,10 +6,9 @@ from pathlib import Path
 import mcp.types as mt
 from fastmcp import FastMCP
 
-from .openapi_policies import PROJECT_WAIT_TOOL_BY_ASSET
+from .openapi_policies import MCP_APP_VIEW_URI, PROJECT_WAIT_TOOL_BY_ASSET
 
 UI_READ_ORIGIN = "magic-hour/ui-read"
-MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
 MCP_APP_VIEW_PATH = "/app/project-result"
 MCP_APP_ASSET_PATH = "/app/project-result-assets"
 MCP_APP_SERVER_ORIGIN = "https://mcp.magichour.ai"

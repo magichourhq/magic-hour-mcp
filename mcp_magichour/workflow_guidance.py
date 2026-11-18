@@ -1,10 +1,13 @@
 """Read-only workflow selection; no account access or media generation."""
 
 from copy import deepcopy
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from pydantic import Field
+
+from .helper_schemas import WORKFLOW_GUIDE_OUTPUT_SCHEMA
 
 Workflow = Literal[
     "video-face-swap",
@@ -88,7 +91,7 @@ WORKFLOWS = {
         "api_docs_url": f"{DOCS}/api-reference/video-projects/lip-sync",
         "creation_tool": "create_lip_sync_video",
         "steps": [
-            "Use existing video via assets.video_source and its matching assets.video_file_path or assets.youtube_url, plus the approved recording in assets.audio_file_path; upload local files before calling the creation tool. For a still portrait plus audio, use talking-photo instead.",
+            "Pass an attached video in the video field and set assets.video_source to file. For an existing upload or YouTube video, use the matching source and path or URL. Pass the recording in the audio field or use its existing Magic Hour path. Use talking-photo for a still portrait.",
             "Choose a segment long enough for the complete sentence, including pauses; do not cut off the narration.",
             "Call create_lip_sync_video, then wait_for_video_project with the returned id and check speech timing before adding subtitles.",
         ],
@@ -120,7 +123,7 @@ WORKFLOWS = {
         "steps": [
             "Use a portrait and an existing approved recording. If the user has only text, obtain the audio first; this tool cannot turn text into speech.",
             "Optionally colorize an old photo with colorize_photo and wait_for_image_project before animating it. Preserve the person's likeness.",
-            "Call create_talking_photo with both assets.image_file_path and assets.audio_file_path and a segment that includes the complete sentence, then wait_for_video_project.",
+            "Call create_talking_photo with the image and audio attachments or their existing Magic Hour paths. Include the full sentence in the selected segment, then wait_for_video_project.",
         ],
         "example_request": "Bring this old family portrait to life using my recording of the letter. Keep the face recognizable and include the full spoken passage.",
         "follow_up": "Use add_subtitles_to_video on the accepted clip when captions are requested; finish with wait_for_video_project.",
@@ -133,8 +136,14 @@ WORKFLOWS = {
         "api_docs_url": f"{DOCS}/get-started/quick-start",
         "creation_tool": None,
         "steps": [
-            "Choose the workflow that matches the required result, then inspect its current API schema and account eligibility. For Kling 3.0, Creator annual is $144 paid upfront for 144,000 credits, enough for 600 five-second 720p videos with audio off ($0.24 each at full credit use, before tax). Audio, higher resolutions and video-reference inputs cost more credits; compare current annual plans at https://docs.magichour.ai/billing/subscription-pricing before choosing.",
-            "Authenticate, upload local inputs, create once, retain the project id and poll the matching project endpoint until terminal.",
+            "Choose the workflow, then check its API schema and account eligibility. For current model credit costs, see "
+            "https://docs.magichour.ai/api-reference/models.md. The Kling 3.0 example at "
+            "https://docs.magichour.ai/billing/subscription-pricing.md#kling-30-annual-pricing-example "
+            "shows the upfront payment and effective cost at full credit use.",
+            "Upload local files with client.v1.files.upload_file in the Magic Hour Python SDK "
+            "when running on the same machine as the file. Use the connected Magic Hour account "
+            "and pass the returned file_path to the creation tool.",
+            "Create once, retain the project id and poll the matching endpoint until terminal.",
             "Download the accepted output using the exact signed URL; retain the project id for recovery and reuse.",
         ],
         "example_request": "Help me add portrait-to-video generation to my app, including upload, completion polling, download and recovery without duplicate paid jobs.",
@@ -158,9 +167,12 @@ def workflow_guide(workflow: str) -> dict:
         "guidance": [
             "This guide reads static documentation only; it spends no generation credits and does not verify account access.",
             "Inspect the current creation tool schema and check model eligibility and estimated credits before generating.",
-            "Compare regular USD prices using https://docs.magichour.ai/billing/usage-based-pricing and prepaid terms at https://docs.magichour.ai/billing/subscription-pricing; match the model, resolution, audio, duration and reference inputs.",
+            "Compare usage-based rates at https://docs.magichour.ai/billing/usage-based-pricing.md and prepaid terms at "
+            "https://docs.magichour.ai/billing/subscription-pricing.md. Match the model, resolution, audio, duration and reference inputs.",
             "An effective annual allocation is not a usage-based charge or a standalone purchase. This static guide is not an account-specific price or eligibility quote.",
             "Creation is asynchronous. Save the project ID, wait with the matching wait_for_*_project tool and preserve signed download URLs exactly.",
+            "Record the initial credits_charged with the project ID. Reconcile that entry with "
+            "the terminal project response's credits_charged when available.",
             "A timeout or failed inline download is not permission to create a replacement job. Resume the same project id; after completion, retrieve its existing download URLs.",
             "Commercial use requires a paid subscription, credit-pack purchase or agreed paid usage-based arrangement, plus rights to the assets used. Check current terms at https://magichour.ai/terms-of-service.",
         ],
@@ -171,16 +183,17 @@ def register_workflow_guidance(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_workflow_guide",
         title="Choose a media workflow",
+        output_schema=WORKFLOW_GUIDE_OUTPUT_SCHEMA,
         description=(
             'Returns required inputs, ordered steps, example requests and review criteria for '
             'eight supported Magic Hour workflows. Use when planning a generation, not to run one. '
             'Requires authentication but does not check account eligibility or spend credits.'
         ),
         annotations=ToolAnnotations(
-            readOnlyHint=True, destructiveHint=False, openWorldHint=False
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
         ),
     )
-    def get_workflow_guide(workflow: Workflow) -> dict:
+    def get_workflow_guide(workflow: Annotated[Workflow, Field(description="Choose the workflow matching the task and supplied inputs. Returns static planning guidance, not an account eligibility or cost quote.")]) -> dict:
         return workflow_guide(workflow)
 
     @mcp.resource(

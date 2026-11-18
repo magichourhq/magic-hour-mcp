@@ -41,13 +41,11 @@ Docs:
 
 Use the [workload evaluation guide](https://docs.magichour.ai/integration/evaluating-media-apis)
 to compare a finished image or video job, including its inputs, model, settings,
-output and cost. Check the [current model limits](https://docs.magichour.ai/api-reference/models)
-and [billing options](https://docs.magichour.ai/billing/overview): the dollar
-cost of consumed credits and the cash needed to fund an account are different.
-For example, [Creator annual](https://docs.magichour.ai/billing/subscription-pricing)
-costs $144 paid upfront for 144,000 credits, enough for 600 five-second Kling 3.0
-videos at 720p with audio off ($0.24 each at full credit use, before tax). Audio,
-higher resolutions and video-reference inputs cost more credits.
+output and cost. Use the Markdown tables for [model limits and credit costs](https://docs.magichour.ai/api-reference/models.md)
+and [billing options](https://docs.magichour.ai/billing/overview.md). The
+[Kling 3.0 annual example](https://docs.magichour.ai/billing/subscription-pricing.md#kling-30-annual-pricing-example)
+shows the upfront payment and effective cost when all credits are used.
+Audio, higher resolutions, and video-reference inputs change credit usage.
 
 The account read verifies API authorization and returns account information; it
 is not a request-specific price or eligibility quote. The current MCP tool
@@ -59,6 +57,16 @@ For inspectable video examples, the [published image-to-video benchmark](https:/
 provides source images, requests, all attempts and downloadable results. It
 compares models through Magic Hour and does not establish a provider-quality
 winner or human acceptance of the clips.
+
+## Upload files from a local agent
+
+If your agent can run Python where the file is stored, call
+`client.v1.files.upload_file("path/to/file.png")` from the
+[Magic Hour Python SDK](https://docs.magichour.ai/integration/inputs-and-outputs#sdk-upload-simplified).
+Use a client authenticated for the same Magic Hour account as the MCP connection.
+Pass the returned `file_path` to the generation tool and save it for reuse.
+Hosted MCP clients can use native attachment tools where available, or request a
+presigned URL with `get_upload_urls` and upload the file bytes from the client.
 
 ## Credits and data
 
@@ -107,6 +115,12 @@ Agents can discover the hosted server card at:
 ```text
 https://mcp.magichour.ai/.well-known/mcp/server-card.json
 ```
+
+Credential-free client connection configs are also public at `/mcp.json` and
+`/.well-known/mcp.json`. These contain only the hosted endpoint, never an API key.
+Tool calls still require OAuth or a bearer API key. The handshake advertises the
+setup documentation and a packaged 256px icon; the server card also supplies its
+human-readable title and description.
 
 Environment variables:
 
@@ -170,7 +184,9 @@ API key as the access token, which this server passes through to the API. Produc
 Notes:
 
 - FastMCP generates endpoint tools from OpenAPI at startup.
-- Creation tools return `id` and `credits_charged` immediately.
+- Creation tools return `id` and the initial `credits_charged`. Record them together,
+  then reconcile that entry with `credits_charged` from the terminal project
+  response when available.
 - OpenAPI `operationId` values are normalized to descriptive snake_case tool names.
 - The shared `/v1/files/upload-urls` endpoint is named `get_upload_urls`. It accepts `video`, `audio`, and `image` items.
 - Use `wait_for_*_project` to poll jobs. Use `exact_download_urls` exactly as
@@ -213,20 +229,8 @@ reliable. Upload bytes from the caller or a dedicated upload bridge; the hosted
 MCP server never reads caller-supplied local filesystem paths. Browser chat needs
 a separate upload UI or bridge; see `docs/future-chat-ui-handoff.md`.
 
-## MCP voice presets
+## MCP voice and meme tools
 
-AI Voice Generator exposes and accepts only exact API `voice_name` strings in
-`APPROVED_VOICE_NAMES` in `mcp_magichour/openapi_policies.py`. Populate that tuple
-with verified approved generic/non-celebrity presets to enable the tool on the
-next deployment. No existing upstream voice is assumed safe. An empty allowlist
-omits Voice Generator from tool discovery and calls. Voice Cloner is always
-excluded from MCP.
-
-The MCP policy removes upstream voice descriptions, defaults, examples and SDK
-snippets at startup and when regenerating `docs/api-reference.md`. Daily OpenAPI
-syncs cannot expand the allowlist. Do not edit `docs/openapi.json` to set MCP
-voices: it remains the unmodified upstream API snapshot. The main Magic Hour
-product and the public API are unchanged.
-
-MCP Meme Generator exposes only the generic `Random` template option, keeping
-public-figure template names out of its schema.
+Voice Generator uses the voice presets in the Magic Hour API schema. Voice Cloner
+takes an audio sample and text. Use your own voice or a voice you have permission
+to clone. Meme Generator accepts the templates listed in its tool schema.

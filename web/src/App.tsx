@@ -240,6 +240,9 @@ export default function App() {
   const projectId = optionalText(project.id);
   const type = projectType(project, downloadUrl);
   const hostCapabilities = app?.getHostCapabilities();
+  const chatGpt = (window as Window & { openai?: {
+    openExternal?: (options: { href: string; redirectUrl: false }) => void | Promise<void>;
+  } }).openai;
   const canOpenDraft = Boolean(status === "complete" && ["image", "video"].includes(type) && project.project_type === type && projectId && downloadUrl
     && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
   const canReadProject = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
@@ -261,7 +264,7 @@ export default function App() {
     if (projectId && downloadUrl && type !== "media") void captureUiResult("download_requested", projectId, type, downloadUrl);
     if (!app || !downloadUrl) return;
     const capabilities = app.getHostCapabilities();
-    if (!capabilities?.downloadFile && !capabilities?.openLinks) return;
+    if (!chatGpt?.openExternal && !capabilities?.downloadFile && !capabilities?.openLinks) return;
     event.preventDefault();
     await readProject("download");
   };
@@ -281,6 +284,11 @@ export default function App() {
     setResult((current) => ({ ...current, pendingRead: request, feedback: null }));
     const download = async (url: string): Promise<boolean> => {
       try {
+        if (chatGpt?.openExternal) {
+          // ChatGPT's standard open-link flow appends a query parameter that invalidates signed URLs.
+          await chatGpt.openExternal({ href: url, redirectUrl: false });
+          return true;
+        }
         const response = hostCapabilities?.downloadFile
           ? await app.downloadFile({ contents: [{ type: "resource_link", uri: url, name }] })
           : await app.openLink({ url });
