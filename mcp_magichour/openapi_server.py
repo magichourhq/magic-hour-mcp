@@ -116,7 +116,7 @@ Choose video from inputs:
 - Still portrait + audio -> create_talking_photo; text alone is not audio.
 - Existing video + replacement audio -> create_lip_sync_video.
 - Choose models from the current schema that fit the inputs, settings and verified account eligibility.
-- Set aspect_ratio by destination: 9:16 TikTok/Reels/Shorts/Stories, 16:9 YouTube/web/TV, 1:1 feed posts; else ask.
+- aspect_ratio by use: 9:16 TikTok/Reels/Shorts/Stories/phone, 16:9 YouTube/web/slides/TV, 1:1 feed/profile; else ask.
 - Preserve an explicitly requested model or provider; explain unsupported settings before proposing a change.
 - Include complete spoken sentences.
 - Use Text-to-Video when no supplied starting image is required.

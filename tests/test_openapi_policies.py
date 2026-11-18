@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from mcp_magichour.openapi_policies import (
     API_TOOL_METADATA,
+    ASPECT_RATIO_GUIDANCE,
     apply_magic_hour_policies,
     customize_openapi_component,
     normalize_mcp_tool_name,
@@ -130,13 +131,11 @@ class OpenApiPolicyTests(unittest.TestCase):
         self.assertIn("hotlinked URLs can fail", description)
 
     def test_aspect_ratio_fields_say_to_choose_by_destination(self):
-        from mcp_magichour.openapi_policies import ASPECT_RATIO_GUIDANCE
-
         spec = json.loads((Path(__file__).parent.parent / "docs/openapi.json").read_text())
         patched = apply_magic_hour_policies(spec)
         expected_default = {
-            "/v1/text-to-video": "the video is 16:9",
-            "/v1/ai-image-generator": "the image is 1:1",
+            "/v1/text-to-video": "If you can't tell where the video will be used, ask before generating",
+            "/v1/ai-image-generator": "omit this for a 1:1 image",
             "/v1/ai-image-editor": "keep `auto`",
         }
         for path, default_note in expected_default.items():
@@ -145,12 +144,16 @@ class OpenApiPolicyTests(unittest.TestCase):
                 field = patched["paths"][path]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["aspect_ratio"]
                 self.assertTrue(field["description"].startswith(ASPECT_RATIO_GUIDANCE))
                 self.assertIn(default_note, field["description"])
-                # The API's own per-model support list is kept.
                 self.assertTrue(field["description"].endswith(original["description"]))
                 self.assertEqual(field["enum"], original["enum"])
-        for platform in ("9:16 for TikTok", "16:9 for YouTube", "1:1 for an Instagram", "ask"):
+        for platform in ("9:16 for TikTok", "phone screen", "16:9 for YouTube", "slides", "1:1 for an Instagram", "profile picture"):
             self.assertIn(platform, ASPECT_RATIO_GUIDANCE)
         self.assertEqual(apply_magic_hour_policies(patched), patched)
+
+        image_to_video = patched["paths"]["/v1/image-to-video"]["post"]
+        self.assertNotIn("aspect_ratio", image_to_video["requestBody"]["content"]["application/json"]["schema"]["properties"])
+        for phrase in ("no aspect_ratio setting", "shape comes from the image", "9:16 for TikTok", "edit_image"):
+            self.assertIn(phrase, image_to_video["description"])
 
     def test_custom_component_adds_group_tags(self):
         class Route:

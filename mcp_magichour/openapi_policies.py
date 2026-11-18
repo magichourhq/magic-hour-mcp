@@ -158,7 +158,11 @@ API_TOOL_METADATA = {
     ("POST", "/v1/image-to-video"): (
         "create_video_from_image",
         "Create video from image",
-        "Use a still image as the first frame and describe what should move. For a portrait "
+        "Use a still image as the first frame and describe what should move. There is no "
+        "aspect_ratio setting; the video's shape comes from the image. If the user wants a shape "
+        "for where the video will be used (9:16 for TikTok, Reels, Shorts or Stories) and the "
+        "image is a different shape, say so and offer to reframe it first with edit_image. "
+        "For a portrait "
         "speaking to an existing recording, use create_talking_photo. For a prepared ad image "
         "and written script, use create_spoken_ad_video. Starts a background job that costs "
         "credits; returns a project id for wait_for_video_project.",
@@ -429,14 +433,16 @@ LIKENESS_GENERATION_PATHS = {
 }
 ASPECT_RATIO_GUIDANCE = (
     "Choose by where the output will be used: 9:16 for TikTok, Reels, Shorts, Stories or a "
-    "phone screen; 16:9 for YouTube, a website, slides or TV; 1:1 "
-    "for an Instagram or Facebook feed post or a profile picture. If the user names a use but "
-    "you can't tell its shape, ask. "
+    "phone screen; 16:9 for YouTube, a website, slides or TV; 1:1 for an Instagram or Facebook "
+    "feed post or a profile picture. "
 )
 ASPECT_RATIO_DEFAULT_NOTE = {
-    "/v1/text-to-video": "Set this whenever the use is known; if omitted, the video is 16:9.",
-    "/v1/ai-image-generator": "Set this whenever the use is known; if omitted, the image is 1:1.",
-    "/v1/ai-image-editor": "With no new use or shape requested, keep `auto` to match the source image.",
+    "/v1/text-to-video": "If you can't tell where the video will be used, ask before generating. "
+    "If omitted, the video is 16:9.",
+    "/v1/ai-image-generator": "If the user names a use but you can't tell its shape, ask. With no use "
+    "mentioned, omit this for a 1:1 image.",
+    "/v1/ai-image-editor": "If the user names a use but you can't tell its shape, ask. With no new use "
+    "or shape requested, keep `auto` to match the source image.",
 }
 LIKENESS_USAGE_GUIDANCE = (
     "Use only with the user's own likeness or content they are authorized to use. "
