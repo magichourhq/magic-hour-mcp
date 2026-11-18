@@ -399,13 +399,13 @@ Character Replace
   - `image_file_path` (string, required): Reference character image used as the replacement or animation target. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the...
 - `style` (object, optional): Optional style controls for replace vs animate mode and subject selection.
   - `mode` (string, optional) enum=['replace', 'animate']: Processing mode. `replace` swaps the detected subject with your reference character. `animate` transfers motion from the video onto your character image.
-  - `prompt` (string, optional): Optional direction. Supported by kling-3.0, minimax-h3.
+  - `prompt` (string, optional): Optional direction. Supported by kling-3.0, minimax-h3. For MiniMax H3 in replace mode, ignored and not saved when `selection_mode` is `point`; applies only to automatic person selection.
   - `selection_mode` (string, optional) enum=['auto', 'point']: How to locate the subject in the source video. `auto` detects a person automatically. `point` uses your `points` to mark the subject and is supported by `wan-animate`, `minimax-h3`. `minimax-h3` subject `points` are...
   - `points` (array, optional): On-frame markers for manual subject selection. Required when `selection_mode` is `point`. Ignored when `selection_mode` is `auto` or omitted. Rejected for models without subject selection (supported by `wan-animate`,...
     items:
       - `position_x` (integer, required) range=[0,None]: Horizontal pixel coordinate in the source video frame at `time_seconds`, measured from the left edge.
       - `position_y` (integer, required) range=[0,None]: Vertical pixel coordinate in the source video frame at `time_seconds`, measured from the top edge.
-      - `time_seconds` (number, required) range=[0,None]: Timestamp on the source video timeline in seconds. Uses the same clock as `start_seconds` and `end_seconds`.
+      - `time_seconds` (number, required) range=[0,None]: Timestamp on the source video timeline in seconds. Uses the same clock as `start_seconds` and `end_seconds`. For MiniMax H3 manual replacement, `start_seconds <= time_seconds < end_seconds`.
 
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
