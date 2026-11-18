@@ -657,6 +657,15 @@ async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes:
         timeout=API_TIMEOUT, follow_redirects=False, headers={"User-Agent": MCP_USER_AGENT}
     ) as client:
         async with client.stream("GET", download_url) as response:
+            if response.status_code == 403:
+                project_type = expected_prefix.removesuffix("/")
+                raise httpx.HTTPStatusError(
+                    "Download access denied (403 Forbidden). "
+                    f"Open the same project with get_{project_type}_project to get a fresh download link. "
+                    "Use the returned URL exactly. If the project is unavailable, check the project ID and connected account.",
+                    request=response.request,
+                    response=response,
+                )
             response.raise_for_status()
             mime_type = _resolve_media_mime_type(
                 download_url,
