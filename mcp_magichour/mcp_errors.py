@@ -11,6 +11,7 @@ from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import McpError
 
 from .chatgpt_media import attachment_fields
+from .openapi_policies import IMAGE_DEFAULT_MODELS, sorted_resolutions
 
 
 class APIErrorRecoveryMiddleware(Middleware):
@@ -112,6 +113,57 @@ class APIErrorRecoveryMiddleware(Middleware):
                 # source/upload host errors must not be classified as API rejections.
                 cause = cause.__cause__ or cause.__context__
             raise
+
+
+class UnsupportedResolutionMiddleware(Middleware):
+    def __init__(self, rules: dict[str, dict[str, set[str]]]) -> None:
+        self.rules = rules
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        models = self.rules.get(context.message.name)
+        arguments = context.message.arguments or {}
+        model, resolution = arguments.get("model") or "default", arguments.get("resolution")
+        if (
+            models
+            and isinstance(model, str) and model in models
+            and isinstance(resolution, str) and resolution != "auto"
+            and resolution not in models[model]
+        ):
+            supported_by = sorted(
+                name for name, resolutions in models.items() if name != "default" and resolution in resolutions
+            )
+            name = model
+            if model == "default":
+                name = f"the default model ({IMAGE_DEFAULT_MODELS[context.message.name]})"
+            order = sorted_resolutions(models[model] | {resolution})
+            lower = [value for value in order[:order.index(resolution)] if value in models[model]]
+            higher = [value for value in order[order.index(resolution) + 1:] if value in models[model]]
+            options = [f"switch to a model that supports {resolution} ({', '.join(supported_by) or 'none'})"]
+            if lower:
+                options.append(f"keep {name} and go down to {lower[-1]}")
+            if higher:
+                options.append(f"keep {name} and go up to {higher[0]}")
+            payload = {"error": {
+                "code": "unsupported_resolution",
+                "message": (
+                    f"{name.replace('the default', 'The default', 1)} does not support {resolution}. It supports "
+                    f"{', '.join(sorted_resolutions(models[model]))}. Nothing was generated or charged."
+                ),
+                "supported_models": supported_by,
+                "closest_lower_resolution": lower[-1] if lower else None,
+                "closest_higher_resolution": higher[0] if higher else None,
+                "next_action": (
+                    f"Tell the user {name} can't make {resolution} and give them these choices: "
+                    + "; ".join(options)
+                    + ". Ask which they want before generating. Check the account can use the model."
+                ),
+            }}
+            return ToolResult(content=json.dumps(payload), structured_content=payload, is_error=True)
+        return await call_next(context)
 
 
 def _has_local_asset_path(value: object) -> bool:
