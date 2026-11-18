@@ -179,8 +179,9 @@ API_TOOL_METADATA = {
         "create_video_from_text",
         "Create video from text",
         "Generates a video from a text prompt, with optional supported reference inputs and model "
-        "settings. Set aspect_ratio for where the video will be used, such as 9:16 for TikTok or "
-        "Reels. To animate an existing starting image, use create_video_from_image. Starts a "
+        "settings. If the user has not specified an aspect ratio, choose it for where the video "
+        "will be used, such as 9:16 for TikTok or Reels. To animate an existing starting image, "
+        "use create_video_from_image. Starts a "
         "background job that costs credits; returns a project id for wait_for_video_project.",
     ),
     ("POST", "/v1/video-to-video"): (
@@ -432,7 +433,8 @@ LIKENESS_GENERATION_PATHS = {
     "/v1/lip-sync", "/v1/ai-talking-photo", "/v1/character-replace", "/v1/ai-clothes-changer",
 }
 ASPECT_RATIO_GUIDANCE = (
-    "Choose by where the output will be used: 9:16 for TikTok, Reels, Shorts, Stories or a "
+    "Keep an aspect ratio the user explicitly requests. Otherwise, choose by where the output "
+    "will be used: 9:16 for TikTok, Reels, Shorts, Stories or a "
     "phone screen; 16:9 for YouTube, a website, slides or TV; 1:1 for an Instagram or Facebook "
     "feed post or a profile picture. "
 )
