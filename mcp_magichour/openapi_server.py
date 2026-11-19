@@ -851,11 +851,16 @@ class _VideoProjectCard(ToolMiddleware):
     ) -> ToolResult:
         result = await call_next(context)
         project = result.structured_content
-        if context.message.name == "get_video_project" and project and project.get("id"):
+        project_type = {
+            "get_video_project": "video",
+            "get_image_project": "image",
+            "get_audio_project": "audio",
+        }.get(context.message.name)
+        if project_type and project and project.get("id"):
             structured = _project_structured_content_for_agent(project)
             if "downloads" in project:
                 structured["downloads"] = project["downloads"]
-            result.structured_content = {**structured, "project_type": "video"}
+            result.structured_content = {**structured, "project_type": project_type}
         return result
 
 

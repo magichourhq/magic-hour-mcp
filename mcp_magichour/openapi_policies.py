@@ -195,8 +195,9 @@ API_TOOL_METADATA = {
     ("GET", "/v1/image-projects/{id}"): (
         "get_image_project",
         "Get image project",
-        "Returns an image project's status and, once complete, its download URLs. Use to check "
-        "progress with the id from an image create tool. Read-only.",
+        "Open a saved image in Magic Hour’s result card with the image and Download in ChatGPT. "
+        "Use when someone asks to see, download or reopen an existing image. "
+        "Pass the existing project ID. Read-only.",
     ),
     ("DELETE", "/v1/image-projects/{id}"): (
         "delete_image_project",
@@ -300,8 +301,9 @@ API_TOOL_METADATA = {
     ("GET", "/v1/audio-projects/{id}"): (
         "get_audio_project",
         "Get audio project",
-        "Returns an audio project's status and, once complete, its download URLs. Use to check "
-        "progress with the id from an audio create tool. Read-only.",
+        "Open a saved audio project in Magic Hour’s result card with playback and Download in ChatGPT. "
+        "Use when someone asks to hear, download or reopen an existing audio project. "
+        "Pass the existing project ID. Read-only.",
     ),
     ("DELETE", "/v1/audio-projects/{id}"): (
         "delete_audio_project",
@@ -741,14 +743,17 @@ def customize_openapi_component(route: Any, component: Any) -> None:
             destructiveHint=method == "DELETE",
             openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL|searchWeb\b", repr(component.parameters))),
         )
-        if method == "GET" and path == "/v1/video-projects/{id}":
+        reopen_labels = {
+            "/v1/video-projects/{id}": ("Opening your video project…", "Video project opened"),
+            "/v1/image-projects/{id}": ("Opening your image project…", "Image project opened"),
+            "/v1/audio-projects/{id}": ("Opening your audio project…", "Audio project opened"),
+        }
+        if method == "GET" and path in reopen_labels:
+            invoking, invoked = reopen_labels[path]
             component.meta = {
                 **(component.meta or {}),
                 "ui": {"resourceUri": MCP_APP_VIEW_URI},
-                "openai/toolInvocation": {
-                    "invoking": "Opening your video project…",
-                    "invoked": "Video project opened",
-                },
+                "openai/toolInvocation": {"invoking": invoking, "invoked": invoked},
             }
 
     if is_estimate:
