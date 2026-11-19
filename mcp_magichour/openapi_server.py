@@ -455,13 +455,14 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
         description += (
             " For playback or downloads in ChatGPT, open Magic Hour’s result card with "
             "get_video_project or wait_for_video_project using the existing project ID. "
-            "This tool returns file bytes for clients that explicitly need them."
+            "When this tool shows a result card in ChatGPT, use its Download control. Do not put the signed URL in a chat link."
         )
 
     @mcp.tool(
         name=tool_name,
         title=title,
         description=description,
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI) if media_type == "video" else None,
         annotations=ToolAnnotations(title=title, readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     async def fetch_download(
@@ -471,14 +472,23 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
         try:
             data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
         except InlineMediaTooLargeError:
-            return ToolResult(content=[
+            content = [
                 TextContent(
                     type="text",
                     text=f"This file is too large for an inline preview. Download the original result.\n{download_url}",
                 ),
                 ResourceLink(type="resource_link", uri=download_url, name=f"Download original {media_type}"),
-            ])
-        return _media_content(media_type, data, mime_type, source_uri=download_url)
+            ]
+        else:
+            content = [_media_content(media_type, data, mime_type, source_uri=download_url)]
+        return ToolResult(
+            content=content,
+            structured_content={
+                "status": "complete",
+                "project_type": "video",
+                "exact_download_urls": [download_url],
+            } if media_type == "video" else None,
+        )
 
 
 async def _upload_chatgpt_file(file: ChatGPTFile, media_type: ProjectType) -> dict[str, str]:
