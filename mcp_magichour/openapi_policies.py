@@ -467,6 +467,40 @@ def apply_magic_hour_policies(openapi_spec: dict[str, Any]) -> dict[str, Any]:
     return spec
 
 
+IMAGE_RESOLUTION_TOOLS = {"/v1/ai-image-generator": "generate_image", "/v1/ai-image-editor": "edit_image"}
+IMAGE_DEFAULT_MODELS = {"generate_image": "z-image-turbo", "edit_image": "nano-banana"}
+
+
+def sorted_resolutions(resolutions: set[str]) -> list[str]:
+    order = ["640px", "1k", "2k", "4k"]
+    return sorted(resolutions, key=lambda value: order.index(value) if value in order else len(order))
+
+
+def _per_model_resolutions(description: str) -> dict[str, set[str]]:
+    _, found, per_model = description.partition("**Per-model support:**")
+    models: dict[str, set[str]] = {}
+    for line in per_model.splitlines() if found else []:
+        match = re.match(r"\s*-\s*`([^`]+)`\s*-\s*(.+)$", line)
+        if match:
+            models[match.group(1)] = {value.strip() for value in match.group(2).split(",")}
+    return models
+
+
+def image_model_resolutions(openapi_spec: dict[str, Any]) -> dict[str, dict[str, set[str]]]:
+    rules: dict[str, dict[str, set[str]]] = {}
+    for path, tool in IMAGE_RESOLUTION_TOOLS.items():
+        properties = (
+            openapi_spec.get("paths", {}).get(path, {}).get("post", {}).get("requestBody", {})
+            .get("content", {}).get("application/json", {}).get("schema", {}).get("properties", {})
+        )
+        models = _per_model_resolutions(properties.get("resolution", {}).get("description", ""))
+        if models:
+            if IMAGE_DEFAULT_MODELS[tool] in models:
+                models["default"] = models[IMAGE_DEFAULT_MODELS[tool]]
+            rules[tool] = models
+    return rules
+
+
 def normalize_mcp_tool_name(operation_id: str) -> str:
     """Convert an OpenAPI operation ID to a descriptive snake_case MCP tool name."""
     name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", operation_id)
@@ -553,12 +587,29 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
                 "a specific model. This is the default behavior.",
                 "Uses the server-selected default model, which may change over time.",
             )
+        default_model = IMAGE_DEFAULT_MODELS[IMAGE_RESOLUTION_TOOLS[path]]
+        default_resolutions = _per_model_resolutions(
+            properties.get("resolution", {}).get("description", "")
+        ).get(default_model)
+        resolution_guidance = "If the user asks for a resolution, pick a model whose supported resolutions include it. "
+        if path == "/v1/ai-image-editor":
+            resolution_guidance += (
+                f"`default` is {default_model} on paid plans. "
+                "The API chooses and validates the default model for the account's plan. "
+            )
+        elif default_resolutions:
+            resolution_guidance += (
+                f"`default` is {default_model}, which supports only {', '.join(sorted_resolutions(default_resolutions))}; "
+                "for anything higher, choose a model that lists it. "
+            )
+        if resolution_guidance not in model.get("description", ""):
+            model["description"] = resolution_guidance + model.get("description", "")
         if path == "/v1/ai-image-generator":
             guidance = (
                 "When the user has not requested a model, use `default` rather than selecting "
                 "a premium model. Preserve an explicit model. "
             )
-            if not model.get("description", "").startswith(guidance):
+            if guidance not in model.get("description", ""):
                 model["description"] = guidance + model.get("description", "")
 
     asset_type = next((asset for tag, asset in PROJECT_TAG_TO_ASSET.items() if tag in tags), None)

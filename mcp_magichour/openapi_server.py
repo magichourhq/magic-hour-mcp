@@ -43,13 +43,14 @@ from .app_events import app_events
 from .chatgpt_media import ChatGPTFile, ProjectType, add_chatgpt_media_inputs, prepare_chatgpt_media
 from .helper_schemas import PROJECT_WAIT_OUTPUT_SCHEMA
 from .openapi_auth import BearerPassthroughAuth, BearerPassthroughMiddleware, current_authorization_header
-from .mcp_errors import APIErrorRecoveryMiddleware, install_structured_tool_errors
+from .mcp_errors import APIErrorRecoveryMiddleware, UnsupportedResolutionMiddleware, install_structured_tool_errors
 from .oauth_compat import MCPToolOAuthMiddleware, create_oauth_compatibility_app
 from .openapi_policies import (
     GENERATION_ESTIMATE_PATHS,
     PROJECT_CONTENT_BLOCK_GUIDANCE,
     apply_magic_hour_policies,
     current_tool_replacements,
+    image_model_resolutions,
     customize_openapi_component,
 )
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
@@ -229,6 +230,7 @@ def create_mcp() -> FastMCP:
     mcp.add_middleware(ToolCallLoggingMiddleware())
     mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
+    mcp.add_middleware(UnsupportedResolutionMiddleware(image_model_resolutions(source_spec)))
     mcp.add_middleware(_ChatGPTMediaMiddleware())
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
