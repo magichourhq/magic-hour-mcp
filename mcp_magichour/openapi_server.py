@@ -22,7 +22,15 @@ from fastmcp.server.middleware import CallNext, Middleware as ToolMiddleware, Mi
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import Tool, ToolResult
 from fastmcp.utilities.types import Audio, Image
-from mcp.types import BlobResourceContents, CallToolRequestParams, EmbeddedResource, Icon, TextContent, ToolAnnotations
+from mcp.types import (
+    BlobResourceContents,
+    CallToolRequestParams,
+    EmbeddedResource,
+    Icon,
+    ResourceLink,
+    TextContent,
+    ToolAnnotations,
+)
 from pydantic import Field
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -128,6 +136,10 @@ GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
 MCP_SERVER_DESCRIPTION = "Create and edit images and video, generate music and speech, clone voices, and retrieve existing audio projects."
 MCP_SERVER_URL = "https://mcp.magichour.ai/"
 TERMINAL_PROJECT_STATUSES = {"complete", "error", "canceled"}
+
+
+class InlineMediaTooLargeError(ValueError):
+    """The original file remains available outside the inline response budget."""
 
 
 def _customize_openapi_tool(route: Any, component: Any) -> None:
@@ -436,28 +448,47 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
     description = (
         f"Fetch a completed project's {media_type} as {content_kind} for compatible clients. "
         "Use the exact signed download URL, including query parameters. Requires HTTPS at the "
-        "configured Magic Hour media host. Read-only; limited to 8 MiB, or a smaller requested "
-        "max_bytes. Use the signed URL directly for larger files."
+        "configured Magic Hour media host. Read-only; inline content is limited to 8 MiB, or a smaller requested "
+        "max_bytes. Returns the original-file download link when the media exceeds this limit."
     )
     if media_type == "video":
         description += (
             " For playback or downloads in ChatGPT, open Magic Hour’s result card with "
             "get_video_project or wait_for_video_project using the existing project ID. "
-            "This tool returns file bytes for clients that explicitly need them."
+            "When this tool shows a result card in ChatGPT, use its Download control. Do not put the signed URL in a chat link."
         )
 
     @mcp.tool(
         name=tool_name,
         title=title,
         description=description,
+        app=AppConfig(resource_uri=MCP_APP_VIEW_URI) if media_type == "video" else None,
         annotations=ToolAnnotations(title=title, readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False),
     )
     async def fetch_download(
         download_url: Annotated[str, Field(description="Exact HTTPS URL from a completed project’s downloads or exact_download_urls. Preserve all query parameters; must use the configured Magic Hour media host.")],
-        max_bytes: Annotated[int, Field(description="Positive maximum raw download bytes. The server caps this at 8388608 bytes (8 MiB); use the original URL directly for larger files.")] = DEFAULT_MEDIA_FETCH_MAX_BYTES,
+        max_bytes: Annotated[int, Field(description="Positive maximum inline download bytes, capped at 8388608 bytes (8 MiB). Larger files return an original-file download link.")] = DEFAULT_MEDIA_FETCH_MAX_BYTES,
     ):
-        data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
-        return _media_content(media_type, data, mime_type, source_uri=download_url)
+        try:
+            data, mime_type = await _fetch_media_bytes(download_url, expected_prefix=f"{media_type}/", max_bytes=max_bytes)
+        except InlineMediaTooLargeError:
+            content = [
+                TextContent(
+                    type="text",
+                    text=f"This file is too large for an inline preview. Download the original result.\n{download_url}",
+                ),
+                ResourceLink(type="resource_link", uri=download_url, name=f"Download original {media_type}"),
+            ]
+        else:
+            content = [_media_content(media_type, data, mime_type, source_uri=download_url)]
+        return ToolResult(
+            content=content,
+            structured_content={
+                "status": "complete",
+                "project_type": "video",
+                "exact_download_urls": [download_url],
+            } if media_type == "video" else None,
+        )
 
 
 async def _upload_chatgpt_file(file: ChatGPTFile, media_type: ProjectType) -> dict[str, str]:
@@ -677,7 +708,7 @@ async def _fetch_media_bytes(download_url: str, expected_prefix: str, max_bytes:
             async for chunk in response.aiter_bytes():
                 media.extend(chunk)
                 if len(media) > max_bytes:
-                    raise ValueError(
+                    raise InlineMediaTooLargeError(
                         f"Downloaded media is too large for inline MCP content ({len(media)} bytes > {max_bytes} bytes)."
                     )
 
