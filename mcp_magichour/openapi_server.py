@@ -453,10 +453,10 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
         "configured Magic Hour media host. Read-only; inline content is limited to 8 MiB, or a smaller requested "
         "max_bytes. Returns the original-file download link when the media exceeds this limit."
     )
-    if media_type == "video":
+    if media_type in {"video", "image", "audio"}:
         description += (
             " For playback or downloads in ChatGPT, open Magic Hour’s result card with "
-            "get_video_project or wait_for_video_project using the existing project ID. "
+            f"get_{media_type}_project or wait_for_{media_type}_project using the existing project ID. "
             "When this tool shows a result card in ChatGPT, use its Download control. Do not put the signed URL in a chat link."
         )
 

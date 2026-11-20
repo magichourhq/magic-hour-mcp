@@ -137,6 +137,14 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("fetch_image_download", names)
         self.assertIn("fetch_audio_download", names)
         self.assertIn("fetch_video_download", names)
+        by_name = {tool.name: tool for tool in tools}
+        for media_type in ("image", "audio"):
+            with self.subTest(media_type=media_type):
+                description = by_name[f"fetch_{media_type}_download"].description or ""
+                self.assertIn("result card", description)
+                self.assertIn(f"get_{media_type}_project", description)
+                self.assertIn(f"wait_for_{media_type}_project", description)
+                self.assertIn("Download", description)
         self.assertIn("wait_for_video_project", names)
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)
