@@ -12,7 +12,12 @@ UI_READ_ORIGIN = "magic-hour/ui-read"
 MCP_APP_VIEW_PATH = "/app/project-result"
 MCP_APP_ASSET_PATH = "/app/project-result-assets"
 MCP_APP_SERVER_ORIGIN = "https://mcp.magichour.ai"
-MCP_APP_ORIGIN = os.getenv("MCP_APP_ORIGIN", MCP_APP_SERVER_ORIGIN).rstrip("/")
+# Preview deploys serve the widget from their own host; Vite's base in web/vite.config.js must match.
+MCP_APP_ORIGIN = (
+    f"https://{os.environ['VERCEL_URL']}"
+    if os.getenv("VERCEL_ENV") == "preview" and os.getenv("VERCEL_URL")
+    else MCP_APP_SERVER_ORIGIN
+)
 MCP_APP_MEDIA_ORIGIN = "https://videos.magichour.ai"
 MCP_APP_DIST_PATH = Path(__file__).with_name("static") / "project-result"
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
