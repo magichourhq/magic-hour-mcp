@@ -19,6 +19,7 @@ version was not found; it does not prove publisher authorization or validate the
 rest of the manifest.
 
 Review the final capability description against the live tool catalog and
-approved source. Choose a new version if required. Publishing remains a separate
-manual action through the existing **Publish to MCP Registry** workflow. This
-helper does not publish, authenticate or change that workflow.
+approved source, then change the version in `server.json` in a PR. When that
+merges, the **Publish to MCP Registry** workflow runs this check and publishes.
+Run the workflow manually to publish the current version again, for example
+after a failed publish.

@@ -1,26 +1,55 @@
+# Publishes server.json to the MCP Registry when its version changes on main. Run it manually to
+# publish the current version again, for example after a failed publish.
 name: Publish to MCP Registry
 
 on:
+  push:
+    branches: [main]
+    paths: [server.json]
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Required to log in to the MCP Registry with GitHub OIDC
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Check if the version changed
+        run: |
+          VERSION=$(jq -r .version server.json)
+          OLD_VERSION=$(git show HEAD~1:server.json | jq -r .version)
+          CHANGED=false
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ "$OLD_VERSION" != "$VERSION" ]; then
+            CHANGED=true
+          fi
+          echo "Version $OLD_VERSION -> $VERSION, publish: $CHANGED"
+          echo "CHANGED=$CHANGED" >> "$GITHUB_ENV"
+
+      # Registry versions are immutable, so stop before logging in if this one is already published.
+      - name: Check the version isn't published
+        if: env.CHANGED == 'true'
+        run: python3 scripts/registry_preflight.py server.json
 
       - name: Install MCP publisher
+        if: env.CHANGED == 'true'
         run: |
           set -euo pipefail
           curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
 
       - name: Authenticate to MCP Registry
+        if: env.CHANGED == 'true'
         run: ./mcp-publisher login github-oidc
 
       - name: Publish server metadata
+        if: env.CHANGED == 'true'
         run: ./mcp-publisher publish server.json

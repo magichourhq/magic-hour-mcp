@@ -1,8 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Pin to the prod origin: VERCEL_URL is the per-deploy host, which the widget CSP blocks.
-const appOrigin = (process.env.MCP_APP_ORIGIN || "https://mcp.magichour.ai").replace(/\/$/, "");
+// Production pins to the prod origin; preview deploys use their own host so the bundle exists there.
+// Must match MCP_APP_ORIGIN in mcp_magichour/project_result_app.py.
+const appOrigin =
+  process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "https://mcp.magichour.ai";
 
 export default defineConfig({
   base: `${appOrigin}/app/project-result-assets/`,
