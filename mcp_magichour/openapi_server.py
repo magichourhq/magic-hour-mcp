@@ -235,7 +235,7 @@ def create_mcp() -> FastMCP:
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
-    mcp.add_middleware(_VideoProjectCard())
+    mcp.add_middleware(_ProjectResultCard())
     return mcp
 
 
@@ -843,7 +843,7 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
     return urls
 
 
-class _VideoProjectCard(ToolMiddleware):
+class _ProjectResultCard(ToolMiddleware):
     async def on_call_tool(
         self,
         context: MiddlewareContext[mt.CallToolRequestParams],
