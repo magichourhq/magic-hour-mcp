@@ -921,7 +921,7 @@ AI Voice Generator
 - `name` (string, optional) default=Voice Generator - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.
 - `style` (object, required): The content used to generate speech.
   - `prompt` (string, required): Text used to generate speech. The character limit is 5000 characters.
-  - `voice_name` (string, required) enum=[1744 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Use the `id` of a voice returned by `GET /v1/voices`.
+  - `voice_name` (string, required) enum=[1743 values, e.g. ['Elon Musk', 'Mark Zuckerberg', 'Joe Rogan', 'Barack Obama', 'Morgan Freeman', 'Kanye West'], ...]: The voice to use for the speech. Use the `id` of a voice returned by `GET /v1/voices`.
   - `language` (string, optional) enum=[82 values, e.g. ['auto', 'chinese', 'english', 'japanese', 'korean', 'german'], ...] default=auto: Spoken language. Use a canonical lowercase language name, or auto to detect the language from the text. Defaults to auto.
   - `speed` (number, optional) default=1 range=[0.75,1.3]: Speech speed multiplier, from 0.75 to 1.30 inclusive. Defaults to 1 (normal speed).
 
