@@ -392,14 +392,14 @@ Character Replace
 - `name` (string, optional) default=Character Replace - dateTime: Give your video a custom name for easy identification.
 - `start_seconds` (number, optional) default=0 range=[0,None]: Start time of your clip (seconds). Must be ≥ 0.
 - `end_seconds` (number, required) range=[0.1,None]: End time of your clip (seconds). Must be greater than start_seconds.
-- `model` (string, optional) enum=['wan-animate', 'kling-3.0', 'minimax-h3'] default=wan-animate: Model to use. Defaults to `wan-animate`.
+- `model` (string, optional) enum=['wan-animate', 'kling-3.0', 'kling-4.0', 'minimax-h3'] default=wan-animate: Model to use. Defaults to `wan-animate`.
 - `resolution` (string, optional) enum=['480p', '720p', '1080p']: Output video resolution. Must be supported by `model`. Defaults to the lowest resolution available on your plan for that model.
 - `assets` (object, required): Source video and reference character image for the job.
   - `video_file_path` (string, required): Source video containing the subject to replace or animate. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the [upload urls...
   - `image_file_path` (string, required): Reference character image used as the replacement or animation target. This value is either - a direct URL to the file. The URL path must end in a supported file extension. - `file_path` field from the response of the...
 - `style` (object, optional): Optional style controls for replace vs animate mode and subject selection.
   - `mode` (string, optional) enum=['replace', 'animate']: Processing mode. `replace` swaps the detected subject with your reference character. `animate` transfers motion from the video onto your character image.
-  - `prompt` (string, optional): Optional direction. Supported by kling-3.0, minimax-h3. For MiniMax H3 in replace mode, ignored and not saved when `selection_mode` is `point`; applies only to automatic person selection.
+  - `prompt` (string, optional): Optional direction. Supported by kling-3.0, kling-4.0, minimax-h3. For MiniMax H3 in replace mode, ignored and not saved when `selection_mode` is `point`; applies only to automatic person selection.
   - `selection_mode` (string, optional) enum=['auto', 'point']: How to locate the subject in the source video. `auto` detects a person automatically. `point` uses your `points` to mark the subject and is supported by `wan-animate`, `minimax-h3`. `minimax-h3` subject `points` are...
   - `points` (array, optional): On-frame markers for manual subject selection. Required when `selection_mode` is `point`. Ignored when `selection_mode` is `auto` or omitted. Rejected for models without subject selection (supported by `wan-animate`,...
     items:
