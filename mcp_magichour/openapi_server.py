@@ -18,6 +18,7 @@ import mcp.types as mt
 from fastmcp import FastMCP
 from fastmcp.apps import AppConfig, ResourceCSP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.dependencies import get_http_headers
 from fastmcp.server.middleware import CallNext, Middleware as ToolMiddleware, MiddlewareContext
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.tools.base import Tool, ToolResult
@@ -149,6 +150,27 @@ def _customize_openapi_tool(route: Any, component: Any) -> None:
         add_chatgpt_media_inputs(component)
 
 
+class _ChatGPTPresignedUploadGuard(ToolMiddleware):
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[CallToolRequestParams],
+        call_next: CallNext[CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        if context.message.name == "get_upload_urls" and _is_chatgpt_request():
+            raise ToolError(
+                "get_upload_urls can't be used from ChatGPT: its sandbox has no internet, so the "
+                "upload to upload_url would fail. Call the creation tool again with the attached "
+                "file in its attachment field (for example image, images, video or audio), or call "
+                "upload_chatgpt_image or upload_chatgpt_media with the attachment and use the "
+                "returned file_path. Keep the requested settings."
+            )
+        return await call_next(context)
+
+
+def _is_chatgpt_request() -> bool:
+    return get_http_headers(include={"user-agent"}).get("user-agent", "").lower().startswith("openai-mcp")
+
+
 class _ChatGPTMediaMiddleware(ToolMiddleware):
     async def on_call_tool(
         self,
@@ -231,6 +253,7 @@ def create_mcp() -> FastMCP:
     mcp.add_middleware(APIErrorRecoveryMiddleware(client.base_url))
     mcp.add_middleware(MCPToolOAuthMiddleware())
     mcp.add_middleware(UnsupportedResolutionMiddleware(image_model_resolutions(source_spec)))
+    mcp.add_middleware(_ChatGPTPresignedUploadGuard())
     mcp.add_middleware(_ChatGPTMediaMiddleware())
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
