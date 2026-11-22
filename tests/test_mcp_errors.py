@@ -105,12 +105,14 @@ class MCPErrorTests(unittest.IsolatedAsyncioTestCase):
 
 
 class LocalAssetRecoveryTests(unittest.IsolatedAsyncioTestCase):
-    async def rejected_call(self, tool, arguments, *, status=422, code="unprocessable_entity", message="Invalid asset path"):
+    async def rejected_call(
+        self, tool, arguments, *, status=422, code="unprocessable_entity", message="Invalid asset path", extra=None,
+    ):
         requests = []
 
         def upstream(request):
             requests.append(json.loads(request.content))
-            return httpx.Response(status, json={"code": code, "message": message})
+            return httpx.Response(status, json={"code": code, "message": message, **(extra or {})})
 
         async with httpx.AsyncClient(
             base_url="https://api.example.test", transport=httpx.MockTransport(upstream),
@@ -128,7 +130,20 @@ class LocalAssetRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error["message"], message)
         self.assertEqual(error["code"], code)
         self.assertEqual(error["http_status"], status)
+        self.error = error
         return error["next_action"]
+
+    async def test_credit_shortfall_is_reported_only_for_insufficient_credits(self):
+        arguments = {"assets": {"image_file_path": "api-assets/id/image.png"}, "end_seconds": 5}
+        extra = {"credit_shortfall": 150}
+        await self.rejected_call(
+            "create_video_from_image", arguments, status=402, code="insufficient_credits", extra=extra,
+        )
+        self.assertEqual(self.error["credit_shortfall"], 150)
+        await self.rejected_call(
+            "create_video_from_image", arguments, status=402, code="plan_upgrade_required", extra=extra,
+        )
+        self.assertNotIn("credit_shortfall", self.error)
 
     async def test_local_image_and_video_rejections_name_attachment_upload_helpers(self):
         cases = [
