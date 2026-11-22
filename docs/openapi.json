@@ -927,6 +927,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -1241,6 +1245,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -1517,6 +1525,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -1885,6 +1897,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -2082,6 +2098,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -2416,6 +2436,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -2721,6 +2745,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -3093,6 +3121,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -3456,6 +3488,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -3760,6 +3796,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -4245,6 +4285,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -4564,6 +4608,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -4925,6 +4973,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -5312,6 +5364,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -5687,6 +5743,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -6039,6 +6099,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -6379,6 +6443,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -6758,6 +6826,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -7586,6 +7658,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -7926,6 +8002,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -8123,6 +8203,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -8390,6 +8474,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -8805,6 +8893,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -9092,6 +9184,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -9451,6 +9547,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -9737,6 +9837,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -10113,6 +10217,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -10421,6 +10529,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -10811,6 +10923,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -11091,6 +11207,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -11386,6 +11506,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -11713,6 +11837,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -12001,6 +12129,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -12281,6 +12413,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -12557,6 +12693,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -12891,6 +13031,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -13088,6 +13232,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -13357,6 +13505,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -13747,6 +13899,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -15879,6 +16035,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
