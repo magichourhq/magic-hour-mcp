@@ -228,8 +228,9 @@ API_TOOL_METADATA = {
         "Edit image",
         "Edits one or more supplied images using a text prompt. For prompt-only creation use "
         "generate_image. Costs credits; returns a project id for wait_for_image_project. Model "
-        "eligibility depends on the account plan. When the user has not chosen a model, omit "
-        "model; the API picks an eligible default for the plan. Preserve an explicit model, "
+        "eligibility depends on the account plan. When the user has not chosen a model, "
+        "resolution or count, omit them; the API picks eligible defaults for the plan. "
+        "Preserve an explicit model, "
         "resolution or count; if the plan can't use it, explain the limit and offer a supported "
         "option before changing it. Check the chosen model's input limits; never drop references.",
     ),
