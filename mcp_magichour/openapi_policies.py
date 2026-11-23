@@ -229,11 +229,11 @@ API_TOOL_METADATA = {
         "Edit image",
         "Edits one or more supplied images using a text prompt. For prompt-only creation use "
         "generate_image. Costs credits; returns a project id for wait_for_image_project. Model "
-        "eligibility depends on the account plan. Read get_account_info first; do not assume an "
-        "API default is eligible. For a Free account with no requested model, "
-        "flux-2-klein at 640px with image_count=1 is an available option when it supports the "
-        "supplied inputs and requested edit. Check the current model's input limits; never drop "
-        "references or change an explicit model, resolution or count to fit this option.",
+        "eligibility depends on the account plan. When the user has not chosen a model, "
+        "resolution or count, omit them; the API picks eligible defaults for the plan. "
+        "Preserve an explicit model, "
+        "resolution or count; if the plan can't use it, explain the limit and offer a supported "
+        "option before changing it. Check the chosen model's input limits; never drop references.",
     ),
     ("POST", "/v1/ai-headshot-generator"): (
         "generate_headshot",

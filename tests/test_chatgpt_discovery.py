@@ -37,8 +37,8 @@ When exposed, use a matching estimate with the exact create body; resolve blocke
 get_workflow_guide gives static inputs/docs/review, not account eligibility.
 After creation, use matching wait_for_*_project with the returned id.
 For *_file_path, never send sandbox paths (/mnt/data/...). Upload native attachments with upload_chatgpt_image or upload_chatgpt_media; use returned file_path. PUT other local bytes via get_upload_urls. Public URLs must fetch raw bytes. Preserve signed URLs and query parameters; never append expiry metadata.
-Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
-On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
+Omit unrequested options only when defaults are eligible. Image Editor defaults fit the plan; omit model, resolution and count unless the user chose them.
+Balance does not unlock restricted settings.
 On tier restrictions, explain the block; never retry unchanged or blindly remove fields.
 
 Choose video from inputs:
