@@ -39,6 +39,7 @@ After creation, use matching wait_for_*_project with the returned id.
 For *_file_path, never send sandbox paths (/mnt/data/...). Upload native attachments with upload_chatgpt_image or upload_chatgpt_media; use returned file_path. PUT other local bytes via get_upload_urls. Public URLs must fetch raw bytes. Preserve signed URLs and query parameters; never append expiry metadata.
 Omit unrequested options only when defaults are eligible. Image Editor defaults fit the plan; omit model, resolution and count unless the user chose them.
 Balance does not unlock restricted settings.
+If only credits are short, still submit: refusal is free.
 On tier restrictions, explain the block; never retry unchanged or blindly remove fields.
 
 Choose video from inputs:

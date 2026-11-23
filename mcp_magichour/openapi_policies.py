@@ -756,6 +756,14 @@ def customize_openapi_component(route: Any, component: Any) -> None:
                 "openai/toolInvocation": {"invoking": invoking, "invoked": invoked},
             }
 
+    is_generation = bool(route_tags.intersection(PROJECT_TAG_TO_ASSET)) and method == "POST" and not is_estimate
+    if isinstance(component, Tool) and is_generation:
+        # Lets a refused create call show the Add credits card.
+        component.meta = {**(component.meta or {}), "ui": {"resourceUri": MCP_APP_VIEW_URI}}
+        # The refusal is a non-error result with no project id.
+        if component.output_schema:
+            component.output_schema = {**component.output_schema, "required": []}
+
     if is_estimate:
         tags.add("read-operation")
     elif method == "POST":

@@ -123,7 +123,7 @@ class LocalAssetRecoveryTests(unittest.IsolatedAsyncioTestCase):
                 async with Client(server) as caller:
                     result = await caller.call_tool(tool, arguments, raise_on_error=False)
 
-        self.assertTrue(result.is_error)
+        self.assertEqual(result.is_error, code != "insufficient_credits")
         self.assertEqual(requests, [arguments], "Rejected generation must not retry or change settings")
         self.assertEqual(json.loads(result.content[0].text), result.structured_content)
         error = result.structured_content["error"]

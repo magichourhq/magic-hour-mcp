@@ -451,6 +451,33 @@ export default function App() {
     }
   };
 
+  const apiError = record(project.error);
+  if (apiError.code === "insufficient_credits") {
+    const shortfall = typeof apiError.credit_shortfall === "number" ? apiError.credit_shortfall : null;
+    const addCredits = async () => {
+      const href = "https://magichour.ai/pricing#credit-pack";
+      if (chatGpt?.openExternal) await (chatGpt.openExternal as (options: { href: string }) => void | Promise<void>)({ href });
+      else await app?.openLink({ url: href });
+    };
+    const resume = async () => {
+      const sent = await app?.sendMessage({ role: "user", content: [{ type: "text", text: "I added credits. Continue with the same request and the same settings." }] }).catch(() => null);
+      setDraftFeedback(sent && !sent.isError ? null : "Could not continue. Ask ChatGPT to continue with the same request.");
+    };
+    return (
+      <main className="card" aria-live="polite">
+        <section className="content">
+          <h1>Add credits to continue</h1>
+          <p className="draft-feedback">{shortfall ? `This request needs ${shortfall} more credits.` : "This request needs more credits."} Nothing was generated or charged.</p>
+          <div className="media-actions">
+            <button className="action" type="button" onClick={addCredits}>Add credits</button>
+            <button className="action action-secondary" type="button" onClick={resume}>Continue</button>
+          </div>
+          {draftFeedback && <p className="draft-feedback" role="status">{draftFeedback}</p>}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
