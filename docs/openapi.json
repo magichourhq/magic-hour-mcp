@@ -927,6 +927,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -1241,6 +1245,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -1517,6 +1525,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -1885,6 +1897,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -2082,6 +2098,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -2416,6 +2436,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -2721,6 +2745,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -3093,6 +3121,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -3456,6 +3488,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -3760,6 +3796,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -4245,6 +4285,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -4564,6 +4608,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -4925,6 +4973,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -5312,6 +5364,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -5687,6 +5743,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -6039,6 +6099,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -6379,6 +6443,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -6758,6 +6826,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -7586,6 +7658,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -7926,6 +8002,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -8123,6 +8203,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -8390,6 +8474,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -8805,6 +8893,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -9092,6 +9184,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -9259,6 +9355,7 @@
                       "qwen-image-2.1",
                       "gpt-image-2",
                       "flux-2-klein",
+                      "flux-3-klein",
                       "nano-banana-pro",
                       "seedream-v5-pro",
                       "seedream-v5-flash",
@@ -9272,7 +9369,7 @@
                       "nano-banana",
                       "nano-banana-2"
                     ],
-                    "description": "The AI model to use for image editing. Each model has different capabilities and costs.\n\n**Models:**\n- `default` - Use the model we recommend, which will change over time. This is recommended unless you need a specific model. This is the default behavior.\n- `flux-2-klein` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 5\n- `gpt-image-2` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `gpt-image-2.5-flare` - from 100 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `krea-2` - from 10 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 1\n- `nano-banana` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `nano-banana-2-lite` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `nano-banana-2.1` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `nano-banana-pro` - from 150 credits/image\n  - Supported resolutions: 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `qwen-edit` - from 10 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 2\n- `qwen-image-2.1` - from 10 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 2\n- `seedream-v4` - from 40 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `seedream-v4.5` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `seedream-v5-flash` - from 30 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `seedream-v5-pro` - from 75 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n",
+                    "description": "The AI model to use for image editing. Each model has different capabilities and costs.\n\n**Models:**\n- `default` - Use the model we recommend, which will change over time. This is recommended unless you need a specific model. This is the default behavior.\n- `flux-2-klein` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 5\n- `flux-3-klein` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 1\n- `gpt-image-2` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `gpt-image-2.5-flare` - from 100 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `krea-2` - from 10 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 1\n- `nano-banana` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `nano-banana-2-lite` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `nano-banana-2.1` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `nano-banana-pro` - from 150 credits/image\n  - Supported resolutions: 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `qwen-edit` - from 10 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 2\n- `qwen-image-2.1` - from 10 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Max additional input images: 2\n- `seedream-v4` - from 40 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `seedream-v4.5` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `seedream-v5-flash` - from 30 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n- `seedream-v5-pro` - from 75 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Max additional input images: 9\n",
                     "example": "flux-2-klein"
                   },
                   "aspect_ratio": {
@@ -9299,7 +9396,7 @@
                       "2k",
                       "4k"
                     ],
-                    "description": "Maximum resolution (longest edge) for the output image.\n\n**Options:**\n- `640px` — up to 640px\n- `1k` — up to 1024px\n- `2k` — up to 2048px\n- `4k` — up to 4096px\n- `auto` — **Deprecated.** Mapped server-side from your subscription tier to the best matching resolution the model supports\n\n**Per-model support:**\n- `flux-2-klein` - 640px, 1k, 2k\n- `gpt-image-2` - 640px, 1k, 2k, 4k\n- `gpt-image-2.5-flare` - 640px, 1k, 2k, 4k\n- `krea-2` - 640px, 1k\n- `nano-banana` - 640px, 1k\n- `nano-banana-2-lite` - 640px, 1k\n- `nano-banana-2.1` - 640px, 1k, 2k, 4k\n- `nano-banana-pro` - 1k, 2k, 4k\n- `qwen-edit` - 640px, 1k, 2k\n- `qwen-image-2.1` - 640px, 1k, 2k\n- `seedream-v4` - 640px, 1k, 2k, 4k\n- `seedream-v4.5` - 640px, 1k, 2k, 4k\n- `seedream-v5-flash` - 640px, 1k, 2k\n- `seedream-v5-pro` - 640px, 1k, 2k\n\nNote: Resolution availability depends on the model and your subscription tier.",
+                    "description": "Maximum resolution (longest edge) for the output image.\n\n**Options:**\n- `640px` — up to 640px\n- `1k` — up to 1024px\n- `2k` — up to 2048px\n- `4k` — up to 4096px\n- `auto` — **Deprecated.** Mapped server-side from your subscription tier to the best matching resolution the model supports\n\n**Per-model support:**\n- `flux-2-klein` - 640px, 1k, 2k\n- `flux-3-klein` - 640px, 1k, 2k\n- `gpt-image-2` - 640px, 1k, 2k, 4k\n- `gpt-image-2.5-flare` - 640px, 1k, 2k, 4k\n- `krea-2` - 640px, 1k\n- `nano-banana` - 640px, 1k\n- `nano-banana-2-lite` - 640px, 1k\n- `nano-banana-2.1` - 640px, 1k, 2k, 4k\n- `nano-banana-pro` - 1k, 2k, 4k\n- `qwen-edit` - 640px, 1k, 2k\n- `qwen-image-2.1` - 640px, 1k, 2k\n- `seedream-v4` - 640px, 1k, 2k, 4k\n- `seedream-v4.5` - 640px, 1k, 2k, 4k\n- `seedream-v5-flash` - 640px, 1k, 2k\n- `seedream-v5-pro` - 640px, 1k, 2k\n\nNote: Resolution availability depends on the model and your subscription tier.",
                     "example": "640px"
                   },
                   "style": {
@@ -9450,6 +9547,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -9736,6 +9837,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -9899,6 +10004,7 @@
                       "gpt-image-2",
                       "qwen-image-2.1",
                       "flux-2-klein",
+                      "flux-3-klein",
                       "nano-banana-2.1",
                       "nano-banana-pro",
                       "krea-2",
@@ -9913,7 +10019,7 @@
                       "seedream",
                       "nano-banana-2"
                     ],
-                    "description": "The AI model to use for image generation. Each model has different capabilities and costs.\n\n**Models:**\n- `default` - Use the model we recommend, which will change over time. This is recommended unless you need a specific model. This is the default behavior.\n- `flux-2-klein` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1\n- `flux-schnell` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `gpt-image-2` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `gpt-image-2.5-flare` - from 100 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `krea-2` - from 10 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1\n- `nano-banana` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `nano-banana-2-lite` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `nano-banana-2.1` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 4, 9, 16\n- `nano-banana-pro` - from 150 credits/image\n  - Supported resolutions: 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 4, 9, 16\n- `qwen-image-2.1` - from 10 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v4` - from 40 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v4.5` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v5-flash` - from 30 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v5-pro` - from 75 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `z-image-turbo` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n\n**Deprecated Enum Values:**\n- `seedream` - Use `seedream-v4` instead.\n",
+                    "description": "The AI model to use for image generation. Each model has different capabilities and costs.\n\n**Models:**\n- `default` - Use the model we recommend, which will change over time. This is recommended unless you need a specific model. This is the default behavior.\n- `flux-2-klein` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1\n- `flux-3-klein` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `flux-schnell` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `gpt-image-2` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `gpt-image-2.5-flare` - from 100 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `krea-2` - from 10 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1\n- `nano-banana` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `nano-banana-2-lite` - from 50 credits/image\n  - Supported resolutions: 640px, 1k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `nano-banana-2.1` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 4, 9, 16\n- `nano-banana-pro` - from 150 credits/image\n  - Supported resolutions: 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 4, 9, 16\n- `qwen-image-2.1` - from 10 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v4` - from 40 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v4.5` - from 50 credits/image\n  - Supported resolutions: 640px, 1k, 2k, 4k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v5-flash` - from 30 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `seedream-v5-pro` - from 75 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n- `z-image-turbo` - from 5 credits/image\n  - Supported resolutions: 640px, 1k, 2k\n  - Available for tiers: free, creator, pro, business\n  - Image count allowed: 1, 2, 3, 4\n\n**Deprecated Enum Values:**\n- `seedream` - Use `seedream-v4` instead.\n",
                     "example": "z-image-turbo"
                   },
                   "aspect_ratio": {
@@ -9936,7 +10042,7 @@
                       "2k",
                       "4k"
                     ],
-                    "description": "Maximum resolution (longest edge) for the output image.\n\n**Options:**\n- `640px` — up to 640px\n- `1k` — up to 1024px\n- `2k` — up to 2048px\n- `4k` — up to 4096px\n- `auto` — **Deprecated.** Mapped server-side from your subscription tier to the best matching resolution the model supports\n\n**Per-model support:**\n- `flux-2-klein` - 640px, 1k, 2k\n- `flux-schnell` - 640px, 1k, 2k\n- `gpt-image-2` - 640px, 1k, 2k, 4k\n- `gpt-image-2.5-flare` - 640px, 1k, 2k, 4k\n- `krea-2` - 640px, 1k\n- `nano-banana` - 640px, 1k\n- `nano-banana-2-lite` - 640px, 1k\n- `nano-banana-2.1` - 640px, 1k, 2k, 4k\n- `nano-banana-pro` - 1k, 2k, 4k\n- `qwen-image-2.1` - 640px, 1k, 2k\n- `seedream-v4` - 640px, 1k, 2k, 4k\n- `seedream-v4.5` - 640px, 1k, 2k, 4k\n- `seedream-v5-flash` - 640px, 1k, 2k\n- `seedream-v5-pro` - 640px, 1k, 2k\n- `z-image-turbo` - 640px, 1k, 2k\n\nNote: Resolution availability depends on the model and your subscription tier.",
+                    "description": "Maximum resolution (longest edge) for the output image.\n\n**Options:**\n- `640px` — up to 640px\n- `1k` — up to 1024px\n- `2k` — up to 2048px\n- `4k` — up to 4096px\n- `auto` — **Deprecated.** Mapped server-side from your subscription tier to the best matching resolution the model supports\n\n**Per-model support:**\n- `flux-2-klein` - 640px, 1k, 2k\n- `flux-3-klein` - 640px, 1k, 2k\n- `flux-schnell` - 640px, 1k, 2k\n- `gpt-image-2` - 640px, 1k, 2k, 4k\n- `gpt-image-2.5-flare` - 640px, 1k, 2k, 4k\n- `krea-2` - 640px, 1k\n- `nano-banana` - 640px, 1k\n- `nano-banana-2-lite` - 640px, 1k\n- `nano-banana-2.1` - 640px, 1k, 2k, 4k\n- `nano-banana-pro` - 1k, 2k, 4k\n- `qwen-image-2.1` - 640px, 1k, 2k\n- `seedream-v4` - 640px, 1k, 2k, 4k\n- `seedream-v4.5` - 640px, 1k, 2k, 4k\n- `seedream-v5-flash` - 640px, 1k, 2k\n- `seedream-v5-pro` - 640px, 1k, 2k\n- `z-image-turbo` - 640px, 1k, 2k\n\nNote: Resolution availability depends on the model and your subscription tier.",
                     "example": "640px"
                   },
                   "style": {
@@ -10111,6 +10217,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -10419,6 +10529,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -10809,6 +10923,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -11089,6 +11207,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -11384,6 +11506,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -11711,6 +11837,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -11999,6 +12129,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -12279,6 +12413,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -12555,6 +12693,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -12889,6 +13031,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -13086,6 +13232,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -13355,6 +13505,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -13745,6 +13899,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }
@@ -15877,6 +16035,10 @@
                     "message": {
                       "type": "string",
                       "description": "Human-readable error message."
+                    },
+                    "credit_shortfall": {
+                      "type": "number",
+                      "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
                     }
                   }
                 }

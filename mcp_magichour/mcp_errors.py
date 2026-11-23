@@ -106,6 +106,13 @@ class APIErrorRecoveryMiddleware(Middleware):
                                 "http_status": cause.response.status_code,
                                 "next_action": next_action,
                             }}
+                            shortfall = body.get("credit_shortfall")
+                            if (
+                                code == "insufficient_credits"
+                                and isinstance(shortfall, (int, float))
+                                and not isinstance(shortfall, bool)
+                            ):
+                                payload["error"]["credit_shortfall"] = shortfall
                             return ToolResult(
                                 content=json.dumps(payload), structured_content=payload, is_error=True,
                             )
