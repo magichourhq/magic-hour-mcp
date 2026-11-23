@@ -233,11 +233,14 @@ export default function App() {
 
   const project = record(toolOutput);
   const style = record(project.style);
-  const status = text(project.status, "waiting").toLowerCase();
   const rawUrls = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
   const urls = projectUrls(project);
   const downloadUrl = urls[selectedOutput] ?? null;
   const projectId = optionalText(project.id);
+  // A lookup the account cannot access has an error and no project id. Treat it as
+  // unavailable so the card does not show a waiting state or start a status poll.
+  const inaccessible = !projectId && project.error != null;
+  const status = inaccessible ? "error" : text(project.status, "waiting").toLowerCase();
   const type = projectType(project, downloadUrl);
   const hostCapabilities = app?.getHostCapabilities();
   const chatGpt = (window as Window & { openai?: {
@@ -251,7 +254,7 @@ export default function App() {
   const readBusyLabel = pendingRead?.action === "download" ? "Preparing download…"
     : pendingRead?.id !== projectId || pendingRead?.projectType !== project.project_type
       ? "Finishing check…" : status === "complete" ? "Loading your result…" : "Checking…";
-  const name = text(project.name, `${capitalize(type)} project`);
+  const name = text(project.name, inaccessible ? "Project unavailable" : `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
   const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled"].includes(status) ? "danger" : "warning";
