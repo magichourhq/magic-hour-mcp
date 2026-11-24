@@ -112,6 +112,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
 | GET | `/v1/voices` | Audio Projects | List voices |
 | GET | `/v1/account` | Account | Get account details |
+| POST | `/v1/account/checkout` | Account | Create checkout |
 
 ## Per-endpoint detail
 
