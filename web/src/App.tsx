@@ -478,6 +478,18 @@ export default function App() {
     );
   }
 
+  // A create result has an id but no project_type or status, so it cannot be polled.
+  if (projectId && !project.project_type && !project.status) {
+    return (
+      <main className="card" aria-live="polite">
+        <section className="content">
+          <h1>Generation started</h1>
+          <p className="draft-feedback">Your result will appear in this chat when it is ready.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="card" aria-live="polite">
       <section className="preview" aria-label="Generated media preview">
