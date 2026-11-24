@@ -40,6 +40,15 @@ class FrameTests(unittest.TestCase):
         self.assertEqual((got["width"], got["height"], got["way"]), (480, 854, "fill"))
         self.assertEqual((m.probe(self.dir / "r.mp4")["width"], m.probe(self.dir / "r.mp4")["height"]), (480, 854))
 
+    def test_a_photo_card_fills_the_frame_with_a_blur_not_white(self):
+        from PIL import Image
+
+        Image.new("RGB", (640, 640), (200, 40, 40)).save(self.dir / "p.png")
+        card = m.fit_picture(self.dir / "p.png", None, (480, 854), self.dir / "card.png", ["Coffee first"])
+        corner = Image.open(card).convert("RGB").getpixel((5, 5))
+        self.assertNotEqual(corner, (255, 255, 255))
+        self.assertGreater(corner[0], corner[2])   # the photo's own colour, blurred and darkened
+
     def test_reframe_works_on_a_picture(self):
         from PIL import Image
 
@@ -47,6 +56,21 @@ class FrameTests(unittest.TestCase):
         got = m.reframe(self.dir / "p.png", "9:16", self.dir / "r.png")
         self.assertEqual(got["way"], "fill")
         self.assertEqual(Image.open(self.dir / "r.png").size, (got["width"], got["height"]))
+
+    def test_two_lines_at_one_place_and_time_become_one_band(self):
+        got = m.stack_lines([{"text": "Maya Chen", "place": "bottom", "start": 1, "end": 7},
+                             {"text": "Community Gardener", "place": "bottom", "start": 1, "end": 7},
+                             {"text": "Rooftop Jazz", "place": "top"}])
+        self.assertEqual([g["text"] for g in got], ["Maya Chen\nCommunity Gardener", "Rooftop Jazz"])
+
+    def test_a_long_title_at_the_top_stays_inside_the_frame(self):
+        from PIL import Image
+
+        png = m._caption_png("Biltmore House\nAsheville, North Carolina\nDecember 24, 1895\nHistorical reconstruction",
+                             (854, 480), self.dir / "t.png", at=0.15, share=0.075)
+        box = Image.open(png).getbbox()
+        self.assertGreater(box[1], 0)
+        self.assertLess(box[3], 480)
 
 
 @unittest.skipUnless(m.have_ffmpeg(), "needs ffmpeg")
@@ -220,6 +244,18 @@ class TicketTests(unittest.TestCase):
     def test_focus_moves_the_crop(self):
         self.assertIn("(iw-480)*0.000", m.frame_filter(854, 480, 480, 854, "crop", 0.0)[0])
         self.assertIn("(iw-480)*1.000", m.frame_filter(854, 480, 480, 854, "crop", 1.0)[0])
+
+    def test_a_watermark_sits_in_its_corner_and_a_lower_third_on_the_left(self):
+        from PIL import Image
+
+        style = m.word_style({"text": "@flightschool", "place": "bottom_right", "size": "small", "style": "shadow", "opacity": 0.6})
+        png = m._caption_png("@flightschool", (854, 480), self.dir / "w.png", **style)
+        box = Image.open(png).getchannel("A").getbbox()
+        self.assertGreater(box[0], 854 * 0.6)
+        self.assertGreater(box[1], 480 * 0.8)
+        self.assertLessEqual(max(Image.open(png).getchannel("A").getdata()), 160)   # see-through
+        left = m._caption_png("Maya Chen\nFounder", (854, 480), self.dir / "l.png", **m.word_style({"place": "bottom", "align": "left"}))
+        self.assertLess(Image.open(left).getchannel("A").getbbox()[0], 854 * 0.1)
 
 
 class FfmpegByPathTest(unittest.TestCase):

@@ -217,6 +217,41 @@ def fit_length(file: Path, seconds: float, how: str, out: Path) -> Path:
     return out
 
 
+def read_words(image: Path) -> str | None:
+    """The words in a picture, read by tesseract. None when the server has no tesseract (the words are then checked by eye)."""
+    exe = shutil.which("tesseract")
+    if not exe:
+        return None
+    done = subprocess.run([exe, str(image), "-", "--psm", "11"], capture_output=True, text=True)
+    return done.stdout if done.returncode == 0 else None
+
+
+def check_words(image: Path, wanted: list[str]) -> dict | None:
+    """Read a card's words, as drawn and on a 3x grey copy; the better read counts. None: no reader on this server.
+    verdict: "right" (every word found), "misspelled" (most found, one or more not: "slze"), "unread" (the reader
+    could not read the letters, as on thin words over a glow; the card is not made again, the eye checks it)."""
+    reads = [read_words(image)]
+    if reads[0] is None:
+        return None
+    bigger = image.with_name(image.stem + "-read.png")
+    try:
+        _ffmpeg(["-i", str(image), "-vf", "scale=iw*3:ih*3:flags=lanczos,format=gray,negate", str(bigger)])
+        reads.append(read_words(bigger) or "")
+    except Exception:
+        pass
+    best = max(reads, key=lambda r: words_found(wanted, r or "")[0]) or ""
+    found, total = words_found(wanted, best)
+    verdict = "right" if found == total else "misspelled" if found * 2 >= total else "unread"
+    return {"read": " ".join(best.split()), "found": f"{found} of {total}", "verdict": verdict}
+
+
+def words_found(wanted: list[str], read: str) -> tuple[int, int]:
+    """How many of the wanted words are in the read text, letter for letter ("sleep" drawn as "sleen")."""
+    tokens = set(re.findall(r"[a-z0-9]+", read.lower()))
+    want = [t for w in wanted for t in re.findall(r"[a-z0-9]+", w.lower())]
+    return sum(t in tokens for t in want), len(want)
+
+
 FLOOR_GAP_DB = 6.0   # a clip whose background is this much louder than the others is turned down
 FLOOR_MAX_CUT_DB = 12.0
 
@@ -761,3 +796,245 @@ def add_sound(film: Path, out: Path, narration: Path | None = None, parts: list[
     else:
         shutil.rmtree(folder, ignore_errors=True)
     return {"lufs_before": before, "lufs": loudness(out), "speech": speech, "layers": order}
+
+
+def have_captions() -> bool:
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+FONTS = ("/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+         "/usr/share/fonts/dejavu/DejaVuSans.ttf", "C:/Windows/Fonts/arial.ttf")
+# Fonts shipped with the MCP (Google Fonts, open licences in fonts/)
+FONT_DIR = Path(__file__).with_name("fonts")
+FONT_FILES = {
+    "Anton": "Anton-Regular.ttf", "Bebas Neue": "BebasNeue-Regular.ttf", "Archivo Black": "ArchivoBlack-Regular.ttf",
+    "Abril Fatface": "AbrilFatface-Regular.ttf", "Permanent Marker": "PermanentMarker-Regular.ttf",
+    "Bungee": "Bungee-Regular.ttf", "Lilita One": "LilitaOne-Regular.ttf", "Pacifico": "Pacifico-Regular.ttf",
+}
+# Named looks for words in a film or picture. A look never changes the letters: the words are drawn as the host
+# wrote them, capitals included. scale: tall narrow fonts are drawn larger, so a title stays larger than a caption. caption: the default for captions (white letters,
+# black outline, as in memes). The others are for titles and on-screen words, so they never look like a caption.
+LOOKS = {
+    "caption": {"font": "Archivo Black", "style": "outline"},
+    "bold": {"font": "Anton", "style": "outline", "scale": 1.4},          # a heavy tall title (default for titles)
+    "clean": {"font": "Bebas Neue", "style": "shadow", "scale": 1.4},     # modern, thin and tall
+    "classic": {"font": "Abril Fatface", "style": "shadow"},  # an elegant serif: luxury, film, food
+    "marker": {"font": "Permanent Marker", "style": "outline"},  # hand written: vlog, fun, kids
+    "block": {"font": "Bungee", "style": "outline"},        # loud blocks: games, sport, sale
+    "playful": {"font": "Lilita One", "style": "outline"},  # round and friendly
+    "script": {"font": "Pacifico", "style": "shadow"},     # joined hand writing: a wedding, a café
+}
+TITLE_LOOK = "bold"
+
+
+def load_font(points: int, name: str | None = None):
+    """A shipped font by name (FONT_FILES), else the system sans."""
+    from PIL import ImageFont
+
+    if name and (FONT_DIR / FONT_FILES.get(name, "-")).exists():
+        return ImageFont.truetype(str(FONT_DIR / FONT_FILES[name]), points)
+    return next((ImageFont.truetype(f, points) for f in FONTS if Path(f).exists()), None) or ImageFont.load_default(points)
+
+
+def draw_card(words: list[str], background: str, size: tuple[int, int], out: Path, font: str | None = None) -> Path:
+    """A flat card: the background colour exactly, the words centred in white, one item on each line, the first larger.
+    font: a FONT_FILES name; default the title look's font."""
+    from PIL import Image, ImageDraw
+
+    width, height = size
+    image = Image.new("RGB", size, background)
+    draw = ImageDraw.Draw(image)
+    sizes = [round(min(width, height) * (0.09 if i == 0 else 0.055)) for i in range(len(words))]
+    fonts = [load_font(s, font or LOOKS[TITLE_LOOK]["font"]) for s in sizes]
+    for i, (line, face) in enumerate(zip(words, fonts)):   # shrink a line that is too wide
+        while draw.textlength(line, font=face) > width * 0.86 and face.size > 10:
+            face = face.font_variant(size=face.size - 2)
+        fonts[i] = face
+    gaps = [round(f.size * 1.35) for f in fonts]
+    y = (height - sum(gaps)) / 2
+    for line, face, gap in zip(words, fonts, gaps):
+        draw.text(((width - draw.textlength(line, font=face)) / 2, y), line, font=face, fill="white")
+        y += gap
+    image.save(out)
+    return out
+
+
+def fit_picture(source: Path, background: str | None, size: tuple[int, int], out: Path, words: list[str] | None = None,
+                font: str | None = None) -> Path:
+    """The picture unchanged, never cropped. With `background` (a logo, a screenshot): 80% of the frame, centred on that
+    colour. Without it (a photo): as large as fits, over a blurred copy of itself that fills the frame.
+    words: drawn exactly over the lower part of the picture, one line each, in the title look."""
+    from PIL import Image, ImageFilter
+
+    picture = Image.open(source).convert("RGBA")
+    room = 0.8 if background else 1.0
+    scale = min(size[0] * room / picture.width, size[1] * room / picture.height)
+    if background and picture.width <= size[0] and picture.height <= size[1]:
+        scale = min(scale, 1.0)   # a small logo is not blown up
+    fitted = picture.resize((max(1, round(picture.width * scale)), max(1, round(picture.height * scale))), Image.LANCZOS)
+    if background:
+        frame = Image.new("RGBA", size, background)
+    else:
+        cover = max(size[0] / picture.width, size[1] / picture.height)
+        wide = picture.resize((round(picture.width * cover) + 1, round(picture.height * cover) + 1), Image.LANCZOS)
+        left, top = (wide.width - size[0]) // 2, (wide.height - size[1]) // 2
+        frame = wide.crop((left, top, left + size[0], top + size[1])).filter(ImageFilter.GaussianBlur(24))
+        frame = Image.alpha_composite(frame, Image.new("RGBA", size, (0, 0, 0, 60)))
+    frame.alpha_composite(fitted, ((size[0] - fitted.width) // 2, (size[1] - fitted.height) // 2))
+    if words:
+        band = out.with_name(out.stem + "-words.png")
+        _caption_png("\n".join(words), size, band, **dict(word_style({"text": "", "look": TITLE_LOOK, "size": "large", "font": font}), at=0.82))
+        frame.alpha_composite(Image.open(band).convert("RGBA"))
+        band.unlink()
+    frame.convert("RGB").save(out)
+    return out
+
+
+def picture_copy(file: Path) -> Path | None:
+    """A copy of `file` with its picture type's suffix when it is a still picture (png, jpg, webp), else None. A kept or
+    downloaded clip is saved as .mp4 whatever it holds, and ffmpeg loops a still only by its image suffix."""
+    with open(file, "rb") as f:
+        head = f.read(12)
+    suffix = (".png" if head.startswith(b"\x89PNG") else ".jpg" if head.startswith(b"\xff\xd8\xff")
+              else ".webp" if head[:4] == b"RIFF" and head[8:12] == b"WEBP" else None)
+    if not suffix:
+        return None
+    out = file.with_name(file.stem + "-picture" + suffix)
+    shutil.copyfile(file, out)
+    return out
+
+
+def still_video(image: Path, seconds: float, out: Path) -> Path:
+    """A picture held still for `seconds`, silent, at 24 frames a second."""
+    _ffmpeg(["-loop", "1", "-i", str(image), "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", f"{seconds:.2f}",
+             "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=24,format=yuv420p", "-c:v", "libx264", "-c:a", "aac", "-shortest", str(out)])
+    return out
+
+
+def _caption_png(text: str, size: tuple[int, int], out: Path, at: float = 0.80, share: float = 0.052, align: str = "center",
+                 style: str = "band", opacity: float = 1.0, font: str | None = None) -> Path:
+    """Words on a clear picture of `size`, white on a dark band. at: where the band's middle is (share of the height).
+    share: letter height as a share of the short side. A line break in `text` starts a new line.
+    align: left, center or right, with a 5% margin (a lower third). style: band (a dark band), shadow (no band,
+    a soft shadow under the letters; a watermark) or outline (white letters with a black outline, no band).
+    opacity: 0 to 1 for the whole drawing. font: a FONT_FILES name. The words are drawn as given."""
+    from PIL import Image, ImageDraw
+
+    width, height = size
+    points = round(min(width, height) * share)
+    font = load_font(points, font)
+    image = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    lines = []
+    for given in text.split("\n"):
+        current = ""
+        for word in given.split():
+            if current and draw.textlength(f"{current} {word}", font=font) > width * 0.84:
+                lines.append(current)
+                current = word
+            else:
+                current = f"{current} {word}".strip()
+        lines.append(current)
+    line_height = round(points * 1.3)
+    top = round(height * at) - line_height * len(lines) // 2
+    top = max(round(points * 0.5), min(top, height - line_height * len(lines) - round(points * 0.5)))   # the band stays inside the frame
+    box = max(draw.textlength(line, font=font) for line in lines) + points
+    margin = round(width * 0.05)
+    left = {"left": margin, "right": width - margin - box}.get(align, (width - box) / 2)
+    if style == "band":
+        draw.rounded_rectangle([left, top - points * 0.35, left + box, top + line_height * len(lines) + points * 0.2],
+                               radius=points * 0.4, fill=(0, 0, 0, 150))
+    else:
+        from PIL import ImageFilter
+        shadow = Image.new("RGBA", size, (0, 0, 0, 0))
+        shade = ImageDraw.Draw(shadow)
+    for i, line in enumerate(lines):
+        x = {"left": left + points / 2, "right": left + box - points / 2 - draw.textlength(line, font=font)}.get(
+            align, (width - draw.textlength(line, font=font)) / 2)
+        if style == "shadow":
+            offset = max(1, round(points * 0.06))
+            shade.text((x + offset, top + i * line_height + offset), line, font=font, fill=(0, 0, 0, 200))
+        stroke = max(2, round(points * 0.09)) if style == "outline" else 0
+        draw.text((x, top + i * line_height), line, font=font, fill=(255, 255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0, 255))
+    if style != "band":
+        image = Image.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(max(1, points * 0.08))), image)
+    if opacity < 1:
+        alpha = image.getchannel("A").point(lambda a: round(a * max(0.0, opacity)))
+        image.putalpha(alpha)
+    image.save(out)
+    return out
+
+
+def draw_words(source: Path, words: list[dict], out: Path, picture: bool) -> Path:
+    """Exact words on a picture or a video. words: [{text, place, start?, end?, large?}]."""
+    words = stack_lines(words)
+    if picture:
+        from PIL import Image
+
+        frame = Image.open(source).convert("RGBA")
+        for i, line in enumerate(words):
+            band = out.with_name(f"{out.stem}-w{i}.png")
+            _caption_png(line["text"], frame.size, band, **word_style(line))
+            frame.alpha_composite(Image.open(band).convert("RGBA"))
+            band.unlink()
+        frame.convert("RGB").save(out)
+        return out
+    total = probe(source)["seconds"]
+    return draw_captions(source, [dict(w, start=w.get("start") or 0, end=w.get("end") or total + 1) for w in words], out)
+
+
+WORD_PLACES = {"top": 0.15, "middle": 0.5, "bottom": 0.80}
+CORNERS = {"top_left": (0.08, "left"), "top_right": (0.08, "right"), "bottom_left": (0.92, "left"), "bottom_right": (0.92, "right")}
+SIZES = {"small": 0.032, "normal": 0.052, "large": 0.075}
+
+
+def word_style(line: dict) -> dict:
+    """_caption_png settings for one line: {text, place, align?, size?, large?, look?, font?, style?, opacity?}.
+    look: a LOOKS name (font, style); font and style given with it win over the look's."""
+    place = line.get("place") or "bottom"
+    at, align = CORNERS.get(place, (WORD_PLACES.get(place, 0.80), line.get("align") or "center"))
+    size = line.get("size") or ("large" if line.get("large") else "normal")
+    look = LOOKS.get(line.get("look") or "", {})
+    return {"at": at, "align": align, "share": SIZES.get(size, 0.052) * look.get("scale", 1.0), "style": line.get("style") or look.get("style") or "band",
+            "opacity": float(line["opacity"]) if line.get("opacity") is not None else 1.0,
+            "font": line.get("font") or look.get("font")}
+
+
+def stack_lines(lines: list[dict]) -> list[dict]:
+    """Lines at the same place that are on screen at the same time become one band, one line under the other
+    (two bottom lines were drawn over each other)."""
+    out: list[dict] = []
+    for line in lines:
+        start, end = line.get("start") or 0, line.get("end") if line.get("end") is not None else 1e9
+        same = next((o for o in out if (o.get("place") or "bottom") == (line.get("place") or "bottom")
+                     and (o.get("start") or 0) == start and (o.get("end") if o.get("end") is not None else 1e9) == end), None)
+        if same:
+            same["text"] += "\n" + line["text"]
+        else:
+            out.append(dict(line))
+    return out
+
+
+def draw_captions(film: Path, timed: list[dict], out: Path) -> Path:
+    """Draw exact words on the picture. timed: [{"text", "start", "end", "place"?: top|middle|bottom, "large"?: bool}].
+    Lines at the same place should not overlap in time. Needs Pillow."""
+    info = probe(film)
+    timed = stack_lines(timed)
+    inputs, chain, last, pngs = ["-i", str(film)], [], "0:v", []
+    for i, line in enumerate(timed):
+        pngs.append(_caption_png(line["text"], (info["width"], info["height"]), out.with_name(f"{out.stem}-caption{i}.png"),
+                                 **word_style(line)))
+        # -loop 1 and shortest=1: a single-frame picture was dropped when the film's video started a moment after 0 s
+        # (the join's file starts at 0.021 s; words_drawn 3, none on screen)
+        inputs += ["-loop", "1", "-i", str(pngs[-1])]
+        chain.append(f"[{last}][{i + 1}:v]overlay=shortest=1:enable='between(t,{line['start']:.2f},{line['end']:.2f})'[v{i}]")
+        last = f"v{i}"
+    _ffmpeg([*inputs, "-filter_complex", ";".join(chain), "-map", f"[{last}]", "-map", "0:a?",
+                           "-c:v", "libx264", "-crf", "18", "-c:a", "copy", str(out)])
+    for png in pngs:
+        png.unlink()
+    return out
