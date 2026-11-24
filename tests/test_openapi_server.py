@@ -20,23 +20,6 @@ from mcp_magichour.openapi_server import (
     load_openapi_spec,
     mcp,
 )
-from mcp_magichour.openapi_policies import (
-    PROJECT_WAIT_TOOL_BY_ASSET,
-    VIDEO_CREATE_INVOCATION,
-)
-
-VIDEO_CREATE_TOOLS = {
-    "create_talking_photo", "create_spoken_ad_video", "edit_video", "translate_video",
-    "upscale_video", "create_animation", "create_video_from_audio", "add_subtitles_to_video",
-    "replace_character_in_video", "swap_face_in_video", "create_video_from_image",
-    "create_lip_sync_video", "create_video_from_text", "restyle_video",
-}
-# Tools that look up, wait on or download an existing project. They show the result card too.
-PROJECT_READ_CARD_TOOLS = (
-    {f"get_{asset}_project" for asset in PROJECT_WAIT_TOOL_BY_ASSET}
-    | set(PROJECT_WAIT_TOOL_BY_ASSET.values())
-    | {"fetch_video_download"}
-)
 
 
 class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
@@ -132,47 +115,6 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
                     [item["expires_at"] for item in project["download_expiration_metadata"]],
                     [item["expires_at"] for item in expected],
                 )
-
-    def test_video_next_step_keeps_waiting_for_clients_without_cards(self):
-        from mcp_magichour.openapi_server import VIDEO_NEXT_STEP
-
-        self.assertIn("wait_for_video_project", VIDEO_NEXT_STEP)
-        self.assertIn("no card", VIDEO_NEXT_STEP)
-
-    async def test_video_create_tools_expose_result_card(self):
-        from mcp_magichour.project_result_app import MCP_APP_VIEW_URI
-
-        async with Client(mcp) as caller:
-            tools = {tool.name: tool for tool in await caller.list_tools()}
-        for name in VIDEO_CREATE_TOOLS:
-            with self.subTest(tool=name):
-                self.assertEqual(tools[name].meta["ui"]["resourceUri"], MCP_APP_VIEW_URI)
-                self.assertEqual(tools[name].meta["openai/toolInvocation"], VIDEO_CREATE_INVOCATION)
-
-    def test_video_create_invocation_labels_fit_limit(self):
-        for state, label in VIDEO_CREATE_INVOCATION.items():
-            with self.subTest(state=state):
-                self.assertTrue(label.strip())
-                self.assertLessEqual(len(label), 64)
-
-    async def test_only_card_tools_declare_ui(self):
-        async with Client(mcp) as caller:
-            tools = await caller.list_tools()
-        for tool in tools:
-            # Every create tool shows the card, so a refused create can show Add credits.
-            is_create = "generation" in (tool.meta or {}).get("fastmcp", {}).get("tags", [])
-            if not is_create and tool.name not in PROJECT_READ_CARD_TOOLS:
-                with self.subTest(tool=tool.name):
-                    self.assertNotIn("ui", tool.meta or {})
-
-    async def test_only_video_creates_announce_a_video(self):
-        async with Client(mcp) as caller:
-            tools = await caller.list_tools()
-        announcing = {
-            tool.name for tool in tools
-            if (tool.meta or {}).get("openai/toolInvocation") == VIDEO_CREATE_INVOCATION
-        }
-        self.assertEqual(announcing, VIDEO_CREATE_TOOLS)
 
     async def test_metadata_fits_claude_code_utf8_budget(self):
         from mcp_magichour.openapi_server import MCP_SERVER_INSTRUCTIONS

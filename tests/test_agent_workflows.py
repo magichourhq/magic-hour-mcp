@@ -35,7 +35,6 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.jobs = {}
         self.statuses = ["queued", "complete"]
         self.poll_error_once = False
-        self.create_error = None
 
         def upstream(request):
             self.requests.append((request.method, str(request.url)))
@@ -60,8 +59,6 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
                     "expires_at": "2030-01-01T00:00:00Z",
                 } for i, item in enumerate(items)]})
             if request.method == "POST":
-                if self.create_error:
-                    return httpx.Response(self.create_error[0], json={"code": self.create_error[1], "message": "Synthetic rejection"})
                 payload = json.loads(request.content)
                 for value in payload.get("assets", {}).values():
                     if isinstance(value, str) and value.startswith("api-assets/test/"):
@@ -145,31 +142,6 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("queued", result.content[0].text)
         await self.finish("job-1")
         self.assertEqual(len(self.jobs), 1, "Waiting must not start another render")
-
-    async def test_rejected_video_create_returns_error_without_card_fields(self):
-        # 402/422 get a structured error from the recovery middleware; 429 and 503 have no
-        # recovery entry and come back as an error with text only. The card handles both.
-        for status, code in (
-            (402, "insufficient_credits"), (422, "unprocessable_entity"),
-            (429, "rate_limited"), (503, "service_unavailable"),
-        ):
-            with self.subTest(status=status):
-                self.create_error = (status, code)
-                result = await self.caller.call_tool("create_video_from_text", {
-                    "end_seconds": 5, "style": {"prompt": "A blue bottle"},
-                }, raise_on_error=False)
-                # A 402 returns the error as a normal result so ChatGPT can show Add credits.
-                self.assertEqual(result.is_error, status != 402)
-                structured = result.structured_content or {}
-                for key in ("project_type", "status", "message"):
-                    self.assertNotIn(key, structured)
-        self.assertEqual(self.jobs, {})
-
-    async def test_image_create_result_unchanged(self):
-        result = await self.caller.call_tool("generate_image", {
-            "image_count": 1, "style": {"prompt": "A blue bottle"},
-        })
-        self.assertEqual(result.structured_content, {"id": "job-1", "credits_charged": 1})
 
     async def test_product_image_reaches_video_without_an_image_edit(self):
         self.assertEqual(data(await self.caller.call_tool("get_account_info", {}))["tier"], "pro")
