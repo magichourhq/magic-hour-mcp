@@ -1,0 +1,79 @@
+{
+  "id": "C9",
+  "title": "Through the door, then the beach",
+  "decides": "After the door shot (no cut), does a clip that starts from its last frame stay on the beach and keep Mara?",
+  "aspect": "16:9",
+  "audio": false,
+  "seconds": 17,
+  "setting": "A gentle short film in natural light, soft colour, steady camera, shallow depth of field.",
+  "subjects": [
+    {
+      "id": "mara",
+      "role": "person",
+      "words": "Mara, a woman in her thirties with short curly red hair, round gold glasses and a mustard-yellow wool coat"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 4,
+      "place": "spring",
+      "subjects": [
+        "mara"
+      ],
+      "text": "Mara walks through a walled spring garden under cherry blossom, petals in the air, toward a blue wooden door in the wall. She is seen from the side."
+    },
+    {
+      "seconds": 2,
+      "place": "spring",
+      "subjects": [
+        "mara"
+      ],
+      "link": "continues",
+      "text": "She stops at the blue door and puts her hand on the handle, her face in profile."
+    },
+    {
+      "seconds": 2,
+      "place": "doorway",
+      "subjects": [
+        "mara"
+      ],
+      "link": "continues",
+      "text": "She pulls the door open. Through the doorway: a bright summer beach, white sand and blue sea."
+    },
+    {
+      "seconds": 4,
+      "place": "summer",
+      "subjects": [
+        "mara"
+      ],
+      "link": "continues",
+      "text": "She steps through the doorway onto the summer beach. The sea is in front of her and the blue door stands open behind her."
+    },
+    {
+      "seconds": 5,
+      "place": "summer",
+      "subjects": [
+        "mara"
+      ],
+      "link": "continues",
+      "text": "On the beach, Mara walks to the edge of the water, then turns to the camera and smiles."
+    }
+  ],
+  "variants": [
+    {
+      "name": "door-then-beach",
+      "strategy": "manual",
+      "cuts": [
+        5
+      ],
+      "end_on": false
+    }
+  ],
+  "checks": [
+    "One file, 17 s, 16:9",
+    "Garden, door, door opens, beach, edge of the water: in order, each once",
+    "Mara is the same person after the cut, when she turns",
+    "The second clip is on the summer beach (no garden)",
+    "No visible jump at the cut"
+  ]
+}
