@@ -291,6 +291,11 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         for name in ("wait_for_video_project", "wait_for_image_project", "wait_for_audio_project"):
             tool = next(tool for tool in tools if tool["name"] == name)
             self.assertEqual(tool["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+        # Video creates open the card when the render is accepted; image creates don't.
+        create_video = next(tool for tool in tools if tool["name"] == "create_video_from_text")
+        self.assertEqual(create_video["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+        generate_image = next(tool for tool in tools if tool["name"] == "generate_image")
+        self.assertNotIn("ui", generate_image.get("_meta", {}))
 
         listed_resources = await client.post(
             "/",

@@ -52,6 +52,7 @@ from .openapi_policies import (
     current_tool_replacements,
     image_model_resolutions,
     customize_openapi_component,
+    video_create_tool_names,
 )
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
@@ -132,6 +133,7 @@ Choose video from inputs:
 - Use Text-to-Video when no supplied starting image is required.
 - Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
   """.strip()
+VIDEO_ACCEPTED_MESSAGE = "Magic Hour accepted this video request. Rendering has not finished yet."
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 MCP_CLIENT_CONFIG_PATHS = ("/mcp.json", "/.well-known/mcp.json")
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
@@ -236,7 +238,7 @@ def create_mcp() -> FastMCP:
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
-    mcp.add_middleware(_ProjectResultCard())
+    mcp.add_middleware(_ProjectResultCard(video_create_tool_names(source_spec)))
     return mcp
 
 
@@ -845,6 +847,18 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
 
 
 class _ProjectResultCard(ToolMiddleware):
+    def __init__(self, video_create_tools: frozenset[str] = frozenset()) -> None:
+        self._video_create_tools = video_create_tools
+
+    def _is_accepted_video_create(self, tool_name: str, project: Any) -> bool:
+        """A video create that returned a project id. The card starts it at "queued" and polls that id."""
+        return (
+            tool_name in self._video_create_tools
+            and isinstance(project, dict)
+            and bool(project.get("id"))
+            and "error" not in project
+        )
+
     async def on_call_tool(
         self,
         context: MiddlewareContext[mt.CallToolRequestParams],
@@ -862,6 +876,14 @@ class _ProjectResultCard(ToolMiddleware):
             if "downloads" in project:
                 structured["downloads"] = project["downloads"]
             result.structured_content = {**structured, "project_type": project_type}
+        elif self._is_accepted_video_create(context.message.name, project):
+            # Clients without cards read the text content, so only the structured content changes.
+            result.structured_content = {
+                **project,
+                "project_type": "video",
+                "status": "queued",
+                "message": VIDEO_ACCEPTED_MESSAGE,
+            }
         return result
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
+from collections.abc import Iterable
 from typing import Any
 
 from fastmcp.tools.base import Tool
@@ -23,6 +24,11 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
 }
 
 MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
+
+VIDEO_CREATE_INVOCATION = {
+    "invoking": "Starting your video…",
+    "invoked": "Video request sent",
+}
 
 PROJECT_CONTENT_BLOCK_GUIDANCE = (
     "Say the project was blocked by a content check. Use a specific reason only when "
@@ -503,6 +509,26 @@ def image_model_resolutions(openapi_spec: dict[str, Any]) -> dict[str, dict[str,
     return rules
 
 
+def is_video_create_operation(method: str, path: str, tags: Iterable[str] | None) -> bool:
+    """True for operations that start a video render. Their results open the result card."""
+    return (
+        method == "POST"
+        and "Video Projects" in (tags or ())
+        and path not in GENERATION_ESTIMATE_PATHS
+        and (method, path) in API_TOOL_METADATA
+    )
+
+
+def video_create_tool_names(openapi_spec: dict[str, Any]) -> frozenset[str]:
+    """MCP names of the tools that start a video render."""
+    names = set()
+    for path, operations in openapi_spec.get("paths", {}).items():
+        operation = operations.get("post")
+        if isinstance(operation, dict) and is_video_create_operation("POST", path, operation.get("tags")):
+            names.add(API_TOOL_METADATA[("POST", path)][0])
+    return frozenset(names)
+
+
 def normalize_mcp_tool_name(operation_id: str) -> str:
     """Convert an OpenAPI operation ID to a descriptive snake_case MCP tool name."""
     name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", operation_id)
@@ -719,6 +745,15 @@ def _append_mcp_guidance(description: str, additions: list[str]) -> str:
     return f"{guidance}\n\n{existing}"
 
 
+def _attach_result_card(component: Tool, invoking: str, invoked: str) -> None:
+    """Show the project result card for this tool, with ChatGPT's in-progress and done labels."""
+    component.meta = {
+        **(component.meta or {}),
+        "ui": {"resourceUri": MCP_APP_VIEW_URI},
+        "openai/toolInvocation": {"invoking": invoking, "invoked": invoked},
+    }
+
+
 def customize_openapi_component(route: Any, component: Any) -> None:
     """Small runtime component policy for tags; text policy is applied to the spec."""
     tags = getattr(component, "tags", None)
@@ -748,13 +783,10 @@ def customize_openapi_component(route: Any, component: Any) -> None:
             "/v1/image-projects/{id}": ("Opening your image project…", "Image project opened"),
             "/v1/audio-projects/{id}": ("Opening your audio project…", "Audio project opened"),
         }
-        if method == "GET" and path in reopen_labels:
-            invoking, invoked = reopen_labels[path]
-            component.meta = {
-                **(component.meta or {}),
-                "ui": {"resourceUri": MCP_APP_VIEW_URI},
-                "openai/toolInvocation": {"invoking": invoking, "invoked": invoked},
-            }
+        if is_video_create_operation(method, path, route_tags):
+            _attach_result_card(component, VIDEO_CREATE_INVOCATION["invoking"], VIDEO_CREATE_INVOCATION["invoked"])
+        elif method == "GET" and path in reopen_labels:
+            _attach_result_card(component, *reopen_labels[path])
 
     is_generation = bool(route_tags.intersection(PROJECT_TAG_TO_ASSET)) and method == "POST" and not is_estimate
     if isinstance(component, Tool) and is_generation:

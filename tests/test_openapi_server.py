@@ -3,12 +3,15 @@ import re
 import unittest
 from base64 import b64encode
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastmcp import Client
+from fastmcp.tools.base import ToolResult
 
 from mcp_magichour.openapi_server import (
+    _ProjectResultCard,
     _project_download_guidance_text,
     _fetch_media_bytes,
     _project_status_text,
@@ -19,6 +22,24 @@ from mcp_magichour.openapi_server import (
     create_mcp,
     load_openapi_spec,
     mcp,
+)
+from mcp_magichour.openapi_policies import (
+    PROJECT_WAIT_TOOL_BY_ASSET,
+    VIDEO_CREATE_INVOCATION,
+    video_create_tool_names,
+)
+
+VIDEO_CREATE_TOOLS = {
+    "create_talking_photo", "create_spoken_ad_video", "edit_video", "translate_video",
+    "upscale_video", "create_animation", "create_video_from_audio", "add_subtitles_to_video",
+    "replace_character_in_video", "swap_face_in_video", "create_video_from_image",
+    "create_lip_sync_video", "create_video_from_text", "restyle_video",
+}
+# Tools that look up, wait on or download an existing project. They show the result card too.
+PROJECT_READ_CARD_TOOLS = (
+    {f"get_{asset}_project" for asset in PROJECT_WAIT_TOOL_BY_ASSET}
+    | set(PROJECT_WAIT_TOOL_BY_ASSET.values())
+    | {"fetch_video_download"}
 )
 
 
@@ -115,6 +136,55 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
                     [item["expires_at"] for item in project["download_expiration_metadata"]],
                     [item["expires_at"] for item in expected],
                 )
+
+    def test_video_create_tool_names(self):
+        self.assertEqual(video_create_tool_names(load_openapi_spec()), frozenset(VIDEO_CREATE_TOOLS))
+
+    async def card_result_for_video_create(self, structured_content):
+        card = _ProjectResultCard(frozenset({"create_video_from_text"}))
+        context = SimpleNamespace(message=SimpleNamespace(name="create_video_from_text"))
+
+        async def call_next(_context):
+            return ToolResult(structured_content=dict(structured_content))
+
+        return (await card.on_call_tool(context, call_next)).structured_content
+
+    async def test_accepted_video_create_becomes_queued_card(self):
+        from mcp_magichour.openapi_server import VIDEO_ACCEPTED_MESSAGE
+
+        result = await self.card_result_for_video_create({"id": "job-1", "credits_charged": 1})
+        self.assertEqual(result, {
+            "id": "job-1", "credits_charged": 1,
+            "project_type": "video", "status": "queued", "message": VIDEO_ACCEPTED_MESSAGE,
+        })
+
+    async def test_video_create_with_error_is_left_unchanged(self):
+        project = {"id": "job-1", "error": {"message": "Rejected"}}
+        self.assertEqual(await self.card_result_for_video_create(project), project)
+
+    async def test_video_create_tools_expose_result_card(self):
+        from mcp_magichour.project_result_app import MCP_APP_VIEW_URI
+
+        async with Client(mcp) as caller:
+            tools = {tool.name: tool for tool in await caller.list_tools()}
+        for name in VIDEO_CREATE_TOOLS:
+            with self.subTest(tool=name):
+                self.assertEqual(tools[name].meta["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+                self.assertEqual(tools[name].meta["openai/toolInvocation"], VIDEO_CREATE_INVOCATION)
+
+    def test_video_create_invocation_labels_fit_limit(self):
+        for state, label in VIDEO_CREATE_INVOCATION.items():
+            with self.subTest(state=state):
+                self.assertTrue(label.strip())
+                self.assertLessEqual(len(label), 64)
+
+    async def test_only_card_tools_declare_ui(self):
+        async with Client(mcp) as caller:
+            tools = await caller.list_tools()
+        for tool in tools:
+            if tool.name not in VIDEO_CREATE_TOOLS | PROJECT_READ_CARD_TOOLS:
+                with self.subTest(tool=tool.name):
+                    self.assertNotIn("ui", tool.meta or {})
 
     async def test_metadata_fits_claude_code_utf8_budget(self):
         from mcp_magichour.openapi_server import MCP_SERVER_INSTRUCTIONS
