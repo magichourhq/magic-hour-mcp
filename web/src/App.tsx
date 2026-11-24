@@ -455,7 +455,10 @@ export default function App() {
   if (apiError.code === "insufficient_credits") {
     const shortfall = typeof apiError.credit_shortfall === "number" ? apiError.credit_shortfall : null;
     const addCredits = async () => {
-      const href = "https://magichour.ai/pricing#credit-pack";
+      const checkout = await app?.callServerTool({ name: "create_credit_checkout", arguments: shortfall ? { credit_shortfall: shortfall } : {} }).catch(() => null);
+      const checkoutUrl = checkout?.isError ? null : optionalText(record(checkout?.structuredContent).checkout_url);
+      // Falls back to the pricing page if the checkout could not be created.
+      const href = checkoutUrl?.startsWith("https://pay.magichour.ai/") ? checkoutUrl : "https://magichour.ai/pricing#credit-pack";
       if (chatGpt?.openExternal) await (chatGpt.openExternal as (options: { href: string }) => void | Promise<void>)({ href });
       else await app?.openLink({ url: href });
     };
