@@ -43,7 +43,7 @@ def install_ui_read_origin(mcp: FastMCP) -> None:
         meta = request.params.meta.model_dump() if request.params.meta else {}
         origin = meta.get(UI_READ_ORIGIN)
         if (
-            request.params.name in PROJECT_WAIT_TOOL_BY_ASSET.values()
+            request.params.name in {*PROJECT_WAIT_TOOL_BY_ASSET.values(), "create_credit_checkout"}
             and isinstance(origin, str)
             and re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", origin)
             and isinstance(response.root, mt.CallToolResult)
