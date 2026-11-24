@@ -11,7 +11,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 from mcp.shared.exceptions import McpError
 
-from mcp_magichour.openapi_server import VIDEO_ACCEPTED_MESSAGE, create_mcp
+from mcp_magichour.openapi_server import VIDEO_ACCEPTED_MESSAGE, VIDEO_NEXT_STEP, create_mcp
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -139,6 +139,7 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.structured_content, {
             "id": "job-1", "credits_charged": 1,
             "project_type": "video", "status": "queued", "message": VIDEO_ACCEPTED_MESSAGE,
+            "next_step": VIDEO_NEXT_STEP,
         })
         self.assertIn("job-1", result.content[0].text)
         self.assertNotIn("queued", result.content[0].text)
