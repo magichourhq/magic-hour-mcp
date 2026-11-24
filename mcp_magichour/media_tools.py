@@ -283,6 +283,31 @@ def join_audio(files: list[Path], out: Path, gap: float = 0.0) -> Path:
 MIX_MAX_SECONDS = 600   # the longest mix (a mix padded to seconds=1e6 wrote a 63 GB file)
 
 
+def mix_audio(tracks: list[dict], out: Path, seconds: float | None = None, fade_out: float = 0.0) -> Path:
+    """Sound files laid over each other into one sound file (a voice over music, no picture).
+    tracks: [{file, at (seconds into the mix), volume (1 = as it is), fade_in (seconds)}]. seconds: the mix length
+    (default: to the end of the longest track), at most MIX_MAX_SECONDS. fade_out: seconds of fade at the end of the mix."""
+    if (seconds is not None and seconds <= 0) or fade_out < 0:
+        raise ValueError("seconds must be more than 0, and fade_out 0 or more")
+    inputs, chain = [], []
+    for i, t in enumerate(tracks):
+        inputs += ["-i", str(t["file"])]
+        steps = [f"aresample=48000,aformat=channel_layouts=stereo,volume={float(t.get('volume', 1)):.3f}"]
+        if t.get("fade_in"):
+            steps.append(f"afade=t=in:d={float(t['fade_in']):.2f}")
+        steps.append(f"adelay={int(float(t.get('at', 0)) * 1000)}:all=1")
+        chain.append(f"[{i}:a]{','.join(steps)}[t{i}]")
+    total = seconds or max(float(t.get("at", 0)) + probe(Path(t["file"]))["seconds"] for t in tracks)
+    if total > MIX_MAX_SECONDS:
+        raise ValueError(f"The mix would be {total:.0f} s long; the most is {MIX_MAX_SECONDS} s.")
+    end =f",afade=t=out:st={max(0, total - fade_out):.2f}:d={fade_out:.2f}" if fade_out else ""
+    # apad: a `seconds` longer than the tracks ends in silence (a line padded to the video's length)
+    chain.append("".join(f"[t{i}]" for i in range(len(tracks))) + f"amix=inputs={len(tracks)}:duration=longest:normalize=0,apad,atrim=0:{total:.2f}{end}[a]")
+    codec = {".wav": ["-c:a", "pcm_s16le"], ".mp3": ["-c:a", "libmp3lame", "-q:a", "2"]}.get(out.suffix.lower(), ["-c:a", "aac", "-b:a", "192k"])
+    _ffmpeg([*inputs, "-filter_complex", ";".join(chain), "-map", "[a]", "-vn", *codec, "-t", f"{total:.2f}", str(out)])
+    return out
+
+
 def trim(source: Path, out: Path, start: float = 0.0, end: float | None = None) -> Path:
     """The part of a video or sound file from `start` to `end` seconds, cut frame-exact (re-encoded), sound kept."""
     length = probe(source)["seconds"]
@@ -314,3 +339,425 @@ def reframe(source: Path, aspect: str, out: Path, how: str = "auto", focus: floa
     else:
         _ffmpeg(["-i", str(source), "-vf", f"{graph},format=yuv420p", "-c:v", "libx264", "-crf", "18", "-c:a", "aac", str(out)])
     return {"width": target[0], "height": target[1], "way": way, "lost": round(crop_share(info["width"], info["height"], *target), 2) if way == "crop" else 0}
+
+
+# ---- sound: one narration for the whole film, a music track, drawn captions ------------------------------------------
+def letters(text: str) -> int:
+    return sum(ch.isalnum() for ch in text)
+
+
+def speech_spans(audio: Path, noise_db: int = -35, min_gap: float = 0.12) -> list[tuple[float, float]]:
+    """The stretches of an audio or video file where something is heard."""
+    log = _ffmpeg(["-i", str(audio), "-af", f"silencedetect=noise={noise_db}dB:d={min_gap}", "-vn", "-f", "null", "-"], capture=True)
+    total = probe_seconds(audio)
+    starts = [float(x.split("silence_start:")[1].split()[0]) for x in log.splitlines() if "silence_start:" in x]
+    ends = [float(x.split("silence_end:")[1].split()[0]) for x in log.splitlines() if "silence_end:" in x]
+    spans, at = [], 0.0
+    for i, start in enumerate(starts):
+        if start - at > 0.05:
+            spans.append((at, start))
+        at = ends[i] if i < len(ends) else total
+    if total - at > 0.05:
+        spans.append((at, total))
+    return spans
+
+
+SAID_LEAD, SAID_TAIL = 0.6, 1.2   # how far before and after its slot a spoken line is looked for
+
+
+def _heard_in(film: Path, start: float, end: float) -> list[tuple[float, float]]:
+    """Where something is heard in the film's own sound between start and end (film seconds). The threshold is set
+    from the loudest moment there, so a quiet background between the words reads as a pause."""
+    with tempfile.TemporaryDirectory() as folder:
+        part = Path(folder) / "part.wav"
+        _ffmpeg(["-i", str(film), "-ss", f"{start:.3f}", "-t", f"{max(end - start, 0.1):.3f}", "-vn", "-ac", "1", "-ar", "16000", str(part)])
+        report = _ffmpeg(["-i", str(part), "-af", "volumedetect", "-f", "null", "-"], capture=True)
+        loudest = re.search(r"max_volume: (-?\d+\.?\d*) dB", report)
+        if not loudest or float(loudest.group(1)) < -60:
+            return []
+        noise = int(max(-50.0, min(-30.0, float(loudest.group(1)) - 25)))
+        return [(start + a, start + b) for a, b in speech_spans(part, noise_db=noise, min_gap=0.25)]
+
+
+def time_spoken(film: Path, lines: list[dict]) -> list[dict]:
+    """Caption times for the lines people on screen say (a voice-over and a presenter in one film).
+    lines: [{"text", "start", "end", "clip": (start, end)}] in film seconds, in film order; start and end are the
+    line's slot (the time the prompt gave it). The speech heard near the slot, in the film's own sound, sets the
+    times; when nothing is heard there, the slot is used. A line with no slot (start None: the user's own clip) is
+    placed with the other such lines of its clip in the speech heard there, in order, by length (align_parts).
+    Each sentence gets a share of its line's time by its letters. Returns [{"text", "start", "end", "timed": "heard" | "slot"}]."""
+    if not lines:
+        return []
+    sound = probe(film)["audio"]
+    heard: dict[tuple, list[tuple[float, float]]] = {}
+    for clip in {tuple(line["clip"]) for line in lines}:
+        heard[clip] = _heard_in(film, *clip) if sound else []
+    placed: dict[int, tuple[float, float, str]] = {}
+    for clip in {tuple(line["clip"]) for line in lines if line["start"] is None}:
+        free = [i for i, line in enumerate(lines) if line["start"] is None and tuple(line["clip"]) == clip]
+        found = _share_spans(heard[clip], [lines[i]["text"] for i in free])
+        if len(found) == len(free):
+            placed.update({i: (a, b, "heard") for i, (a, b) in zip(free, found)})
+        else:   # nothing heard: the clip's time, shared by letters
+            total, at = sum(letters(lines[i]["text"]) for i in free) or 1, clip[0]
+            for i in free:
+                length = (clip[1] - clip[0]) * letters(lines[i]["text"]) / total
+                placed[i] = (at, at + length, "slot")
+                at += length
+    out, previous = [], None
+    for i, line in enumerate(lines):
+        clip = tuple(line["clip"])
+        if i in placed:
+            start, end, how = placed[i]
+            later = placed[i + 1][0] if i + 1 in placed and tuple(lines[i + 1]["clip"]) == clip else clip[1]
+            end = max(end, min(start + 1.0, later))   # at least a second on screen
+            previous = (clip, end)
+            out += _sentences(line["text"], start, end, how)
+            continue
+        after = lines[i + 1] if i + 1 < len(lines) and tuple(lines[i + 1]["clip"]) == clip else None
+        low = max(clip[0], line["start"] - SAID_LEAD, previous[1] if previous and previous[0] == clip else clip[0])
+        high = min(clip[1], line["end"] + SAID_TAIL, after["start"] + 0.3 if after else clip[1])
+        found = [(max(a, low), min(b, high)) for a, b in heard.get(clip, []) if b > low and a < high]
+        found = [(a, b) for a, b in found if b - a >= 0.15]
+        if found:
+            start, end, how = found[0][0], found[-1][1], "heard"
+        else:
+            start, end, how = max(low, line["start"]), min(high, line["end"]), "slot"
+        end = max(end, min(start + 1.0, high))   # at least a second on screen
+        previous = (clip, end)
+        out += _sentences(line["text"], start, end, how)
+    return out
+
+
+def _share_spans(spans: list[tuple[float, float]], texts: list[str]) -> list[tuple[float, float]]:
+    """Lines said in order over heard spans, with no speech-to-text model: each line takes whole spans, and a line
+    ends at the pause where the speech heard so far is closest to its share of the letters. With fewer spans than
+    lines, align_parts cuts inside the spans."""
+    if not spans or not texts:
+        return []
+    if len(spans) < len(texts):
+        return align_parts(spans, texts)
+    heard, total = [], 0.0
+    for start, end in spans:
+        total += end - start
+        heard.append(total)
+    weights = [letters(t) or 1 for t in texts]
+    out, first, done = [], 0, 0
+    for i, weight in enumerate(weights[:-1]):
+        done += weight
+        target = total * done / sum(weights)
+        last = min(range(first, len(spans) - (len(texts) - 1 - i)), key=lambda k: abs(heard[k] - target))
+        out.append((spans[first][0], spans[last][1]))
+        first = last + 1
+    out.append((spans[first][0], spans[-1][1]))
+    return out
+
+
+def _sentences(text: str, start: float, end: float, how: str) -> list[dict]:
+    """One caption for each sentence of a line, each a share of the line's time by its letters."""
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s]
+    total, at, out = sum(letters(s) for s in sentences) or 1, start, []
+    for s in sentences:
+        length = (end - start) * letters(s) / total
+        out.append({"text": s, "start": round(at, 2), "end": round(at + length, 2), "timed": how})
+        at += length
+    return out
+
+
+def probe_seconds(file: Path) -> float:
+    return probe(file)["seconds"]
+
+
+def align_parts(spans: list[tuple[float, float]], parts: list[str], fine: list[tuple[float, float]] | None = None) -> list[tuple[float, float]]:
+    """Where each part of a script is in a narration that reads the parts in order, with no speech-to-text model.
+
+    Each part gets a share of the spoken time equal to its share of the letters. The boundary between two parts is
+    then moved to a pause near it, because a narrator pauses between sentences. `fine`: the same narration cut at
+    shorter pauses (speech_spans with a small min_gap), used where no long pause is near.
+    """
+    if not spans or not parts:
+        return []
+    spoken = sum(end - start for start, end in spans)
+
+    def said(text: str) -> int:   # about how long a text is when read: a digit is read as a word ("35": thirty-five)
+        return letters(text) + 4 * sum(ch.isdigit() for ch in text)
+
+    total_letters = sum(said(p) for p in parts) or 1
+
+    def at_spoken(position: float) -> float:   # the clock time at which this much speech has been heard
+        for start, end in spans:
+            if position <= end - start:
+                return start + position
+            position -= end - start
+        return spans[-1][1]
+
+    def pauses(of: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        return [(of[i][1], of[i + 1][0]) for i in range(len(of) - 1)]
+
+    def pick(candidates: list[tuple[float, float]], guess: float, reach: float, after: float) -> tuple[float, float] | None:
+        near = [g for g in candidates if abs((g[0] + g[1]) / 2 - guess) <= reach and g[0] > after]
+        return max(near, key=lambda g: (g[1] - g[0]) - 0.15 * abs((g[0] + g[1]) / 2 - guess), default=None)   # the longer pause wins
+
+    cuts, used = [], 0
+    for part in parts[:-1]:
+        used += said(part)
+        guess = at_spoken(spoken * used / total_letters)
+        after = cuts[-1] if cuts else spans[0][0]
+        # a sentence ends on a real pause; a breath inside a sentence is used only when no real pause is near
+        # ("F-35A" is short in letters, long when read; the cut fell on a breath 1.4 s early)
+        best = (pick(pauses(spans), guess, 0.6, after) or pick(pauses(spans), guess, 1.5, after)
+                or pick(pauses(fine or []), guess, 0.9, after))
+        cuts.append((best[0] + best[1]) / 2 if best else guess)
+    edges = [spans[0][0], *cuts, spans[-1][1]]
+    return [(edges[i], edges[i + 1]) for i in range(len(parts))]
+
+
+# Sound layers. Priority: 1 speech (narration and spoken lines), 2 music, 3 effects (the clips' own
+# sound). A layer is lowered only where a higher layer plays, and only there. With no speech, music is the top layer.
+MUSIC_UNDER_SPEECH_DB = 9    # music under speech (18, then 12: more music under the voice)
+SWELL_DB = 8                 # music_swell: how far the music rises between the lines
+EFFECTS_UNDER_DB = 10        # effects under narration or music
+CUE_MAX_RAISE_DB = 15        # a sound before a late music start is raised at most this much to the music's loudness
+TARGET_LUFS = -16.0          # the whole film, social video
+DUCK_RAMP = 0.3              # seconds to go down or up
+DUCK_BRIDGE = 1.0            # a gap shorter than this between two speech spans stays lowered (no pumping)
+LIMIT_TRUE_PEAK = 0.89       # about -1 dBTP
+
+
+VOICE_LEAD = 0.5             # a narration part starts this far into its beat
+VOICE_LEAD_MIN = 0.1         # ... or this far, when it does not fit
+VOICE_GAP = 0.1              # the least pause between two parts
+VOICE_TEMPO_MAX = 1.15       # the most a narration is sped up to fit (more is heard)
+HOLD_TAIL = 0.3              # the picture holds this long after the last word
+
+
+def fit_parts(parts: list[dict], seconds: float) -> dict:
+    """Fit a narration's parts into a film of `seconds` without cutting a word (the last words ran past the
+    end and were cut). parts: [{"start", "end"} in the narration, "at" in the film, with VOICE_LEAD]. In order:
+    1 no part starts before the one before it ends; 2 the parts start VOICE_LEAD_MIN into their beat, not VOICE_LEAD;
+    3 the narration is read up to VOICE_TEMPO_MAX faster; 4 the film holds its last frame. Returns
+    {"parts" (each with "tempo"), "tempo", "moved", "hold"}: hold = the seconds the last frame is held (0: none)."""
+    def place(lead_cut: float, tempo: float) -> list[dict]:
+        out, after = [], 0.0
+        for p in parts:
+            at = max(p["at"] - lead_cut, after + (VOICE_GAP if out else 0.0))
+            out.append(dict(p, at=round(at, 3), tempo=tempo))
+            after = at + (p["end"] - p["start"]) / tempo
+        return out
+
+    def over(placed: list[dict]) -> float:
+        last = placed[-1]
+        return last["at"] + (last["end"] - last["start"]) / last["tempo"] + HOLD_TAIL - seconds
+
+    if not parts:
+        return {"parts": [], "tempo": 1.0, "moved": False, "hold": 0.0}
+    placed = place(0.0, 1.0)
+    if over(placed) <= 0:
+        return {"parts": placed, "tempo": 1.0, "moved": placed != [dict(p, tempo=1.0) for p in parts], "hold": 0.0}
+    placed = place(VOICE_LEAD - VOICE_LEAD_MIN, 1.0)
+    if over(placed) > 0:
+        low, high = 1.0, VOICE_TEMPO_MAX   # the least speed-up that fits (a part held at its beat start shrinks only by itself)
+        if over(place(VOICE_LEAD - VOICE_LEAD_MIN, high)) <= 0:
+            for _ in range(20):
+                low, high = (low, (low + high) / 2) if over(place(VOICE_LEAD - VOICE_LEAD_MIN, (low + high) / 2)) <= 0 else ((low + high) / 2, high)
+        placed = place(VOICE_LEAD - VOICE_LEAD_MIN, round(high + 0.0005, 3))
+    return {"parts": placed, "tempo": placed[0]["tempo"], "moved": True, "hold": round(max(0.0, over(placed)), 2)}
+
+
+def hold_end(film: Path, seconds: float, out: Path) -> Path:
+    """The film with its last frame held `seconds` longer (its sound padded with silence)."""
+    has_audio = probe(film)["audio"]
+    _ffmpeg(["-i", str(film), "-vf", f"tpad=stop_mode=clone:stop_duration={seconds:.2f}",
+             *(["-af", f"apad=pad_dur={seconds:.2f}"] if has_audio else []),
+             "-c:v", "libx264", "-pix_fmt", "yuv420p", *(["-c:a", "aac"] if has_audio else []), str(out)])
+    return out
+
+
+def merge_spans(spans: list[tuple[float, float]], bridge: float = DUCK_BRIDGE) -> list[tuple[float, float]]:
+    out: list[list[float]] = []
+    for start, end in sorted(spans):
+        if out and start - out[-1][1] < bridge:
+            out[-1][1] = max(out[-1][1], end)
+        else:
+            out.append([start, end])
+    return [(a, b) for a, b in out]
+
+
+def _inside(spans: list[tuple[float, float]], ramp: float = DUCK_RAMP) -> str:
+    """An ffmpeg expression of t: 1 inside the spans, 0 outside, with a linear ramp at each edge."""
+    expr = "0"
+    for start, end in spans:
+        one = f"clip(min((t-{start - ramp:.3f})/{ramp},({end + ramp:.3f}-t)/{ramp}),0,1)"
+        expr = one if expr == "0" else f"max({expr},{one})"
+    return expr
+
+
+def _gain(lowered: str, db: float, kept: str = "0") -> str:
+    """volume expression: lowered by `db` where `lowered` is 1, never where `kept` is 1."""
+    depth = 1 - 10 ** (-db / 20)
+    return f"1-{depth:.4f}*({lowered})*(1-({kept}))"
+
+
+def loudness(file: Path) -> float | None:
+    """Integrated loudness in LUFS, or None when nothing is heard."""
+    report = _ffmpeg(["-i", str(file), "-af", "ebur128", "-vn", "-f", "null", "-"], capture=True)
+    found = re.findall(r"I:\s+(-?\d+\.?\d*) LUFS", report)
+    value = float(found[-1]) if found else None
+    return None if value is None or value <= -69 else value
+
+
+def loudness_between(file: Path, spans: list[tuple[float, float]], gain_db: float = 0.0) -> float | None:
+    """The loudness of a file inside the spans only (a spoken line inside the film's own sound). gain_db: measured this
+    much louder, then taken off again (a quiet background is under the meter's -70 LUFS gate)."""
+    pick = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in spans)
+    raised = f"volume={gain_db:.1f}dB," if gain_db else ""
+    report = _ffmpeg(["-i", str(file), "-vn", "-af", f"aselect='{pick}',{raised}ebur128", "-f", "null", "-"], capture=True)
+    found = re.findall(r"I:\s+(-?\d+\.?\d*) LUFS", report)
+    value = float(found[-1]) if found else None
+    return None if value is None or value <= -69 else round(value - gain_db, 1)
+
+
+# In testing, the street under a spoken line was 53 dB under the voice and heard only at
+# full volume. The steady background of a clip's own sound is lifted, the voice is not touched. The background is what
+# afftdn takes out as noise; the lowpass removes the speech traces left in its top.
+BED_FILTER = "afftdn=nr=30:nf=-75:tn=1:om=n,lowpass=f=7000"
+BED_UNDER_VOICE_DB = 23      # the background is lifted to this far under the spoken line (in testing: +30 dB, 23 LU)
+BED_MAX_RAISE_DB = 30        # at most this much
+BED_MIN_RAISE_DB = 3         # a smaller lift is not done
+BED_MEASURE_GAIN_DB = 40     # a quiet background is measured this much louder (loudness_between)
+BED_PAUSE_MARGIN = 0.2       # a pause starts this far after a heard sound and ends this far before the next
+
+
+def lift_bed(film: Path, spoken: list[tuple[float, float]], clips: list[tuple[float, float]], out: Path) -> dict | None:
+    """The film with the steady background of its own sound lifted inside `clips` (the clips with a spoken line), to
+    BED_UNDER_VOICE_DB under the speech in `spoken`. The background is measured in the pauses, where nothing is heard
+    (speech_spans). None when there is no pause (the background is heard already), no background, or it is loud enough."""
+    if not spoken or not clips or not probe(film)["audio"]:
+        return None
+    voice = loudness_between(film, spoken)
+    heard, pauses = speech_spans(film), []
+    for start, end in clips:
+        at = start
+        for a, b in heard:
+            if b <= start or a >= end:
+                continue
+            if a - BED_PAUSE_MARGIN - at >= 0.3:
+                pauses.append((at, a - BED_PAUSE_MARGIN))
+            at = max(at, b + BED_PAUSE_MARGIN)
+        if end - at >= 0.3:
+            pauses.append((at, end))
+    if voice is None or sum(b - a for a, b in pauses) < 0.5:
+        return None
+    target = voice - BED_UNDER_VOICE_DB
+    street = loudness_between(film, pauses, BED_MEASURE_GAIN_DB)
+    if street is not None and street > target - BED_MIN_RAISE_DB:
+        return None
+    with tempfile.TemporaryDirectory() as folder:   # the background track is a working file, never beside the film
+        bed_file = Path(folder) / "bed.wav"
+        _ffmpeg(["-i", str(film), "-vn", "-af", BED_FILTER, str(bed_file)])
+        bed = loudness_between(bed_file, pauses, BED_MEASURE_GAIN_DB)
+        if bed is None:
+            return None
+        raise_db = min(BED_MAX_RAISE_DB, target - bed)
+        if raise_db < BED_MIN_RAISE_DB:
+            return None
+        level = f"{10 ** (raise_db / 20):.4f}*({_inside(clips)})"
+        _ffmpeg(["-i", str(film), "-i", str(bed_file), "-filter_complex",
+                 f"[1:a]volume='{level}':eval=frame[bed];[0:a][bed]amix=inputs=2:normalize=0:duration=first[a]",
+                 "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", str(out)])
+    return {"raised_db": round(raise_db, 1), "voice_lufs": voice, "background_lufs_before": street,
+            "background_lufs": loudness_between(out, pauses, BED_MEASURE_GAIN_DB)}
+
+
+def add_sound(film: Path, out: Path, narration: Path | None = None, parts: list[dict] | None = None, music: Path | None = None,
+              spoken: list[tuple[float, float]] | None = None, music_first: bool = False, layers: Path | None = None,
+              music_swell: bool = False, music_at: float = 0.0) -> dict:
+    """Mix the film's sound from three layers and normalize it to TARGET_LUFS.
+    parts: [{"start", "end"} in the narration, "at" in the film]. spoken: where a person on screen speaks (inside the
+    film's own sound). music_first: the music is never lowered (a music video). layers: a folder that keeps each layer
+    as its own file, so a later mix can use them again. music_at: the second the music starts (the whoosh first,
+    then the music). Returns what was done and measured."""
+    seconds = probe_seconds(film)
+    folder = layers or Path(tempfile.mkdtemp())
+    folder.mkdir(parents=True, exist_ok=True)
+    parts = parts if narration and parts else []
+    narrated = merge_spans([(p["at"], p["at"] + (p["end"] - p["start"]) / p.get("tempo", 1.0)) for p in parts])
+    talk = merge_spans(list(spoken or []))
+    speech = merge_spans(narrated + talk)
+    silence = ["-f", "lavfi", "-i", f"anullsrc=r=48000:cl=stereo:d={seconds:.3f}"]
+    # pad to the film's length and stop there (an open-ended apad made ffmpeg wait forever on a multi-part narration)
+    fit = f"aresample=48000,aformat=channel_layouts=stereo,apad=whole_dur={seconds:.3f},atrim=0:{seconds:.3f}"
+    end = ["-t", f"{seconds:.3f}"]
+    files: dict[str, Path] = {}
+
+    # 1 speech: the narration, each part at its place
+    files["speech"] = folder / "speech.wav"
+    if parts:
+        steps = [f"[0:a]atrim={p['start']:.2f}:{p['end']:.2f},asetpts=PTS-STARTPTS,"
+                 + (f"atempo={p['tempo']:.3f}," if p.get("tempo", 1.0) != 1.0 else "")
+                 + f"afade=t=in:d=0.03,afade=t=out:st={max(0, (p['end'] - p['start']) / p.get('tempo', 1.0) - 0.03):.2f}:d=0.03,"
+                 f"adelay={int(p['at'] * 1000)}:all=1[n{i}]"
+                 for i, p in enumerate(parts)]
+        steps.append("".join(f"[n{i}]" for i in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0,{fit}[s]")
+        _ffmpeg(["-i", str(narration), "-filter_complex", ";".join(steps), "-map", "[s]", *end, str(files["speech"])])
+    else:
+        _ffmpeg([*silence, str(files["speech"])])
+
+    # 2 music. A film with speech: one steady level, 12 dB under the voice, the whole film (a bed). music_swell: full
+    # level between the lines, down only while someone speaks. music_first, or no speech: never lowered.
+    if music:
+        files["music"] = folder / "music.wav"
+        level = "1"
+        if speech and not music_first:
+            voice = loudness(files["speech"]) if parts else None
+            if voice is None and talk and probe(film)["audio"]:
+                voice = loudness_between(film, talk)
+            track = loudness(music)
+            depth = MUSIC_UNDER_SPEECH_DB if voice is None or track is None else track - (voice - MUSIC_UNDER_SPEECH_DB)
+            bed = 10 ** (-depth / 20)
+            if music_swell:   # between the lines the music rises SWELL_DB over the bed (not to full: that blasted)
+                high = min(1.0, bed * 10 ** (SWELL_DB / 20)) if depth > 0 else bed
+                level = f"{high:.4f}-{high - bed:.4f}*({_inside(speech)})"
+            else:
+                level = f"{bed:.4f}"
+        late = f"adelay={int(music_at * 1000)}:all=1," if music_at > 0 else ""
+        rise = 0.3 if music_at > 0 else 1   # a late start is a cue: it comes in quickly
+        _ffmpeg(["-i", str(music), "-af", f"{late}{fit},volume='{level}':eval=frame,afade=t=in:st={music_at:.2f}:d={rise},"
+                 f"afade=t=out:st={max(0, seconds - 2):.2f}:d=2", *end, str(files["music"])])
+
+    # 3 effects: the film's own sound, lowered under narration and music; a spoken line in it is never lowered
+    files["effects"] = folder / "effects.wav"
+    if probe(film)["audio"]:
+        # before a late music start the film's own sound (the whoosh) is not lowered
+        heard = _inside([(music_at, seconds)]) if music and music_at > 0 else "1"
+        above = heard if music else _inside(narrated)
+        if music and narrated and music_at > 0:
+            above = f"max({heard},{_inside(narrated)})"
+        level = _gain(above, EFFECTS_UNDER_DB, _inside(talk)) if (music or narrated) else "1"
+        if music and music_at > 0 and not narrated:
+            # a cue before the music (the whoosh) came out 25 dB under it; it is raised to the music's
+            # loudness, at most CUE_MAX_RAISE_DB
+            cue, track = loudness_between(film, [(0, music_at)]), loudness(files["music"])
+            raise_db = 0.0 if cue is None or track is None else max(0.0, min(CUE_MAX_RAISE_DB, track - cue))
+            if raise_db:
+                level = f"({level})*(1+{10 ** (raise_db / 20) - 1:.4f}*(1-({heard})))"
+        _ffmpeg(["-i", str(film), "-vn", "-af", f"{fit},volume='{level}':eval=frame", *end, str(files["effects"])])
+    else:
+        _ffmpeg([*silence, str(files["effects"])])
+
+    order = [k for k in ("speech", "music", "effects") if k in files]
+    mix = folder / "mix.wav"
+    _ffmpeg([*sum((["-i", str(files[k])] for k in order), []), "-filter_complex",
+             "".join(f"[{i}:a]" for i in range(len(order))) + f"amix=inputs={len(order)}:normalize=0[a]", "-map", "[a]", str(mix)])
+    before = loudness(mix)
+    gain = 0.0 if before is None else TARGET_LUFS - before
+    _ffmpeg(["-i", str(film), "-i", str(mix), "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+             "-af", f"volume={gain:.2f}dB,alimiter=limit={LIMIT_TRUE_PEAK}:level=disabled", "-c:a", "aac", "-b:a", "192k",
+             "-t", f"{seconds:.2f}", str(out)])
+    if layers:
+        (layers / "layers.json").write_text(json.dumps({
+            "priority": ["speech", "music", "effects"], "music_first": music_first, "music_swell": music_swell, "speech": speech, "spoken": talk,
+            "files": {k: files[k].name for k in order}, "gain_db": round(gain, 2), "target_lufs": TARGET_LUFS}, indent=1))
+    else:
+        shutil.rmtree(folder, ignore_errors=True)
+    return {"lufs_before": before, "lufs": loudness(out), "speech": speech, "layers": order}
