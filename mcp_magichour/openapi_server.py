@@ -114,7 +114,7 @@ Create and edit images and video, generate music and speech, clone voices, and r
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote. Estimates never authorize spending.
 get_workflow_guide gives static inputs/docs/review, not account eligibility.
-After creation, use matching wait_for_*_project with the returned id, unless a video result card is shown.
+After creation, use matching wait_for_*_project unless a video card shows.
 For *_file_path, never send sandbox paths (/mnt/data/...). Upload native attachments with upload_chatgpt_image or upload_chatgpt_media; use returned file_path. PUT other local bytes via get_upload_urls. Public URLs must fetch raw bytes. Preserve signed URLs and query parameters; never append expiry metadata.
 Omit unrequested options only when defaults are eligible. Image Editor defaults fit the plan; omit model, resolution and count unless the user chose them.
 Balance does not unlock restricted settings.

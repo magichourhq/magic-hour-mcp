@@ -189,9 +189,20 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         async with Client(mcp) as caller:
             tools = await caller.list_tools()
         for tool in tools:
-            if tool.name not in VIDEO_CREATE_TOOLS | PROJECT_READ_CARD_TOOLS:
+            # Every create tool shows the card, so a refused create can show Add credits.
+            is_create = "generation" in (tool.meta or {}).get("fastmcp", {}).get("tags", [])
+            if not is_create and tool.name not in PROJECT_READ_CARD_TOOLS:
                 with self.subTest(tool=tool.name):
                     self.assertNotIn("ui", tool.meta or {})
+
+    async def test_only_video_creates_announce_a_video(self):
+        async with Client(mcp) as caller:
+            tools = await caller.list_tools()
+        announcing = {
+            tool.name for tool in tools
+            if (tool.meta or {}).get("openai/toolInvocation") == VIDEO_CREATE_INVOCATION
+        }
+        self.assertEqual(announcing, VIDEO_CREATE_TOOLS)
 
     async def test_metadata_fits_claude_code_utf8_budget(self):
         from mcp_magichour.openapi_server import MCP_SERVER_INSTRUCTIONS

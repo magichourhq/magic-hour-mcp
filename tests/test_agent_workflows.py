@@ -158,7 +158,8 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 result = await self.caller.call_tool("create_video_from_text", {
                     "end_seconds": 5, "style": {"prompt": "A blue bottle"},
                 }, raise_on_error=False)
-                self.assertTrue(result.is_error)
+                # A 402 returns the error as a normal result so ChatGPT can show Add credits.
+                self.assertEqual(result.is_error, status != 402)
                 structured = result.structured_content or {}
                 for key in ("project_type", "status", "message"):
                     self.assertNotIn(key, structured)
