@@ -68,6 +68,7 @@ from .project_result_app import (
     read_mcp_app_html,
 )
 from . import kept_files
+from .plan_request import register_plan_request
 from .tool_logging import ToolCallLoggingMiddleware
 from .workflow_guidance import register_workflow_guidance
 
@@ -242,6 +243,7 @@ def create_mcp() -> FastMCP:
 
 def register_custom_tools(mcp: FastMCP) -> None:
     register_workflow_guidance(mcp)
+    register_plan_request(mcp)
 
     @mcp.tool(
         name="upload_chatgpt_image",
