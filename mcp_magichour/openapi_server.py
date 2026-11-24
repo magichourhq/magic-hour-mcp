@@ -67,6 +67,7 @@ from .project_result_app import (
     install_ui_read_origin,
     read_mcp_app_html,
 )
+from . import kept_files
 from .tool_logging import ToolCallLoggingMiddleware
 from .workflow_guidance import register_workflow_guidance
 
@@ -561,6 +562,7 @@ async def _upload_chatgpt_file(file: ChatGPTFile, media_type: ProjectType) -> di
             )
             uploaded = await files.put(item["upload_url"], content=bytes(media))
             uploaded.raise_for_status()
+            await asyncio.to_thread(kept_files.keep_if_possible, item["file_path"], bytes(media))   # read again by join / last frame
             return {"file_path": item["file_path"]}
 
     try:
