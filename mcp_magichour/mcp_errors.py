@@ -50,8 +50,10 @@ class APIErrorRecoveryMiddleware(Middleware):
                             "invalid_request": (400, "Correct the fields described by the API using the current tool schema. Preserve explicit settings; ask before changing them. Do not retry the unchanged request."),
                             "insufficient_credits": (
                                 402,
-                                "Explain that the connected account lacks credits. State the shortfall if the API reports it. "
-                                "Lead with [Add credits](https://magichour.ai/pricing#credit-pack) for a one-time purchase. "
+                                "Nothing was generated or charged. Explain that the connected account lacks credits. "
+                                "State the shortfall if the API reports it. In ChatGPT the card shows Add credits and "
+                                "Continue buttons; do not repeat them. Elsewhere, "
+                                "lead with [Add credits](https://magichour.ai/pricing#credit-pack) for a one-time purchase. "
                                 "If the user asks about a subscription, show https://magichour.ai/pricing. "
                                 "Ask them to use the same Magic Hour account and return here to continue. "
                                 "A credit purchase does not unlock subscription-only models or resolutions. "
@@ -114,7 +116,9 @@ class APIErrorRecoveryMiddleware(Middleware):
                             ):
                                 payload["error"]["credit_shortfall"] = shortfall
                             return ToolResult(
-                                content=json.dumps(payload), structured_content=payload, is_error=True,
+                                content=json.dumps(payload), structured_content=payload,
+                                # ChatGPT shows no card for an error result.
+                                is_error=code != "insufficient_credits",
                             )
                 # Attachment helpers suppress their cause but retain context. Their
                 # source/upload host errors must not be classified as API rejections.
