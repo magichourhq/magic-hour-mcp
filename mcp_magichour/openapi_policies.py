@@ -519,16 +519,6 @@ def is_video_create_operation(method: str, path: str, tags: Iterable[str] | None
     )
 
 
-def video_create_tool_names(openapi_spec: dict[str, Any]) -> frozenset[str]:
-    """MCP names of the tools that start a video render."""
-    names = set()
-    for path, operations in openapi_spec.get("paths", {}).items():
-        operation = operations.get("post")
-        if isinstance(operation, dict) and is_video_create_operation("POST", path, operation.get("tags")):
-            names.add(API_TOOL_METADATA[("POST", path)][0])
-    return frozenset(names)
-
-
 def normalize_mcp_tool_name(operation_id: str) -> str:
     """Convert an OpenAPI operation ID to a descriptive snake_case MCP tool name."""
     name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", operation_id)

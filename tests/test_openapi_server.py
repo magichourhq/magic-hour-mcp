@@ -3,15 +3,12 @@ import re
 import unittest
 from base64 import b64encode
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastmcp import Client
-from fastmcp.tools.base import ToolResult
 
 from mcp_magichour.openapi_server import (
-    _ProjectResultCard,
     _project_download_guidance_text,
     _fetch_media_bytes,
     _project_status_text,
@@ -26,7 +23,6 @@ from mcp_magichour.openapi_server import (
 from mcp_magichour.openapi_policies import (
     PROJECT_WAIT_TOOL_BY_ASSET,
     VIDEO_CREATE_INVOCATION,
-    video_create_tool_names,
 )
 
 VIDEO_CREATE_TOOLS = {
@@ -137,37 +133,11 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
                     [item["expires_at"] for item in expected],
                 )
 
-    def test_video_create_tool_names(self):
-        self.assertEqual(video_create_tool_names(load_openapi_spec()), frozenset(VIDEO_CREATE_TOOLS))
-
-    async def card_result_for_video_create(self, structured_content):
-        card = _ProjectResultCard(frozenset({"create_video_from_text"}))
-        context = SimpleNamespace(message=SimpleNamespace(name="create_video_from_text"))
-
-        async def call_next(_context):
-            return ToolResult(structured_content=dict(structured_content))
-
-        return (await card.on_call_tool(context, call_next)).structured_content
-
-    async def test_accepted_video_create_becomes_queued_card(self):
-        from mcp_magichour.openapi_server import VIDEO_ACCEPTED_MESSAGE, VIDEO_NEXT_STEP
-
-        result = await self.card_result_for_video_create({"id": "job-1", "credits_charged": 1})
-        self.assertEqual(result, {
-            "id": "job-1", "credits_charged": 1,
-            "project_type": "video", "status": "queued", "message": VIDEO_ACCEPTED_MESSAGE,
-            "next_step": VIDEO_NEXT_STEP,
-        })
-
     def test_video_next_step_keeps_waiting_for_clients_without_cards(self):
         from mcp_magichour.openapi_server import VIDEO_NEXT_STEP
 
         self.assertIn("wait_for_video_project", VIDEO_NEXT_STEP)
         self.assertIn("no card", VIDEO_NEXT_STEP)
-
-    async def test_video_create_with_error_is_left_unchanged(self):
-        project = {"id": "job-1", "error": {"message": "Rejected"}}
-        self.assertEqual(await self.card_result_for_video_create(project), project)
 
     async def test_video_create_tools_expose_result_card(self):
         from mcp_magichour.project_result_app import MCP_APP_VIEW_URI

@@ -52,7 +52,7 @@ from .openapi_policies import (
     current_tool_replacements,
     image_model_resolutions,
     customize_openapi_component,
-    video_create_tool_names,
+    VIDEO_CREATE_INVOCATION,
 )
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
@@ -243,7 +243,7 @@ def create_mcp() -> FastMCP:
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
-    mcp.add_middleware(_ProjectResultCard(video_create_tool_names(source_spec)))
+    mcp.add_middleware(_ProjectResultCard())
     return mcp
 
 
@@ -852,17 +852,16 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
 
 
 class _ProjectResultCard(ToolMiddleware):
-    def __init__(self, video_create_tools: frozenset[str] = frozenset()) -> None:
-        self._video_create_tools = video_create_tools
-
-    def _is_accepted_video_create(self, tool_name: str, project: Any) -> bool:
+    async def _is_accepted_video_create(
+        self, context: MiddlewareContext[mt.CallToolRequestParams], project: Any,
+    ) -> bool:
         """A video create that returned a project id. The card starts it at "queued" and polls that id."""
-        return (
-            tool_name in self._video_create_tools
-            and isinstance(project, dict)
-            and bool(project.get("id"))
-            and "error" not in project
-        )
+        if not isinstance(project, dict) or not project.get("id") or "error" in project:
+            return False
+        # is_video_create_operation marked these tools with the video labels when the tools were built.
+        server = context.fastmcp_context.fastmcp if context.fastmcp_context else None
+        tool = await server.get_tool(context.message.name) if server else None
+        return bool(tool and (tool.meta or {}).get("openai/toolInvocation") == VIDEO_CREATE_INVOCATION)
 
     async def on_call_tool(
         self,
@@ -881,7 +880,7 @@ class _ProjectResultCard(ToolMiddleware):
             if "downloads" in project:
                 structured["downloads"] = project["downloads"]
             result.structured_content = {**structured, "project_type": project_type}
-        elif self._is_accepted_video_create(context.message.name, project):
+        elif await self._is_accepted_video_create(context, project):
             # Clients without cards read the text content, so only the structured content changes.
             result.structured_content = {
                 **project,
