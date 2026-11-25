@@ -131,6 +131,13 @@ MCP_OAUTH_ISSUER_URL=https://mcp.magichour.ai
 MCP_OAUTH_RESOURCE_URL=https://mcp.magichour.ai
 ```
 
+The video production and media tools also read these:
+
+- `BLOB_READ_WRITE_TOKEN`: a public Vercel Blob store for finished films. Without it, a film stays in the temp folder of the instance that made it. Set it on Vercel or on more than one instance.
+- `KEPT_BLOB_READ_WRITE_TOKEN`: a private Vercel Blob store for the kept copy of each upload. Without it, the copies stay in the temp folder of one instance.
+- `MAGIC_HOUR_MCP_PUBLIC_URL`: the public address of this server. Film links use it when there is no Blob store. The default is `http://127.0.0.1:8000`.
+- `MAGIC_HOUR_TRANSCRIBE_CHECK=on` with `OPENAI_API_KEY`: the join sends the narration audio to OpenAI Whisper to check its words. It is off by default.
+
 Override `MAGIC_HOUR_API_BASE_URL` to use a mock or another API base:
 
 ```sh

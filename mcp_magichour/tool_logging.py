@@ -17,9 +17,14 @@ _SECRET_KEYS = {
     "fileid",
     "filename",
     "password",
+    "original",
     "prompt",
+    "request",
     "secret",
+    "story",
+    "text",
     "token",
+    "words",
 }
 
 
@@ -38,6 +43,8 @@ def _safe_tool_arguments(value: Any) -> Any:
         return safe
     if isinstance(value, list):
         return [_safe_tool_arguments(item) for item in value]
+    if isinstance(value, str) and value.startswith(("http://", "https://", "api-assets/")):
+        return "[redacted]"   # a media link or file path under any key name (the video tools say media, video, made)
     if isinstance(value, str) and len(value) > MAX_STRING_LENGTH:
         return f"{value[:MAX_STRING_LENGTH]}…"
     return value
