@@ -885,6 +885,272 @@ def check_plan(story: dict, planned: dict) -> list[str]:
     return problems
 
 
+HEX = re.compile(r"#[0-9A-Fa-f]{6}\b")
+NAMED_HEX = re.compile(r"(\b[A-Za-z]+ )?(#[0-9A-Fa-f]{6})\b")   # "teal #0E7C86": the word before a code, if any
+
+
+SOCIAL = re.compile(r"\b(reels?|ads?|advert\w*|promo\w*|commercial|tiktok|instagram|insta|social|shorts|story post)\b", re.I)
+LATE_MUSIC = re.compile(r"\bthen\b[^.;]{0,40}\b(?:music|sting|jingle|tune)\b|\b(?:music|sting|jingle|tune)\b[^.;]{0,30}\b(?:after|once|as soon as)\b"
+                        r"|\bmusic (?:comes|kicks|starts) in\b|\bsting\b", re.I)
+SILENT = re.compile(r"\b(silent|no (music|sound|audio)|without (music|sound|audio)|mute[d]?)\b", re.I)
+# An action the user gives its own length: "flies low for about 12 seconds".
+NUMBER_WORDS = {w: n for n, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen "
+    "eighteen nineteen twenty".split())}
+NUMBER_WORDS["thirty"] = 30
+TIMED_ACTION = re.compile(r"\b(?:for|lasting)\s+(?:(?:about|around|roughly|nearly|almost|some|a full|a good|at least|just over)\s+)?"
+                          r"(\d+(?:\.\d+)?|" + "|".join(NUMBER_WORDS) + r")[- ](?:full )?(?:seconds?|secs?)\b", re.I)
+
+
+FRAMING = re.compile(r"\b(extreme close[- ]up|close[- ]up|close|medium|wide|two[- ]shot|over[- ]the[- ]shoulder|"
+                     r"from behind|aerial|overhead|top[- ]down)\b", re.I)
+
+
+
+
+def beat_framing(text: str) -> frozenset[str] | None:
+    """The framing a beat's text opens with ("Close two-shot: ...", "Wide shot from behind: ..."); empty if none.
+    None when the text keeps the shot before ("Same two-shot: ...")."""
+    head = text.split(":", 1)[0] if ":" in text[:50] else text[:40]
+    if re.search(r"\bsame\b", head, re.I):
+        return None
+    words = {re.sub(r"[- ]up$|extreme ", "", m.lower()).replace("-", " ") for m in FRAMING.findall(head)}
+    return frozenset(words)
+
+
+def beat_actions(beat: dict) -> int:
+    """About how many actions a beat holds: one, plus one for each ';' and each 'then' in its text. A beat with a spoken
+    line adds only its ';' and 'then': the tool times the line itself (in testing, four beats of one woman talking held)."""
+    text = beat.get("text", "")
+    extra = text.count(";") + len(re.findall(r"\bthen\b", text, re.I))
+    return extra if beat.get("spoken") else 1 + extra
+
+
+# The notes on each tool and model. Findings only: each note is something a benchmark run measured. No advice that
+# was not measured, and no picked defaults. Edit a note here when a new run changes it. The gates show them too.
+# id: (tools or models it applies to, the finding, the evidence)
+NOTES: dict[str, tuple[tuple[str, ...], str, str]] = {
+    "ideas-per-call": (("create_video_from_text", "create_video_from_image", "ltx-2.5", "minimax-h3"),
+                       "About two ideas hold in one call of about 15 s. More ideas in one call: the model plays the shots more than once and mixes them.",
+                       "Old MCP: 4 shots in one 30 s call played 3 times. In testing, 4 seasons in one 20 s call played twice. "
+                       "An 18 s call with 2 shots played them twice. Calls of 5 to 13 s with 1 or 2 beats held."),
+    "ltx-words": (("ltx-2.5",),
+                  "ltx-2.5 does not spell words it is asked to show in a scene.",
+                  "0 of 4: \"walk anway\", \"13 awway\", \"walk anwwy\", \"Avalabile 12 Dembmer\" (end card)."),
+    "minimax-words": (("minimax-h3",),
+                      "minimax-h3 spelled the words it was asked to show.",
+                      "2 of 2: \"walk anyway\" over a scene, an end card (old MCP). Two attempts only."),
+    "still-words": (("generate_image", "qwen-image-2.1"),
+                    "A still made with the exact words, then animated with image-to-video, keeps the words exact. The words stay on screen for the whole clip.",
+                    "End cards from a still: exact in 3 runs. Another run: exact, on screen from the first frame to the last."),
+    "minimax-sound": (("minimax-h3",),
+                      "minimax-h3 adds music or sound even when audio is off.",
+                      "In testing, guitar at -16 dB with audio off. Seasons runs: a music bed on silent requests. Joining with the sound removed made them silent (-91 dB)."),
+    "ltx-sound": (("ltx-2.5",),
+                  "ltx-2.5 is silent when audio is off.",
+                  "In testing: -91 dB."),
+    "regenerate-given-clip": (("create_video_from_text", "minimax-h3"),
+                              "Giving an attached clip as a reference does not reproduce it: the result is a new video that resembles it.",
+                              "In testing, the first 6 s did not match the original (similarity 0.43), and 12 s cost 288 credits."),
+    "last-frame-continues": (("create_video_from_image", "ltx-2.5", "minimax-h3", "get_last_frame"),
+                             "Image-to-video from the last frame of a clip continues it; joined after the clip, the cut is hard to see.",
+                             "ltx-2.5: similarity across the join 0.98. minimax-h3: 0.88, a small jump. "
+                             "minimax-h3 with the clip as a reference, no start frame: 0.41, a visible jump."),
+    "end-frame-fits-between": (("create_video_from_image", "get_first_frame", "get_last_frame", "minimax-h3", "ltx-2.5"),
+                               "A clip made to replace one between two others, with the clip before's last frame as the start image and "
+                               "the clip after's first frame as `end_image_file_path`, joins both cuts smoothly. minimax-h3 kept the "
+                               "planned action; ltx-2.5 made two jumps inside the clip and skipped the action.",
+                               "A fox film, shot 2 replaced: cut after the new shot 0.99 on both models; before, from the start "
+                               "image only, 0.52 (minimax-h3). Inside the new shot: minimax-h3 lowest 0.98 and the yawn shown; ltx-2.5 0.64 "
+                               "and 0.65 (a jump to a close-up and back), no yawn. One run per model. Another run: the host used this path on its "
+                               "own; cuts 1.00 and 0.94, where shot 3 itself changes 0.90 in its first 0.12 s (the fox moves fast)."),
+    "last-frame-keeps-place": (("create_video_from_image", "get_last_frame"),
+                               "A clip that starts from another clip's last frame keeps that clip's place, also when the prompt names a new place.",
+                               "Two chained runs: winter stayed spring; the sea stayed behind the autumn bench."),
+    "picture-resets-place": (("create_video_from_text", "minimax-h3"),
+                             "With a picture reference in each call, two places in one 10 s call held, each in its own part.",
+                             "A bottle, and a bottle with two people: 2 x 10 s, all four seasons in order."),
+    "words-only-places-merge": (("ltx-2.5", "create_video_from_text"),
+                                "Without a picture reference, two places described in one call merged into one place.",
+                                "In testing (ltx-2.5, 2 x 10 s): cherry trees on a beach; autumn and winter never came."),
+    "person-in-words": (("create_video_from_text", "create_video_from_image", "ltx-2.5", "minimax-h3"),
+                        "A person described in words is the same inside one call and a look-alike across calls.",
+                        "One call per season: coats and hair held, faces changed. Another run: Theo the same when his two seasons shared a call; Mara a look-alike in every split."),
+    "small-letters": (("minimax-h3", "edit_image"),
+                      "Letters on a product that is small in the frame change at 480p.",
+                      "In testing, the bottle about 60 px wide in a 640 px edited picture; the letters were wrong in the hand shots and right in the bottle-alone shot."),
+    "spoken-line": (("create_video_from_text", "ltx-2.5", "minimax-h3"),
+                    "A spoken line in a clip with another beat was not said. The same line alone in a short clip was said word for word.",
+                    "ltx-2.5, the line plus a walk-away in one 12 s clip: 0 of 3 runs. The line alone in a 4 s close-up: ltx-2.5 3 of 3, "
+                    "minimax-h3 heard 2 of 2, word for word 1 of 2. Old MCP, one 30 s call: about 10 times."),
+    "hex-codes": (("ltx-2.5", "minimax-h3", "create_video_from_text"),
+                  "A colour code written in a prompt is drawn on screen as text.",
+                  "In testing, \"#E78C28\" printed for 2 s; the codes were in the setting copied into every clip."),
+    "grouping": ((), "The split rule keeps the same people in one clip up to 15 s.",
+                 "Two dry runs: beats the host wrote as separate shots were merged; the spoken line was then lost."),
+    "one-narration": (("create_production_sound", "generate_music", "join_production_clips"),
+                      "One narration track and one music track across the joined film kept the script once and the music even.",
+                      "In testing, with sound: 8 yes, 2 partly, 0 no; the old MCP's single call read the script 3 times and had no music."),
+    "join-silent": (("join_production_clips", "join_videos"),
+                    "Joining with the sound off removes any sound the clips have.",
+                    "In testing: -91 dB after the join."),
+}
+
+
+def advise(story: dict, planned: dict, request: str | None = None) -> list[dict]:
+    """Warnings on a plan, each with the run that showed it. They change nothing: the host decides. (Words in a scene,
+    a spoken line with other beats and colour codes are `questions`, not advice.)
+
+    The notes are in NOTES (findings only). `request`: the user's own words; a quoted phrase, the length or
+    the shape that the story does not carry is reported as not carried."""
+    out: list[dict] = []
+
+    def warn(note: str, clip: int | None, said: str) -> None:
+        out.append({"clip": clip, "note": note, "warning": said, "evidence": NOTES[note][2] if note in NOTES else ""})
+
+    beats = story["beats"]
+    if host_cuts(story) is None and len(planned["clips"]) > 0:
+        warn("grouping", None, "You did not set `clip` on the beats, so the split rule grouped them (the same people stay in one "
+                               "clip up to 15 s). Set `clip` on every beat to choose the clips yourself.")
+    for clip in planned["clips"]:
+        parts = [beats[n - 1] for n in clip["beats"]]
+        model = clip["steps"][-1]["model"]
+        if clip["kind"] == "card":
+            continue
+        places = {p.get("place") for p in parts if p.get("place")}
+        ideas = sum(1 for k, p in enumerate(parts) if k == 0 or beat_link(p, parts[k - 1]) in ("moves", "new"))
+        # The same limit as the split: 15 s, a pictured person 30 s
+        if clip["seconds"] > clip_limit(story, parts) or ideas > 2:
+            warn("ideas-per-call", clip["n"], f"Clip {clip['n']}: {clip['seconds']} s with {ideas} separate ideas in one call.")
+        # Prompt guides: one shot and few actions per clip; separate subject moves, camera moves and cuts
+        shots, at = [], 0
+        for p in parts:
+            framing = beat_framing(p.get("text", ""))
+            if framing and (not shots or framing != shots[-1][0]):
+                shots.append((framing, at))
+            at += p["seconds"]
+        if len(shots) > 1:
+            seen = ", then ".join(f"{' '.join(sorted(f))} at {t} s" for f, t in shots)
+            out.append({"clip": clip["n"], "note": "shot-change", "evidence": (
+                "In testing, clip 2: close two-shot, umbrella, wide from behind in one 10 s call; a second open "
+                "umbrella came in front of the camera."),
+                "warning": f"Clip {clip['n']} changes the shot inside one call ({seen}). The model turns a new shot inside a "
+                           "clip into an unclear move. Give each shot its own clip: the next clip starts from this clip's "
+                           "last frame."})
+        actions = sum(beat_actions(p) for p in parts)
+        if actions > 3:
+            out.append({"clip": clip["n"], "note": "actions-per-clip", "evidence": (
+                "In testing, clip 3: seven actions in one 12 s beat; Wilbur rose into the air with the plane. "
+                "Another run, three actions in the same 12 s: he stayed on the sand."),
+                "warning": f"Clip {clip['n']} holds about {actions} actions in {clip['seconds']} s. After three, the model merges "
+                           "or drops actions. Give each action its own beat, at most three in a clip, and say where each "
+                           "person ends (lets go, stays on the sand)."})
+        # That evidence was ltx-2.5 only; minimax-h3 is now the scene model
+        if model == "ltx-2.5" and len(places) > 1 and clip["reference"]["kind"] not in ("picture", "file"):
+            warn("words-only-places-merge", clip["n"], f"Clip {clip['n']} has {len(places)} places and no picture reference.")
+        # new_place: the planner chose this chain and ends the clip before close on the person
+        if clip["reference"]["kind"] == "last_frame" and clip["reference"].get("of_clip") and not clip["reference"].get("new_place"):
+            before = next((c for c in planned["clips"] if c["n"] == clip["reference"]["of_clip"]), None)
+            if before:
+                old = beats[before["beats"][-1] - 1].get("place")
+                if old and places and old not in places:
+                    warn("last-frame-keeps-place", clip["n"], f"Clip {clip['n']} starts from clip {before['n']}'s last frame "
+                                                              f"({old}) but takes place in {', '.join(sorted(places))}.")
+    subjects = {s["id"]: s for s in story.get("subjects", [])}
+    for sid, subject in subjects.items():
+        if subject["role"] != "product":
+            continue
+        shown = [c for c in planned["clips"] if c["kind"] != "card" and any(sid in beats[n - 1].get("subjects", []) for n in c["beats"])]
+        if subject.get("picture"):
+            used = [c["n"] for c in shown if c["reference"]["kind"] == "picture" and c["reference"].get("subject") == sid]
+            if used:
+                out.append({"clip": used[0], "note": "product-photo-scene", "evidence": "In testing, the kitchen behind the user's bottle stayed in a studio shot.",
+                            "warning": f"Clip(s) {', '.join(map(str, used))} start from the user's photo of {sid}; the model keeps the photo's "
+                                       "background. If the scene is somewhere else, first make a still of the product in that scene "
+                                       "(edit_image with the photo, or remove_image_background) and give it as `reference.file`."})
+        # No "product-no-picture" advice. It said to make a still with generate_image, against
+        # "never a picture made by an image model". The picture-<id> question covers it.
+    if request and story.get("music") and not story.get("music_from_beat") and LATE_MUSIC.search(request):
+        out.append({"clip": None, "note": "music-later", "evidence": "In testing, 'then a soft music sting' ran as a bed from 0 s.",
+                    "warning": "The user's words may place the music after something (a whoosh, the reveal, a line): '"
+                               + LATE_MUSIC.search(request).group(0) + "'. If so, set `music_from_beat` to the beat it starts on; "
+                               "without it the music runs from the start of the film."})
+    if request and not story.get("music") and SOCIAL.search(request) and not SILENT.search(request):
+        out.append({"clip": None, "note": "music-default", "evidence": "In testing, a reel was made silent; the user expected sound.",
+                    "warning": "This is a reel, an ad or a social post, and the story has no `music`. Such videos get music unless the "
+                               "user asks for silence: set `music` (a mood and instruments), or tell the user it is silent."})
+    if request:
+        total = sum(b["seconds"] for b in beats)
+        scenes = [b["seconds"] for b in beats if b.get("kind", "scene") != "card"]
+        for m in TIMED_ACTION.finditer(request):
+            word = m.group(1).lower()
+            n = float(NUMBER_WORDS.get(word, word))
+            if abs(n - total) <= 1 or any(abs(s - n) <= 1 for s in scenes):   # the film's own length, or a beat of it
+                continue
+            start = max(request.rfind(c, 0, m.start()) for c in ".;:!?\n") + 1
+            said = request[start:m.end()].strip()
+            out.append({"clip": None, "note": "timed-action", "evidence": (
+                "In testing, 'flies low for about 12 seconds' was written as an 8 s and a 4 s beat with the take-off "
+                "and the landing inside them; about 3 s of flight. A prompt with 0-2 s take-off, 2-14 s flight and 14-16 s "
+                "landing gave about 12 s of flight (direct test)."),
+                "warning": f"The user gives one action its own length: '{said}'. No beat is about {n:g} s long. Make that "
+                           f"action one beat of {n:g} s. Its start and its end (a take-off, a landing) are beats of their own, "
+                           "before and after it. When the start and the end are in the same beat, the model gives the action "
+                           "only a part of the time."})
+    for n, beat in enumerate(beats, start=1):
+        words = len(" ".join(beat.get("says") or []).split())
+        need = round(words / VOICE_WORDS_PER_SECOND + 0.1, 1)   # the join can start the words 0.1 s into the beat
+        if words and need > beat["seconds"]:
+            out.append({"clip": None, "note": "voice-over-pace", "evidence": "In testing, 12 words in a 4 s beat; the last words ran past the film's end.",
+                        "warning": f"Beat {n}: the voice-over has {words} words for {beat['seconds']} s. The voice reads about "
+                                   f"{VOICE_WORDS_PER_SECOND} words a second, so it needs about {need} s. Cut words or make the beat longer. "
+                                   "If not, the join moves the words earlier, reads them up to 15% faster, and holds the last frame."})
+        said = 0 if beat.get("source") else len(" ".join(beat.get("spoken") or []).split())   # the user's clip: only captioned
+        need = math.ceil(said / SPOKEN_WORDS_PER_SECOND) + 1   # 1 s after the line for the clear end
+        if said and need > beat["seconds"]:
+            out.append({"clip": None, "note": "spoken-pace", "evidence": "In testing, 18 words in a 6 s slot; the line ran over and the model made up words after it.",
+                        "warning": f"Beat {n}: the spoken line has {said} words for {beat['seconds']} s. People on screen say about "
+                                   f"{SPOKEN_WORDS_PER_SECOND} words a second, plus 1 s to finish, so it needs about {need} s. Make the "
+                                   "beat longer or cut words. If not, the line may run past the beat and the model may make up words."})
+        idle = beat["seconds"] - sum(max(2, math.ceil(len(s.split()) / SPOKEN_WORDS_PER_SECOND)) for s in beat.get("spoken") or [])
+        if said and idle > SPOKEN_QUIET_SECONDS:
+            out.append({"clip": None, "note": "spoken-idle", "evidence": "In testing, a person idle on camera for 7 s or more after the line talked again in 3 of 3 clips.",
+                        "warning": f"Beat {n}: the spoken line leaves about {idle} s after it with nothing to do. A person idle on camera "
+                                   f"after a line often starts to talk again. Make the beat shorter (at most {SPOKEN_QUIET_SECONDS} s after the line), or put "
+                                   "the next action in a new beat. If not, the tool fills the time with a slow breath and a glance down."})
+        if beat.get("source") and beat.get("says") and beat.get("source_sound", True) is not False and beat.get("source_speech") is not False:
+            out.append({"clip": None, "note": "voice-over-on-speech", "evidence": "",
+                        "warning": f"Beat {n}: a voice-over on the user's clip, and the clip keeps its own sound. If someone speaks in "
+                                   "the clip, both voices play at once. Set `source_speech` false if its sound is only background, "
+                                   "or `source_sound` false to drop it."})
+    if request:
+        from .plan_request import brief_items
+
+        story_words = _letters(" ".join(
+            [w for b in beats for w in (b.get("exact_words") or []) + (b.get("says") or []) + (b.get("spoken") or [])]))
+        total = sum(b["seconds"] for b in beats)
+        for item in brief_items(request, []):
+            missing = None
+            if item["kind"] == "words" and _letters(item["value"]) not in story_words:
+                missing = f"The request quotes \"{item['value']}\", and no beat carries it in exact_words, says or spoken."
+            elif item["kind"] == "seconds" and abs(int(item["value"]) - total) > 1:
+                missing = f"The request asks for {item['value']} s; the beats add up to {total} s."
+            elif item["kind"] == "aspect" and item["value"] != story["aspect"]:
+                missing = f"The request asks for {item['value']}; the story is {story['aspect']}."
+            if missing:
+                out.append({"clip": None, "note": "not-carried", "warning": missing, "evidence": ""})
+        # A card only when the user asks for one, checked by code so a vague request gets it too.
+        # A card that an answer to a words question made (words_route "card") was chosen, not guessed.
+        if not re.search(r"\bcards?\b", request, re.I):
+            for n, beat in enumerate(beats, start=1):
+                if beat.get("kind") == "card" and beat.get("words_route") != "card":
+                    out.append({"clip": None, "note": "card-not-asked", "evidence": (
+                        "In an ablation test, with no card rule the host made an unasked title card in 3 of 4 runs."),
+                        "warning": f"Beat {n} is a card, and the request does not ask for a card. Make it a scene beat with "
+                                   "its words in `exact_words`, unless the user asked for a card later in the chat."})
+    return out
+
+
 # Plain names for colour codes: a code in a prompt is drawn on screen as text.
 COLOUR_NAMES = {
     "black": (0, 0, 0), "white": (255, 255, 255), "grey": (128, 128, 128), "red": (200, 30, 30), "dark red": (120, 20, 20),
@@ -898,6 +1164,274 @@ COLOUR_NAMES = {
 def colour_name(code: str) -> str:
     r, g, b = int(code[1:3], 16), int(code[3:5], 16), int(code[5:7], 16)
     return min(COLOUR_NAMES, key=lambda k: sum((x - y) ** 2 for x, y in zip(COLOUR_NAMES[k], (r, g, b))))
+
+
+def questions(story: dict, planned: dict) -> list[dict]:
+    """The questions a plan must answer before it is made: risks with a known better way. Ids stay the same while the
+    story is the same, so the answers can go back with it. Each has a recommendation; the host decides."""
+    out: list[dict] = []
+    beats = story["beats"]
+    for n, beat in enumerate(beats, start=1):
+        if beat.get("kind", "scene") == "scene" and beat.get("exact_words") and not beat.get("words_route"):
+            words = " and ".join(f'"{w}"' for w in beat["exact_words"])
+            out.append({
+                "id": f"words-{n}", "beat": n,
+                "ask": (f"Beat {n} asks for the words {words} on screen over the scene. A video model asked to spell words in a scene: "
+                        "ltx-2.5 got them wrong 0 of 4 times; minimax-h3 right 2 of 2. How should they be made? (Words that are "
+                        "part of the picture, such as a label or a sign, go in `in_scene_words` instead: no question, best effort.)"),
+                "options": {
+                    "overlay": "The scene is made without words, and the join draws the words over it by code for the beat's seconds. Always exact; the beat's `words_look` (bold by default).",
+                    "card": "A card of its own right after this beat, 2 s taken from the beat. The words are not over the scene. Made in the film's style by the picture model, which may misspell them.",
+                    "model": "minimax-h3 makes this beat's clip and draws the words in the scene. Looks best; 2 of 2 so far; check the frame after.",
+                    "still": "A picture of the scene with the words is made first and the clip starts from it. The picture model may misspell them; the words stay on screen for the whole clip.",
+                    "accept": "The scene model draws the words as well as it can. They may be misspelled.",
+                },
+                "recommend": "overlay",
+            })
+    for clip in planned.get("clips", []):
+        # The 0 of 3 was ltx-2.5. minimax-h3 said two
+        # lines in one clip 4 of 4 (sound test), so the question is only for an ltx-2.5 clip.
+        model = (clip.get("steps") or [{}])[-1].get("model")
+        if clip["kind"] == "card" or len(clip["beats"]) < 2 or model != "ltx-2.5":
+            continue
+        for n in clip["beats"]:
+            if beats[n - 1].get("spoken") and not beats[n - 1].get("spoken_route"):
+                out.append({
+                    "id": f"line-{n}", "beat": n,
+                    "ask": (f"Beat {n} has a spoken line and shares clip {clip['n']} with {len(clip['beats']) - 1} other beat(s). "
+                            "With another beat in the clip the line was said 0 of 3 times; alone in a short clip, 3 of 3."),
+                    "options": {"split": "Give beat {0} a clip of its own.".format(n), "keep": "Keep the clip. The line may not be said."},
+                    "recommend": "split",
+                })
+    for n, beat in enumerate(beats, start=1):
+        before = beats[n - 2] if n > 1 else None
+        if _held_after_reveal(story, beat, before):
+            out.append({
+                "id": f"held-{n}", "beat": n,
+                "ask": (f"Beat {n} holds the picture still right after beat {n - 1}, which already makes it move. A held still "
+                        "after a reveal reads as a pasted picture, and it jumped in size at the cut."),
+                "options": {"merge": f"Drop the held card: beat {n - 1} runs {beat['seconds']} s longer and ends on the picture; the card's words go over it.",
+                            "keep": "Keep the card: generated from the picture, which may change a little. Choose it when the user asked for an end card."},
+                # An end card the user asked for stays; a still after a reveal goes.
+                "recommend": "keep" if "card" in beat.get("text", "").lower() else "merge",
+            })
+        # As few clips as possible, split only when needed: also an `event` beat that shares a
+        # person with the beat before. The same person is one idea and stays in one clip while it fits.
+        # A process with no person is not joined.
+        link = beat.get("link")
+        shared = bool(people(story, [beat]) & people(story, [before])) if before else False
+        if (beat.get("clip") and before and before.get("clip") and beat["clip"] != before["clip"]
+                and (link == "continues" or (link == "event" and shared))
+                and beat.get("kind", "scene") == "scene" and before.get("kind", "scene") == "scene" and not before.get("source")
+                and not beat.get("together_route")):   # the user's own clip is never generated, so it cannot be joined
+            group = [b for b in beats if b.get("clip") == before["clip"]] + [beat]
+            together = sum(b["seconds"] for b in group)
+            # a line the host split off on an ltx-2.5 clip (line-<n>) stays split
+            if together <= clip_limit(story, group) and not any(b.get("spoken_route") == "split" for b in group):
+                why = (f"Beat {n} continues the same shot as beat {n - 1}, but they are in different clips. A cut in the "
+                       "middle of one motion shows as a jump.") if link == "continues" else (
+                       f"Beat {n} has the same place and person as beat {n - 1}, but they are in different clips. The same "
+                       "person is one idea: one clip while it fits, which also keeps the face and the place the same.")
+                out.append({
+                    "id": f"together-{n}", "beat": n,
+                    "ask": why,
+                    "options": {"join": f"Put beat {n} in clip {before['clip']} ({together} s).", "keep": "Keep the cut."},
+                    "recommend": "join",
+                })
+    # In testing, with no photo, the host made "reference" pictures with an image model and they invented the
+    # products. Real photos as likeness guides made both devices right in every shot.
+    answered = story.get("picture_answers") or {}
+    for subject in story.get("subjects", []):
+        if subject["role"] == "product" and not subject.get("picture") and subject["id"] not in answered:
+            out.append({
+                "id": f"picture-{subject['id']}", "beat": None,
+                "ask": (f"\"{subject['id']}\" is a product with no photo. The video model draws a product it only knows by "
+                        "name wrongly. A real photo as its `picture` keeps it right in every clip. When the user chose a "
+                        "look-alike made from words, answer none: the user's choice wins."),
+                "options": {"web": "A real, sold product: find a free-licence photo on the web (for example Wikimedia "
+                                   "Commons), upload it, set it as the subject's `picture`, and tell the user its source and licence.",
+                            "user": "Ask the user for a photo (their own product, or no free photo found), then set it as `picture`.",
+                            "none": "No photo: the product is made up, its exact look does not matter, or the user chose a "
+                                    "look-alike made from words (the conversation's product_picture answer 'words')."},
+                "recommend": "web",
+            })
+    scene_clips = [c for c in planned.get("clips", []) if c["kind"] == "scene"]
+    if len(scene_clips) >= 2 and not story.get("continuity_checked"):
+        out.append({
+            "id": "continuity", "beat": None,
+            "ask": ("Check the plan before any clip is made. Does any of these happen? (1) A motion or a thing that should "
+                    "stay continuous (a logo forming, one action that goes on, the same object) is cut into two clips, or "
+                    "followed by a card that shows it still. Keep it in one clip; split only when it does not fit or the "
+                    "next action does not depend on it. (2) Two separate actions share one clip "
+                    "with no cut between them: the second one was never made. Give each its own clip, or write them "
+                    "as two shots with a hard cut: \"CUT at 6 s\", a new camera angle, the first action's tool out of frame."),
+            "options": {"ok": "None of these happens.", "change": "One happens: change the beats or `clip` numbers and plan again."},
+            "recommend": "ok",
+        })
+    texts = [story.get("setting", "")] + [b.get("text", "") for b in beats if b.get("kind", "scene") == "scene"]
+    codes = sorted({c for t in texts for c in HEX.findall(t)})
+    if codes and not story.get("colour_codes"):
+        out.append({
+            "id": "colour-codes", "beat": None,
+            "ask": (f"The setting or a scene names colours by code ({', '.join(codes)}). A code in a prompt was drawn on screen as text."),
+            "options": {"words": "Write them as colour words: " + ", ".join(f"{c} as {colour_name(c)}" for c in codes) + ".",
+                        "keep": "Keep the codes."},
+            "recommend": "words",
+        })
+    return out
+
+
+def _held_after_reveal(story: dict, beat: dict, before: dict | None) -> bool:
+    """A card that holds the picture still right after the scene beat that is made from the same picture."""
+    return bool(beat.get("kind") == "card" and beat.get("picture") and before and before.get("kind", "scene") == "scene"
+                and beat["picture"] in _beat_pictures(story, before) and not beat.get("held_route"))
+
+
+def held_merges(story: dict) -> dict[str, str]:
+    """The held cards the plan merges into the scene before, with no question: {"held-N": "merge"}.
+
+    The video makes the logo from its reference picture, in one clip. A held still after the
+    reveal reads as a pasted picture. Hosts kept the card when they were asked ("keep", the user's "stays exactly
+    as in the file") or went around the question. An end card the user asked for ("card" in the beat's text)
+    stays a question."""
+    beats, out = story["beats"], {}
+    for n, beat in enumerate(beats, start=1):
+        if _held_after_reveal(story, beat, beats[n - 2] if n > 1 else None) and "card" not in beat.get("text", "").lower():
+            out[f"held-{n}"] = "merge"
+    return out
+
+
+def _beat_pictures(story: dict, beat: dict) -> set[str]:
+    """The pictures a scene beat is made from: its subjects' pictures and its own file reference."""
+    by_id = {s["id"]: s for s in story.get("subjects", [])}
+    out = {by_id[s]["picture"] for s in beat.get("subjects", []) if s in by_id and by_id[s].get("picture")}
+    if (beat.get("reference") or {}).get("file"):
+        out.add(beat["reference"]["file"])
+    return out
+
+
+def apply_answers(story: dict, answers: dict[str, str]) -> tuple[dict, list[str]]:
+    """The story changed the way the chosen options say. Returns (story, problems with the answers)."""
+    story = deepcopy(story)
+    beats, problems = story["beats"], []
+    groups = [b.get("clip") for b in beats]   # the host's grouping, kept while beats are added or split off
+    inserts: list[tuple[int, dict]] = []
+    drops: list[int] = []   # beats removed by an answer (index), after the answers are read
+    for key, choice in answers.items():
+        kind, _, num = key.partition("-")
+        if key == "colour-codes":
+            if choice == "words":
+                swap = lambda text: NAMED_HEX.sub(lambda m: m.group(1).rstrip() if m.group(1) and m.group(1).strip().lower() == colour_name(m.group(2)) else (m.group(1) or "") + colour_name(m.group(2)), text)
+                story["setting"] = swap(story.get("setting", ""))
+                for b in beats:
+                    if b.get("kind", "scene") == "scene":
+                        b["text"] = swap(b["text"])
+            story["colour_codes"] = choice
+            continue
+        if key == "continuity":
+            if choice == "ok":
+                story["continuity_checked"] = True
+            elif choice == "change":
+                problems.append("continuity: change the beats or `clip` numbers, then plan again without this answer")
+            else:
+                problems.append("continuity: choose ok or change")
+            continue
+        if kind == "picture" and num:
+            ids = {x["id"]: x for x in story.get("subjects", [])}
+            if num not in ids:
+                problems.append(f"no question {key}")
+            elif choice == "none":
+                story.setdefault("picture_answers", {})[num] = "none"
+            elif choice in ("web", "user"):
+                if not ids[num].get("picture"):
+                    where = ("a free-licence photo from the web" if choice == "web" else "the user's photo")
+                    problems.append(f"{key}: upload {where} and set it as `picture` on subject {num}, then plan again "
+                                    f"(or answer none). Never a picture made by an image model.")
+            else:
+                problems.append(f"{key}: choose web, user or none")
+            continue
+        if key == "voice":
+            if choice == "video":
+                story["voice_route"] = "video"
+            elif choice == "sample":
+                pass   # with no recording, the preset voice from pick_voice reads it
+            else:
+                problems.append("voice: choose sample or video")
+            continue
+        if not num.isdigit() or not 1 <= int(num) <= len(beats):
+            problems.append(f"no question {key}")
+            continue
+        beat = beats[int(num) - 1]
+        if kind == "words":
+            if choice not in WORD_ROUTES:
+                problems.append(f"{key}: choose one of {', '.join(WORD_ROUTES)}")
+                continue
+            beat["words_route"] = choice
+            if choice == "model":
+                beat["model"] = REFERENCE_MODEL
+            if choice == "card":
+                take = min(2, beat["seconds"] - 1) if beat["seconds"] > 1 else 0
+                words = beat.pop("exact_words")
+                beat["seconds"] -= take
+                # A card is generated (qwen-image-2.1 spells the quoted
+                # words), not drawn by code, also with an exact colour or a picture.
+                inserts.append((int(num), {"seconds": take or 1, "kind": "card", "exact_words": words, "words_route": "card",
+                                           "text": "A designed title card in the film's style: bold, clean lettering reading exactly "
+                                                   + " and ".join(f'"{w}"' for w in words) + ", large and centred.",
+                                           "_own": True}))
+        elif kind == "held":
+            if choice not in ("merge", "keep"):
+                problems.append(f"{key}: choose merge or keep")
+                continue
+            beat["held_route"] = choice
+            if choice == "merge" and int(num) > 1:
+                before = beats[int(num) - 2]
+                before["seconds"] += beat["seconds"]
+                before["exact_words"] = before.get("exact_words", []) + beat.get("exact_words", [])
+                before["text"] = before["text"].rstrip() + " It ends on the finished picture, held centred and still."
+                drops.append(int(num) - 1)
+        elif kind == "together":
+            if choice not in ("join", "keep"):
+                problems.append(f"{key}: choose join or keep")
+                continue
+            beat["together_route"] = choice
+            if choice == "join" and int(num) > 1:
+                groups[int(num) - 1] = groups[int(num) - 2]
+        elif kind == "line":
+            if choice not in ("split", "keep"):
+                problems.append(f"{key}: choose split or keep")
+                continue
+            beat["spoken_route"] = choice
+            if choice == "split":
+                beat["_own"] = True
+        else:
+            problems.append(f"no question {key}")
+    for at in sorted(drops, reverse=True):
+        del beats[at]
+        del groups[at]
+        inserts = [(i - 1 if i > at else i, c) for i, c in inserts]
+    for at, card in sorted(inserts, reverse=True):
+        beats.insert(at, card)
+        groups.insert(at, None)
+    if all(g is not None for g in groups if g is not None) and any(g is not None for g in groups):
+        _renumber(beats, groups)
+    else:
+        for b in beats:
+            b.pop("_own", None)
+    if (inserts or drops) and "seconds" in story:
+        story["seconds"] = sum(b["seconds"] for b in beats)
+    return story, problems
+
+
+def _renumber(beats: list[dict], groups: list) -> None:
+    """Clip numbers 1, 2, 3 ... from the host's groups; a card and a beat split off get a clip of their own."""
+    n, previous = 0, object()
+    for beat, group in zip(beats, groups):
+        own = beat.pop("_own", False) or beat.get("kind") == "card"
+        if own or group != previous or previous == "own":
+            n += 1
+        beat["clip"] = n
+        previous = "own" if own else group
 
 
 def _letters(text: str) -> str:

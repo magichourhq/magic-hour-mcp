@@ -165,6 +165,32 @@ def parse_seconds(text: str) -> int | None:
     return None
 
 
+# What the user's words name that a finished film must carry. The film advice (video_production.advise) and the gates read it.
+QUOTED = re.compile(r"[\"“]([^\"”]{2,120})[\"”]")
+SOUND = re.compile(r"\b(music|voice[- ]?over|narrat\w*|silent|no sound|dialogue|captions?|subtitles?)\b", re.I)
+LENGTH = re.compile(r"(\d+(?:\.\d+)?)[\s-]*(?:s\b|sec\b|seconds?\b)", re.I)
+
+
+def brief_items(original: str, attachments: list[str]) -> list[dict]:
+    """The things the user's words name that a checklist must carry: quoted words, length, shape, files, sound."""
+    items = [{"kind": "words", "value": q.strip()} for q in QUOTED.findall(original)]
+    lengths = [float(x) for x in LENGTH.findall(original)]
+    seconds, aspect = (int(max(lengths) + 0.5) if lengths else None), parse_aspect(original)
+    if seconds:
+        items.append({"kind": "seconds", "value": str(seconds)})
+    if aspect:
+        items.append({"kind": "aspect", "value": aspect})
+    items += [{"kind": "file", "value": a} for a in attachments]
+    sounds = []
+    for m in SOUND.finditer(original):   # "No music and no narrator" asks for no music: the item is "no music"
+        word = m.group(1).lower()
+        negated = re.search(r"\bno\s+$", original[max(0, m.start() - 4):m.start()], re.I)
+        sounds.append(f"no {word}" if negated and word not in ("silent", "no sound") else word)
+    for value in sorted(set(sounds)):
+        items.append({"kind": "sound", "value": value})
+    return items
+
+
 def parse_sound(text: str) -> str | None:
     """A sound choice from one message. "No music" is not a request for music."""
     if re.search(r"silent|no sound|mute|none|quiet", text, _I):
