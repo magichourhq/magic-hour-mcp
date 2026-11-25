@@ -18,7 +18,7 @@ UI_ERRORS = {
     "result_missing", "result_missing_download", "result_unsafe_download",
     "media_load", "media_network", "media_decode", "media_unsupported",
     "download_rejected", "download_failed", "fullscreen_rejected", "fullscreen_failed",
-    "runtime_error", "unhandled_rejection", "render_error",
+    "runtime_error", "unhandled_rejection", "render_error", "checkout_fallback",
 }
 RESULT_EVENTS = {"preview_loaded", "playback_started", "download_requested"}
 

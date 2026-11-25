@@ -298,7 +298,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         mime_type=MCP_APP_MIME_TYPE,
         meta={
             "openai/widgetDomain": MCP_APP_ORIGIN,
-            "openai/widgetCSP": {"redirect_domains": [MCP_APP_MEDIA_ORIGIN, "https://magichour.ai"]},
+            "openai/widgetCSP": {"redirect_domains": [MCP_APP_MEDIA_ORIGIN, "https://magichour.ai", "https://pay.magichour.ai"]},
             "openai/widgetDescription": (
                 "Displays Magic Hour project status, generated image, video, or audio previews, "
                 "download controls, and expandable generation details, including errors or canceled projects. "
@@ -327,6 +327,27 @@ def register_custom_tools(mcp: FastMCP) -> None:
         "account access or upstream API health."
     ))]:
         return "pong"
+
+    @mcp.tool(
+        name="create_credit_checkout",
+        title="Create Credit Checkout",
+        description=(
+            "Returns a checkout link for a one-time credit pack purchase on the connected Magic Hour account. "
+            "Pass credit_shortfall from an insufficient_credits refusal to start with enough packs. "
+            "Charges nothing; the user pays on the checkout page. Show checkout_url unchanged."
+        ),
+        annotations=ToolAnnotations(title="Create Credit Checkout", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False),
+    )
+    async def create_credit_checkout(
+        credit_shortfall: Annotated[float | None, Field(ge=1, description="Credits the refused request is missing.")] = None,
+        pack_count: Annotated[int | None, Field(ge=1, description="Credit packs to start with, when the user names a number. Takes priority over credit_shortfall.")] = None,
+    ) -> dict[str, str]:
+        options = {"credit_shortfall": credit_shortfall, "pack_count": pack_count}
+        body = {"type": "credit_pack"} | {name: value for name, value in options.items() if value is not None}
+        async with build_api_client() as client:
+            response = await client.post("/v1/account/checkout", json=body, headers={"Authorization": current_authorization_header()})
+            response.raise_for_status()
+            return {"checkout_url": response.json()["checkout_url"]}
 
     @mcp.tool(
         name="wait_for_video_project",
