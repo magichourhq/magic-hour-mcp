@@ -1,11 +1,11 @@
 /**
- * Styles for the More button and menu (`MoreMenu.tsx`). Uses the card's global color
+ * Styles for the More button and menu (`more-menu.tsx`). Uses the card's global color
  * variables (`--line`, `--panel`, `--text`) and the shared `.action` button class from `styles.css`.
  */
 
 /**
  * The menu floats above the More button, over the card's media, so opening it doesn't
- * change the card's height. `MoreMenu.tsx` sets its `left` to keep it inside the action row.
+ * change the card's height. `more-menu.tsx` sets its `left` to keep it inside the action row.
  */
 .more { position: relative; display: inline-flex; }
 .more-menu { position: absolute; bottom: calc(100% + 4px); z-index: 2; display: flex; flex-direction: column; align-items: stretch; width: max-content; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 16px rgb(0 0 0 / 16%); animation: more-menu-in 150ms ease-out; }

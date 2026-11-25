@@ -1,11 +1,11 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { FollowUp } from "./follow-ups";
-import { menuOffset } from "./utils/menuOffset";
-import "./MoreMenu.css";
+import { menuOffset } from "./utils/menu-offset";
+import "./more-menu.css";
 
 /**
  * The arrow on the More button. It points up while the menu is closed, toward where the
- * menu opens, and down while it's open; the rotation is animated in `MoreMenu.css`.
+ * menu opens, and down while it's open; the rotation is animated in `more-menu.css`.
  * @param props.up `true` while the arrow should point up.
  * @returns A decorative arrow, hidden from screen readers.
  */

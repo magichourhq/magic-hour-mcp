@@ -1,7 +1,7 @@
 /** Tests for where the More menu starts horizontally, lined up with the More button. */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { menuOffset } from "./menuOffset.ts";
+import { menuOffset } from "./menu-offset.ts";
 
 /** The action row from the 520 px local card check: 18 px padding on each side. */
 const row = { left: 18, right: 502 };
