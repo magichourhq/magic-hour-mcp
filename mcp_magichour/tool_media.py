@@ -187,7 +187,202 @@ def card_clip(out: Path, seconds: float, words: list[str] | None = None, backgro
     else:
         media_tools.draw_card(words or [""], background, size, still)
     return media_tools.still_video(still, max(0.5, seconds), out)
+
+
+# ---- Head swap for several people in one photo
+# The head swap API has no person choice: on a photo of two people it changes one, and a second call changes both.
+# So each person is cut out, head swapped alone, and only the new head is put back.
+
+HEAD_SWAP_WAIT_SECONDS = 180
 EDGE = 12   # px over which a pasted head fades out at a cut-out's inner edge
+MIN_FACE = 2 * EDGE + 1   # px: a smaller face has no room for that fade, so it is refused before any charge
+
+
+def _diff_score(big, small, x: int, y: int) -> float:
+    from PIL import ImageChops, ImageStat
+
+    d = ImageChops.difference(big.crop((x, y, x + small.width, y + small.height)), small)
+    return sum(ImageStat.Stat(d).mean)
+
+
+def locate_face(photo, crop) -> tuple[int, int, int, int]:
+    """Where a face crop from face detection sits in the photo: (x, y, width, height). The crops are cut from the
+    photo at its own size; other sizes are tried when the match is poor."""
+    from PIL import Image
+
+    best = None
+    for scale in (1.0, 0.9, 1.1, 0.8, 1.25, 0.67, 1.5, 0.5, 2.0):
+        c = crop.resize((max(8, round(crop.width * scale)), max(8, round(crop.height * scale))))
+        if c.width > photo.width or c.height > photo.height:
+            continue
+        k = max(1, round(max(photo.size) / 200))   # coarse search on a photo about 200 px wide
+        small_photo = photo.resize((max(1, photo.width // k), max(1, photo.height // k)), Image.BILINEAR)
+        small_crop = c.resize((max(1, c.width // k), max(1, c.height // k)), Image.BILINEAR)
+        _, cx, cy = min((_diff_score(small_photo, small_crop, x, y), x, y)
+                        for x in range(small_photo.width - small_crop.width + 1)
+                        for y in range(small_photo.height - small_crop.height + 1))
+        fine = min((_diff_score(photo, c, x, y), x, y)
+                   for x in range(max(0, cx * k - k), min(photo.width - c.width, cx * k + k) + 1)
+                   for y in range(max(0, cy * k - k), min(photo.height - c.height, cy * k + k) + 1))
+        if best is None or fine[0] < best[0]:
+            best = (fine[0], fine[1], fine[2], c.width, c.height)
+        if best[0] < 3:   # a near-exact match: stop
+            break
+    return best[1:]
+
+
+def cut_box(face: tuple[int, int, int, int], size: tuple[int, int]) -> tuple[int, int, int, int]:
+    """The part of the photo sent to the head swap: the face crop with room for hair and shoulders."""
+    x, y, w, h = face
+    ex, ey = round(w * 0.25), round(h * 0.3)
+    x0, y0, x1, y1 = max(0, x - ex), max(0, y - ey), min(size[0], x + w + ex), min(size[1], y + h + ey)
+    # an edge near the photo's edge goes to it: a faded edge there kept old hair
+    snap = 24
+    return (0 if x0 < snap else x0, 0 if y0 < snap else y0,
+            size[0] if size[0] - x1 < snap else x1, size[1] if size[1] - y1 < snap else y1)
+
+
+PAD = 16
+
+
+def padded(cut, box: tuple, size: tuple[int, int]):
+    """The cut-out with a mirrored margin on each side that is the photo's edge: the head swap can draw stray
+    colour along its border; the margin takes it and is cut off after. Returns (picture, margins)."""
+    from PIL import Image, ImageOps
+
+    x0, y0, x1, y1 = box
+    left, top = (PAD if x0 == 0 else 0), (PAD if y0 == 0 else 0)
+    right, bottom = (PAD if x1 == size[0] else 0), (PAD if y1 == size[1] else 0)
+    out = Image.new("RGB", (cut.width + left + right, cut.height + top + bottom))
+    out.paste(cut, (left, top))
+    if left:
+        out.paste(ImageOps.mirror(cut.crop((0, 0, left, cut.height))), (0, top))
+    if right:
+        out.paste(ImageOps.mirror(cut.crop((cut.width - right, 0, cut.width, cut.height))), (left + cut.width, top))
+    if top:
+        out.paste(ImageOps.flip(out.crop((0, top, out.width, 2 * top))), (0, 0))
+    if bottom:
+        b = top + cut.height
+        out.paste(ImageOps.flip(out.crop((0, b - bottom, out.width, b))), (0, b))
+    return out, (left, top, right, bottom)
+
+
+def unpadded(new, margins: tuple, cut_size: tuple[int, int]):
+    """The head swap's result without the margin, at the cut-out's size."""
+    from PIL import Image
+
+    left, top, right, bottom = margins
+    w, h = cut_size[0] + left + right, cut_size[1] + top + bottom
+    return new.convert("RGB").resize((w, h), Image.LANCZOS).crop((left, top, left + cut_size[0], top + cut_size[1]))
+
+
+def _oval(face, size, grow: float = 1.1):
+    """A filled oval over a face box, photo size."""
+    from PIL import Image, ImageDraw
+
+    x, y, w, h = face
+    m = Image.new("L", size, 0)
+    cx, cy, rx, ry = x + w / 2, y + h / 2, w / 2 * grow, h / 2 * grow
+    ImageDraw.Draw(m).ellipse((cx - rx, cy - ry, cx + rx, cy + ry), fill=255)
+    return m
+
+
+def _own(i: int, faces: list, box: tuple) -> "Image.Image":
+    """255 where face i is the nearest face (distance in units of each face's size), soft at the border."""
+    from PIL import Image, ImageFilter
+
+    x0, y0, x1, y1 = box
+    k = 4
+    m = Image.new("L", (max(1, (x1 - x0) // k), max(1, (y1 - y0) // k)), 0)
+    px = m.load()
+    centres = [(fx + fw / 2, fy + fh / 2, fw, fh) for fx, fy, fw, fh in faces]
+    for yy in range(m.height):
+        for xx in range(m.width):
+            X, Y = x0 + xx * k + k / 2, y0 + yy * k + k / 2
+            d = [((X - cx) / w) ** 2 + ((Y - cy) / h) ** 2 for cx, cy, w, h in centres]
+            if min(range(len(d)), key=d.__getitem__) == i:
+                px[xx, yy] = 255
+    return m.resize((x1 - x0, y1 - y0), Image.BILINEAR).filter(ImageFilter.GaussianBlur(5))
+
+
+def put_head_back(base, new, box: tuple, i: int, faces: list, keep=None, rivals: list | None = None):
+    """Paste only what the head swap changed (grown and softened), faded at the cut-out's edges unless the edge is
+    the photo's edge, and never over `keep` (a photo-size mask: the heads pasted before, and the people not swapped).
+    `base` is changed in place. Returns the pasted mask at photo size, to add to `keep`.
+    In testing, a mask of 'pixels nearer this face' kept the old hair between two people in 2 of 5 runs."""
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter
+
+    x0, y0, x1, y1 = box
+    cut = base.crop(box)
+    new = new.convert("RGB").resize(cut.size, Image.LANCZOS)
+    changed = ImageChops.difference(new, cut).convert("L").point(lambda v: 255 if v > 28 else 0)
+    changed = changed.filter(ImageFilter.MinFilter(5))
+    # the face area is pasted whole: skin on skin changes little, and holes there let the old fringe show
+    changed = ImageChops.lighter(changed, _oval(faces[i], base.size).crop(box))
+    changed = changed.filter(ImageFilter.MaxFilter(15)).filter(ImageFilter.GaussianBlur(6))
+    ex, ey = min(EDGE, (cut.width - 1) // 2), min(EDGE, (cut.height - 1) // 2)   # a small cut-out has a narrower fade
+    edge = Image.new("L", cut.size, 0)
+    ImageDraw.Draw(edge).rectangle((0 if x0 == 0 else ex, 0 if y0 == 0 else ey, cut.width - 1 - (0 if x1 == base.width else ex),
+                                    cut.height - 1 - (0 if y1 == base.height else ey)), fill=255)
+    mask = ImageChops.multiply(changed, edge.filter(ImageFilter.GaussianBlur(6)))
+    if rivals:   # faces not pasted yet: each keeps the pixels nearer to it
+        mask = ImageChops.multiply(mask, _own(0, [faces[i]] + rivals, box))
+    if keep is not None:   # heads pasted before
+        mask = ImageChops.multiply(mask, ImageChops.invert(keep.crop(box).filter(ImageFilter.GaussianBlur(4))))
+    base.paste(new, (x0, y0), mask)
+    full = Image.new("L", base.size, 0)
+    full.paste(mask.point(lambda v: 255 if v > 127 else 0), (x0, y0))
+    # later pastes keep off this face, not off the space beside it: that space can hold the next person's old hair
+    return ImageChops.multiply(full, _oval(faces[i], base.size))
+
+
+async def _image_url(project_id: str) -> str:
+    """Wait for an image project; its download URL."""
+    for _ in range(HEAD_SWAP_WAIT_SECONDS // 3):
+        project = await _api("GET", f"/v1/image-projects/{project_id}")
+        if project.get("status") == "complete" and project.get("downloads"):
+            return project["downloads"][0]["url"]
+        if project.get("status") in ("error", "canceled"):
+            raise ToolError(f"The head swap {project_id} failed: {project.get('error')}")
+        await asyncio.sleep(3)
+    raise ToolError(f"The head swap {project_id} did not finish in {HEAD_SWAP_WAIT_SECONDS} s.")
+
+
+async def _face_crop(face: str, out: Path) -> Path:
+    """The face crop's file, from the face detection that made it (api-assets/<account>/<detection id>/<n>.png)."""
+    parts = face.split("/")
+    if len(parts) < 3:
+        raise ToolError(f"`face` {face} is not a face path from get_face_detection_results.")
+    detection = await _api("GET", f"/v1/face-detection/{parts[-2]}")
+    match = next((f for f in detection.get("faces") or [] if f.get("path") == face), None)
+    if not match or not match.get("url"):
+        raise ToolError(f"`face` {face} is not in face detection {parts[-2]}. Use a path from get_face_detection_results.")
+    return await _download(match["url"], out)
+
+
+async def _detected_faces(target: str, folder: Path) -> list[Path]:
+    """Run face detection on an uploaded picture and wait for it (it can stay queued for minutes)."""
+    job = await _api("POST", "/v1/face-detection", {"assets": {"target_file_path": target}})
+    for _ in range(HEAD_SWAP_WAIT_SECONDS // 3):
+        result = await _api("GET", f"/v1/face-detection/{job['id']}")
+        if result.get("status") == "complete":
+            return [await _download(f["url"], folder / f"detected{n}.png") for n, f in enumerate(result.get("faces") or [])]
+        if result.get("status") == "error":
+            raise ToolError(f"Face detection {job['id']} failed: {result.get('error')}")
+        await asyncio.sleep(3)
+    raise ToolError(f"Face detection {job['id']} was still queued after {HEAD_SWAP_WAIT_SECONDS} s. Nothing was charged; try again later.")
+
+
+def _who(swap: dict) -> str:
+    """How an entry of `swaps` names its person, for a message."""
+    return f"face {swap['face']}" if swap.get("face") else f"person {swap['person']}"
+
+
+async def _head_ref(head: str) -> str:
+    """A head picture as the head swap takes it: a file_path or URL as it is, an image project id as its URL."""
+    if head.startswith(("http://", "https://", "api-assets/")):
+        return head
+    return await _image_url(head)
 
 
 def _need() -> None:
@@ -261,6 +456,100 @@ def register_tool_media(mcp: FastMCP) -> None:
             out = Path(folder) / ("coloured.png" if picture else "coloured.mp4")
             await asyncio.to_thread(recolour, source, out, warmth, saturation, brightness, contrast)
             return await _deliver(out, picture)
+
+    @mcp.tool(
+        name="swap_heads_in_photo",
+        title="Put a new head on each of several people in a photo",
+        description=(
+            "Put a new head (face, hair and head shape) on each of several people in one photo, each person with their "
+            "own head picture. For one person, use swap_head_in_photo. Give one entry in `swaps` per person: `person` = "
+            "the person's place from the left (1 = the leftmost face in the photo), `head` = the picture of the new head "
+            "(file_path, URL or finished image project id). The tool finds the faces itself (no detect_faces needed); "
+            "instead of `person` you may give `face`, a face path from get_face_detection_results. "
+            "The tool cuts each person out, swaps the head on the cut-out, and puts back only the new head with a soft "
+            "edge, one person after another, so the other people do not change. The head swap tool alone cannot do "
+            "this: it has no person choice, and a second call changes everyone. `picture`: the photo (file_path, URL or "
+            "finished image project id). 10 credits per person. Returns download_url, file_path and credits_charged. "
+            "When a person's head swap fails, the photo comes back with the heads done before it, with `failed` (that "
+            "person and the error) and `not_tried`."
+        ),
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True),
+    )
+    async def swap_heads_in_photo(picture: str, swaps: list[dict[str, str | int]], name: str | None = None) -> dict:
+        from PIL import Image, ImageChops
+
+        if not swaps or any(not ((s.get("face") or s.get("person")) and s.get("head")) for s in swaps):
+            raise ToolError("Give `swaps` as a list of {person, head} (person 1 = leftmost face): one entry per person.")
+        with tempfile.TemporaryDirectory() as folder:
+            f = Path(folder)
+            source, is_picture = await _fetch_media(picture, f, ("image",))
+            if not is_picture:
+                raise ToolError("`picture` is not a picture. For a video, see swap_face_in_video.")
+            photo = await asyncio.to_thread(lambda: Image.open(source).convert("RGB"))   # a large photo took seconds
+            heads = []   # every head is checked before the first charge: a wrong project id failed after others were paid for
+            for s in swaps:
+                try:
+                    heads.append(await _head_ref(str(s["head"])))
+                except ToolError as error:
+                    raise ToolError(f"{_who(s)}: the head {s['head']} cannot be used ({error}). Nothing was charged.") from None
+            found = []
+            if any(not s.get("face") for s in swaps):
+                photo_file = f / "photo.png"
+                await asyncio.to_thread(photo.save, photo_file)
+                crops = await _detected_faces(await _upload(photo_file), f)
+                found = sorted([await asyncio.to_thread(locate_face, photo, Image.open(c).convert("RGB")) for c in crops])
+            faces = []
+            for i, s in enumerate(swaps):
+                if s.get("face"):
+                    crop = Image.open(await _face_crop(str(s["face"]), f / f"face{i}.png")).convert("RGB")
+                    faces.append(await asyncio.to_thread(locate_face, photo, crop))
+                    continue
+                n = int(s["person"])
+                if not 1 <= n <= len(found):
+                    raise ToolError(f"person {n}: the photo has {len(found)} faces (1 = leftmost). Nothing was charged.")
+                faces.append(found[n - 1])
+            given = {}
+            for s, face in zip(swaps, faces):
+                if min(face[2:]) < MIN_FACE:
+                    raise ToolError(f"{_who(s)}: the face is {face[2]}x{face[3]} px; a head swap here needs a face at "
+                                    f"least {MIN_FACE} px wide and high. Nothing was charged.")
+                if tuple(face) in given:   # the same person twice was charged twice, and one head was lost
+                    raise ToolError(f"{given[tuple(face)]} and {_who(s)} are the same face in the photo. Give each person "
+                                    "once. Nothing was charged.")
+                given[tuple(face)] = _who(s)
+            credits, done, failed = 0, [], None
+            # people in the photo who get no new head keep their own area; each pasted head is kept from later pastes
+            keep = Image.new("L", photo.size, 0)
+            others = [x for x in found if tuple(x) not in {tuple(y) for y in faces}]   # people who get no new head
+            for i, s in enumerate(swaps):
+                box = cut_box(faces[i], photo.size)
+                job = {}
+                try:
+                    cut_file = f / f"cut{i}.png"
+                    cut, margins = await asyncio.to_thread(padded, photo.crop(box), box, photo.size)
+                    await asyncio.to_thread(cut.save, cut_file)
+                    body = await _upload(cut_file)
+                    job = await _api("POST", "/v1/head-swap", {"name": f"{name or 'Head swap'} · person {i + 1}",
+                                                               "assets": {"body_file_path": body, "head_file_path": heads[i]}})
+                    credits += job.get("credits_charged") or 0
+                    swapped = await _download(await _image_url(job["id"]), f / f"swapped{i}.png")
+                    new = await asyncio.to_thread(lambda: unpadded(Image.open(swapped), margins, (box[2] - box[0], box[3] - box[1])))
+                    pasted = await asyncio.to_thread(put_head_back, photo, new, box, i, faces, keep, faces[i + 1:] + others)
+                except Exception as error:
+                    if not done:
+                        raise
+                    # a failure here lost the heads paid for before it: the photo now comes back with them
+                    failed = {"person": s.get("person"), "face": s.get("face"), "head": s["head"], "project_id": job.get("id"),
+                              "error": str(error)}
+                    break
+                keep = ImageChops.lighter(keep, pasted)
+                done.append({"person": s.get("person"), "face": s.get("face"), "head": s["head"], "project_id": job["id"], "cut_out": list(box)})
+            out = f / "heads-swapped.png"
+            await asyncio.to_thread(photo.save, out)
+            result = {**await _deliver(out, True), "credits_charged": credits, "people": done}
+            if failed:
+                result |= {"failed": failed, "not_tried": [_who(s) for s in swaps[len(done) + 1:]]}
+            return result
 
     @mcp.tool(
         name="put_pictures_side_by_side",

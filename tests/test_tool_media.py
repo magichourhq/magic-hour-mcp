@@ -208,3 +208,206 @@ class IsolationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeadSwapPhotoTests(unittest.TestCase):
+    """swap_heads_in_photo helpers."""
+
+    def test_cut_box_grows_the_face_and_snaps_to_near_photo_edges(self):
+        from mcp_magichour.tool_media import cut_box
+        self.assertEqual(cut_box((142, 25, 204, 285), (640, 384)), (91, 0, 397, 384))
+        self.assertEqual(cut_box((310, 80, 180, 228), (640, 384)), (265, 0, 535, 384))
+        self.assertEqual(cut_box((300, 300, 100, 100), (1000, 1000)), (275, 270, 425, 430))
+
+    def test_margin_is_added_only_on_photo_edges_and_cut_off_again(self):
+        from PIL import Image, ImageChops
+        from mcp_magichour.tool_media import padded, unpadded
+        photo = Image.effect_noise((640, 384), 60).convert("RGB")
+        box = (91, 0, 397, 384)
+        cut = photo.crop(box)
+        pad, margins = padded(cut, box, photo.size)
+        self.assertEqual(margins, (0, 16, 0, 16))
+        self.assertEqual(pad.size, (306, 416))
+        self.assertIsNone(ImageChops.difference(unpadded(pad, margins, cut.size), cut).getbbox())
+
+    def test_a_face_crop_is_found_where_it_was_cut(self):
+        from PIL import Image
+        from mcp_magichour.tool_media import locate_face
+        photo = Image.effect_noise((640, 384), 80).convert("RGB")
+        self.assertEqual(locate_face(photo, photo.crop((310, 80, 490, 308))), (310, 80, 180, 228))
+
+    def test_a_small_cut_out_is_pasted_back_without_an_error(self):
+        """The faded edge was 12 px on each side: a cut-out under 25 px raised 'x1 must be greater than or equal to x0'."""
+        from PIL import Image
+        from mcp_magichour.tool_media import cut_box, put_head_back
+        photo = Image.effect_noise((400, 300), 60).convert("RGB")
+        face = (200, 150, 9, 11)
+        box = cut_box(face, photo.size)
+        new = Image.new("RGB", (box[2] - box[0], box[3] - box[1]), (0, 255, 0))
+        pasted = put_head_back(photo, new, box, 0, [face])
+        self.assertEqual(pasted.size, photo.size)
+
+    def test_tool_is_listed_with_person_places(self):
+        async def tools():
+            async with Client(create_mcp()) as client:
+                return {t.name: t for t in await client.list_tools()}
+        with patch.dict(os.environ, {"MAGIC_HOUR_CONVERSATION": "on"}):
+            listed = asyncio.run(tools())
+        self.assertIn("swap_heads_in_photo", listed)
+        self.assertIn("1 = the leftmost face", listed["swap_heads_in_photo"].description)
+
+
+def group_photo(size, boxes):
+    """A plain photo with a noise-textured 'face' in each box, so a face crop is found in one place only."""
+    from PIL import Image
+    photo = Image.new("RGB", size, (120, 140, 160))
+    noise = Image.effect_noise(size, 70).convert("RGB")
+    for x, y, w, h in boxes:
+        photo.paste(noise.crop((x, y, x + w, y + h)), (x, y))
+    return photo
+
+
+def change_in(before, after, box):
+    """The mean change of a box between two pictures, 0 to 765."""
+    from PIL import ImageChops, ImageStat
+    x, y, w, h = box
+    return sum(ImageStat.Stat(ImageChops.difference(before.crop((x, y, x + w, y + h)), after.crop((x, y, x + w, y + h)))).mean)
+
+
+class FakeMagicHour:
+    """The Magic Hour calls of swap_heads_in_photo, with no network. Face detection returns crops cut at `boxes` from
+    the uploaded photo; a head swap paints a green oval over the middle of its cut-out."""
+
+    def __init__(self, boxes, failed_job=None, missing=()):
+        self.boxes, self.failed_job, self.missing = boxes, failed_job, set(missing)
+        self.dir = Path(tempfile.mkdtemp())
+        self.uploads, self.jobs, self.charged = {}, {}, 0
+
+    async def api(self, method, path, body=None):
+        if method == "POST" and path == "/v1/face-detection":
+            self.detected = self.uploads[body["assets"]["target_file_path"]]
+            return {"id": "det1"}
+        if path == "/v1/face-detection/det1":
+            return {"status": "complete", "faces": [{"path": f"api-assets/acc/det1/{n}.png", "url": f"https://x/det1/{n}.png"}
+                                                    for n in range(len(self.boxes))]}
+        if method == "POST" and path == "/v1/head-swap":
+            job = f"hs{len(self.jobs)}"
+            self.jobs[job] = body
+            self.charged += 10
+            return {"id": job, "credits_charged": 10}
+        if path.startswith("/v1/image-projects/"):
+            project = path.rsplit("/", 1)[1]
+            if project in self.missing:
+                raise ToolError(f"Magic Hour refused {path} (HTTP 404): not found")
+            if project == self.failed_job:
+                return {"status": "error", "error": {"message": "no face"}}
+            return {"status": "complete", "downloads": [{"url": f"https://x/{project}.png"}]}
+        raise AssertionError(path)
+
+    async def upload(self, file, kind="image"):
+        ref = f"api-assets/acc/up{len(self.uploads)}.png"
+        self.uploads[ref] = Path(shutil.copy(file, self.dir / f"up{len(self.uploads)}.png"))
+        return ref
+
+    async def download(self, url, out):
+        from PIL import Image, ImageDraw
+        name = url.rsplit("/", 1)[1][:-4]
+        if "/det1/" in url:
+            x, y, w, h = self.boxes[int(name)]
+            Image.open(self.detected).convert("RGB").crop((x, y, x + w, y + h)).save(out)
+        else:
+            cut = Image.open(self.uploads[self.jobs[name]["assets"]["body_file_path"]]).convert("RGB")
+            ImageDraw.Draw(cut).ellipse((cut.width * 0.25, cut.height * 0.2, cut.width * 0.75, cut.height * 0.8), fill=(0, 255, 0))
+            cut.save(out)
+        return out
+
+    async def fetch_media(self, media, folder, kinds=("image", "video")):
+        return Path(shutil.copy(media, folder / ("source" + Path(media).suffix))), True
+
+    async def deliver(self, out, picture):
+        return {"file": str(shutil.copy(out, self.dir / "result.png"))}
+
+    def swap(self, picture, swaps):
+        """Call swap_heads_in_photo; returns (is_error, the result's text)."""
+        from mcp_magichour import tool_media
+
+        async def run():
+            with patch.dict(os.environ, {"MAGIC_HOUR_CONVERSATION": "on"}):
+                server = create_mcp()
+            with patch.object(tool_media, "_api", self.api), patch.object(tool_media, "_upload", self.upload), \
+                    patch.object(tool_media, "_download", self.download), \
+                    patch.object(tool_media, "_fetch_media", self.fetch_media), \
+                    patch.object(tool_media, "_deliver", self.deliver), \
+                    patch("mcp_magichour.openapi_server.current_authorization_header", return_value="Bearer synthetic-test-token"), \
+                    patch("mcp_magichour.oauth_compat.current_authorization_header", return_value="Bearer synthetic-test-token"):
+                async with Client(server) as client:
+                    result = await client.call_tool("swap_heads_in_photo", {"picture": str(picture), "swaps": swaps},
+                                                    raise_on_error=False)
+            return result.is_error, result.content[0].text
+        return asyncio.run(run())
+
+
+class SwapHeadsToolTests(unittest.TestCase):
+    """swap_heads_in_photo through the MCP client, with the Magic Hour API faked."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.boxes = [(60, 80, 90, 110), (260, 80, 90, 110), (460, 80, 90, 110)]
+        self.photo = self.dir / "group.png"
+        group_photo((640, 384), self.boxes).save(self.photo)
+
+    def test_two_of_three_people_get_a_new_head(self):
+        from PIL import Image
+        api = FakeMagicHour(self.boxes)
+        error, text = api.swap(self.photo, [{"person": 1, "head": "https://h/a.png"}, {"person": 2, "head": "https://h/b.png"}])
+        self.assertFalse(error, text)
+        done = json.loads(text)
+        self.assertEqual(done["credits_charged"], 20)
+        before, after = Image.open(self.photo).convert("RGB"), Image.open(done["file"]).convert("RGB")
+        self.assertGreater(change_in(before, after, self.boxes[0]), 50)
+        self.assertGreater(change_in(before, after, self.boxes[1]), 50)
+        self.assertEqual(change_in(before, after, self.boxes[2]), 0)
+
+    def test_every_head_is_checked_before_the_first_charge(self):
+        """Person 2's head was a wrong project id: person 1 was charged, then the call failed with nothing to show."""
+        api = FakeMagicHour(self.boxes, missing={"nosuchproject"})
+        error, text = api.swap(self.photo, [{"person": 1, "head": "https://h/a.png"}, {"person": 2, "head": "nosuchproject"}])
+        self.assertTrue(error, text)
+        self.assertIn("Nothing was charged", text)
+        self.assertEqual((api.charged, api.jobs), (0, {}))
+
+    def test_a_failed_head_swap_keeps_the_heads_paid_for_before_it(self):
+        """Person 2's head swap ended in error: person 1's paid head was lost with it."""
+        from PIL import Image
+        api = FakeMagicHour(self.boxes, failed_job="hs1")
+        error, text = api.swap(self.photo, [{"person": 1, "head": "https://h/a.png"}, {"person": 2, "head": "https://h/b.png"},
+                                            {"person": 3, "head": "https://h/c.png"}])
+        self.assertFalse(error, text)
+        done = json.loads(text)
+        self.assertEqual(done["credits_charged"], 20)
+        self.assertEqual([p["project_id"] for p in done["people"]], ["hs0"])
+        self.assertEqual((done["failed"]["person"], done["failed"]["project_id"]), (2, "hs1"))
+        self.assertIn("no face", done["failed"]["error"])
+        self.assertEqual(done["not_tried"], ["person 3"])
+        before, after = Image.open(self.photo).convert("RGB"), Image.open(done["file"]).convert("RGB")
+        self.assertGreater(change_in(before, after, self.boxes[0]), 50)
+        self.assertEqual(change_in(before, after, self.boxes[1]), 0)
+
+    def test_a_person_given_twice_is_refused_before_any_charge(self):
+        """The same person twice (or once by number, once by face path) was charged twice and one head was lost."""
+        for second in ({"person": 1, "head": "https://h/b.png"}, {"face": "api-assets/acc/det1/0.png", "head": "https://h/b.png"}):
+            api = FakeMagicHour(self.boxes)
+            error, text = api.swap(self.photo, [{"person": 1, "head": "https://h/a.png"}, second])
+            self.assertTrue(error, text)
+            self.assertIn("Nothing was charged", text)
+            self.assertEqual(api.charged, 0)
+
+    def test_a_face_too_small_to_swap_is_refused_before_any_charge(self):
+        """A 9x11 px face crashed after the person before it was charged."""
+        boxes = [(60, 80, 90, 110), (300, 150, 9, 11)]
+        group_photo((640, 384), boxes).save(self.dir / "small.png")
+        api = FakeMagicHour(boxes)
+        error, text = api.swap(self.dir / "small.png", [{"person": 1, "head": "https://h/a.png"}, {"person": 2, "head": "https://h/b.png"}])
+        self.assertTrue(error)
+        self.assertIn("Nothing was charged", text)
+        self.assertEqual(api.charged, 0)
