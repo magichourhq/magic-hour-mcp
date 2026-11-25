@@ -20,12 +20,31 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
+// Some failures (rate limits, outages, network errors) return only text. Without this the
+// card would get an empty result and keep waiting for a project it will never see.
+const TEXT_ONLY_ERROR_OUTPUT = {
+  error: { message: "Magic Hour couldn't finish this step. The chat has the details." },
+};
+const FAILED_STATUSES = new Set(["error", "canceled", "cancelled"]);
+const WAITING_STATUSES = new Set(["waiting", "queued", "rendering", "processing", "pending", "timeout"]);
+const VIDEO_PENDING_HINT = "This card will show Play and Download when the video is ready.";
+const SAVED_REQUEST_HINT = "Your request is saved. You can return here for the result.";
+
+function isFailed(status: string): boolean {
+  return FAILED_STATUSES.has(status);
+}
+
+function cardOutputFromCall(structuredContent: unknown, isError: unknown): unknown {
+  if (Object.keys(record(structuredContent)).length) return structuredContent;
+  return isError ? TEXT_ONLY_ERROR_OUTPUT : {};
+}
+
 function chatGptOutput(globals: unknown): unknown {
   const host = record(globals);
   const output = record(host.toolOutput);
-  return Object.keys(output).length
-    ? output
-    : record(record(host.toolResponseMetadata).call_tool_result).structuredContent;
+  if (Object.keys(output).length) return output;
+  const callResult = record(record(host.toolResponseMetadata).call_tool_result);
+  return cardOutputFromCall(callResult.structuredContent, callResult.isError);
 }
 
 function text(value: unknown, fallback = "—"): string {
@@ -91,11 +110,51 @@ function projectType(result: Record<string, unknown>, url: string | null): Media
   return "media";
 }
 
+// A wait call that times out still reports the render's last known status.
+function liveStatusOf(status: string, project: Record<string, unknown>): string {
+  if (status !== "timeout") return status;
+  return optionalText(record(project.last_project).status)?.toLowerCase() ?? status;
+}
+
+function statusLabel(status: string): string {
+  if (status === "timeout") return "Waiting";
+  return capitalize(status);
+}
+
+type Tone = "success" | "danger" | "warning";
+
+function toneOf(status: string): Tone {
+  if (status === "complete") return "success";
+  if (isFailed(status)) return "danger";
+  return "warning";
+}
+
+function readBusyLabelFor(
+  pendingRead: ResultState["pendingRead"], projectId: string | null, projectType: unknown, status: string,
+): string {
+  if (pendingRead?.action === "download") return "Preparing download…";
+  if (pendingRead?.id !== projectId || pendingRead?.projectType !== projectType) return "Finishing check…";
+  if (status === "complete") return "Loading your result…";
+  return "Checking…";
+}
+
+type CardMessageInput = { project: Record<string, unknown>; status: string; tone: Tone; showVideoHint: boolean };
+
+function cardMessage({ project, status, tone, showVideoHint }: CardMessageInput): string {
+  if (showVideoHint) return VIDEO_PENDING_HINT;
+  if (status === "timeout") return SAVED_REQUEST_HINT;
+  return optionalText(project.message)
+    ?? optionalText(project.error)
+    ?? optionalText(record(project.error).message)
+    ?? (tone === "danger" ? "Magic Hour could not complete this project." : "Magic Hour is preparing the result.");
+}
+
 function reportToolResult(result: unknown): void {
   const envelope = record(result);
   const project = record(envelope.structuredContent);
   // Tool and project failures are already captured by server instrumentation.
-  if (envelope.isError || ["error", "canceled", "cancelled", "timeout"].includes(text(project.status).toLowerCase())) return;
+  const status = text(project.status).toLowerCase();
+  if (envelope.isError || isFailed(status) || status === "timeout") return;
   const rawUrls = Array.isArray(project.exact_download_urls) ? project.exact_download_urls : [];
   if (!Object.keys(project).length) captureUiError("result_missing");
   else if (rawUrls.some((url) => !safeMediaUrl(url))) captureUiError("result_unsafe_download");
@@ -158,8 +217,9 @@ function Preview({ projectId, type, url, name, status, message, revision, canRec
     }
   };
   if (status !== "complete" || !url) {
-    const failed = ["error", "canceled", "cancelled"].includes(status);
-    const heading = failed ? "Project unavailable" : "Waiting for result";
+    const failed = isFailed(status);
+    const waitingHeading = type === "video" ? "Rendering your video" : "Waiting for result";
+    const heading = failed ? "Project unavailable" : waitingHeading;
     return <Placeholder icon={failed ? "!" : "…"} heading={heading} message={message} />;
   }
   if (loadFailed) return <Placeholder icon={recovering ? "…" : "!"} heading={recovering ? "Loading your result" : "Preview unavailable"} message={recovering ? "Recovering your existing result." : canRecover ? "Try again, or use Download to get your result." : "Use Download to get your result."}
@@ -193,7 +253,7 @@ export default function App() {
       createdApp.ontoolresult = (result) => {
         if (result.isError || Object.keys(record(result.structuredContent)).length) {
           if (record(result.structuredContent)[UI_READ_ORIGIN] !== readOrigin) activeRead.current = null;
-          setResult((current) => receiveToolOutput(current, result.structuredContent ?? {}, readOrigin));
+          setResult((current) => receiveToolOutput(current, cardOutputFromCall(result.structuredContent, result.isError), readOrigin));
           setDraftFeedback(null);
         }
       };
@@ -249,19 +309,15 @@ export default function App() {
   const canOpenDraft = Boolean(status === "complete" && ["image", "video"].includes(type) && project.project_type === type && projectId && downloadUrl
     && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
   const canReadProject = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
-    && !["error", "canceled", "cancelled"].includes(status) && hostCapabilities?.serverTools);
-  const waitingForResult = ["waiting", "queued", "rendering", "processing", "pending", "timeout"].includes(status);
-  const readBusyLabel = pendingRead?.action === "download" ? "Preparing download…"
-    : pendingRead?.id !== projectId || pendingRead?.projectType !== project.project_type
-      ? "Finishing check…" : status === "complete" ? "Loading your result…" : "Checking…";
+    && !isFailed(status) && hostCapabilities?.serverTools);
+  const waitingForResult = WAITING_STATUSES.has(status);
+  const liveStatus = liveStatusOf(status, project);
+  const readBusyLabel = readBusyLabelFor(pendingRead, projectId, project.project_type, status);
   const name = text(project.name, inaccessible ? "Project unavailable" : `${capitalize(type)} project`);
   const prompt = optionalText(project.prompt) ?? optionalText(style.prompt);
   const model = optionalText(project.model) ?? optionalText(style.model);
-  const tone = status === "complete" ? "success" : ["error", "canceled", "cancelled"].includes(status) ? "danger" : "warning";
-  const message = (status === "timeout" ? "Your request is saved. You can return here for the result." : optionalText(project.message))
-    ?? optionalText(project.error)
-    ?? optionalText(record(project.error).message)
-    ?? (tone === "danger" ? "Magic Hour could not complete this project." : "Magic Hour is preparing the result.");
+  const tone = toneOf(status);
+  const message = cardMessage({ project, status, tone, showVideoHint: type === "video" && waitingForResult && canReadProject });
 
   const openDownload = async (event: MouseEvent<HTMLAnchorElement>) => {
     if (projectId && downloadUrl && type !== "media") void captureUiResult("download_requested", projectId, type, downloadUrl);
@@ -517,7 +573,7 @@ export default function App() {
         )}
       </section>
       <section className="content">
-        {status !== "complete" && <span className="badge" data-tone={tone}>{status === "timeout" ? "Waiting" : capitalize(status)}</span>}
+        {status !== "complete" && <span className="badge" data-tone={tone}>{statusLabel(liveStatus)}</span>}
         <h1>{name}</h1>
         {canReadProject && status !== "complete" && !waitingForResult && <button className="action action-secondary check-status" type="button" disabled={pendingRead !== null} onClick={() => setTrackingRevision((revision) => revision + 1)}>
           {pendingRead ? readBusyLabel : "Check status"}

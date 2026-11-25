@@ -11,7 +11,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 from mcp.shared.exceptions import McpError
 
-from mcp_magichour.openapi_server import create_mcp
+from mcp_magichour.openapi_server import VIDEO_ACCEPTED_MESSAGE, VIDEO_NEXT_STEP, create_mcp
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -128,6 +128,20 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resource.mimeType, "video/mp4")
         self.assertEqual(str(resource.uri), DOWNLOAD)
         self.assertEqual(base64.b64decode(resource.blob), VIDEO)
+
+    async def test_video_create_result_opens_pending_card(self):
+        result = await self.caller.call_tool("create_video_from_text", {
+            "end_seconds": 5, "style": {"prompt": "A blue bottle on a white table"},
+        })
+        self.assertEqual(result.structured_content, {
+            "id": "job-1", "credits_charged": 1,
+            "project_type": "video", "status": "queued", "message": VIDEO_ACCEPTED_MESSAGE,
+            "next_step": VIDEO_NEXT_STEP,
+        })
+        self.assertIn("job-1", result.content[0].text)
+        self.assertNotIn("queued", result.content[0].text)
+        await self.finish("job-1")
+        self.assertEqual(len(self.jobs), 1, "Waiting must not start another render")
 
     async def test_product_image_reaches_video_without_an_image_edit(self):
         self.assertEqual(data(await self.caller.call_tool("get_account_info", {}))["tier"], "pro")

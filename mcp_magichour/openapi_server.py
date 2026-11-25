@@ -52,6 +52,7 @@ from .openapi_policies import (
     current_tool_replacements,
     image_model_resolutions,
     customize_openapi_component,
+    VIDEO_CREATE_INVOCATION,
 )
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
@@ -113,7 +114,7 @@ Create and edit images and video, generate music and speech, clone voices, and r
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote. Estimates never authorize spending.
 get_workflow_guide gives static inputs/docs/review, not account eligibility.
-After creation, use matching wait_for_*_project with the returned id.
+After creation, use matching wait_for_*_project unless a video card shows.
 For *_file_path, never send sandbox paths (/mnt/data/...). Upload native attachments with upload_chatgpt_image or upload_chatgpt_media; use returned file_path. PUT other local bytes via get_upload_urls. Public URLs must fetch raw bytes. Preserve signed URLs and query parameters; never append expiry metadata.
 Omit unrequested options only when defaults are eligible. Image Editor defaults fit the plan; omit model, resolution and count unless the user chose them.
 Balance does not unlock restricted settings.
@@ -132,6 +133,12 @@ Choose video from inputs:
 - Use Text-to-Video when no supplied starting image is required.
 - Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
   """.strip()
+VIDEO_ACCEPTED_MESSAGE = "Magic Hour accepted this video request. Rendering has not finished yet."
+# For the model, not the card. In ChatGPT a wait call would replace the live card with its own.
+VIDEO_NEXT_STEP = (
+    "The result card tracks this render until Play and Download appear. "
+    "Call wait_for_video_project with this id only if the user asks or no card is shown."
+)
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 MCP_CLIENT_CONFIG_PATHS = ("/mcp.json", "/.well-known/mcp.json")
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
@@ -866,6 +873,17 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
 
 
 class _ProjectResultCard(ToolMiddleware):
+    async def _is_accepted_video_create(
+        self, context: MiddlewareContext[mt.CallToolRequestParams], project: Any,
+    ) -> bool:
+        """A video create that returned a project id. The card starts it at "queued" and polls that id."""
+        if not isinstance(project, dict) or not project.get("id") or "error" in project:
+            return False
+        # is_video_create_operation marked these tools with the video labels when the tools were built.
+        server = context.fastmcp_context.fastmcp if context.fastmcp_context else None
+        tool = await server.get_tool(context.message.name) if server else None
+        return bool(tool and (tool.meta or {}).get("openai/toolInvocation") == VIDEO_CREATE_INVOCATION)
+
     async def on_call_tool(
         self,
         context: MiddlewareContext[mt.CallToolRequestParams],
@@ -883,6 +901,15 @@ class _ProjectResultCard(ToolMiddleware):
             if "downloads" in project:
                 structured["downloads"] = project["downloads"]
             result.structured_content = {**structured, "project_type": project_type}
+        elif await self._is_accepted_video_create(context, project):
+            # Clients without cards read the text content, so only the structured content changes.
+            result.structured_content = {
+                **project,
+                "project_type": "video",
+                "status": "queued",
+                "message": VIDEO_ACCEPTED_MESSAGE,
+                "next_step": VIDEO_NEXT_STEP,
+            }
         return result
 
 
