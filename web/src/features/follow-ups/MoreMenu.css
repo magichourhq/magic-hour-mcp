@@ -3,22 +3,24 @@
  * variables (`--line`, `--panel`, `--text`) and the shared `.action` button class from `styles.css`.
  */
 
-/** The More menu is a flex item of the action row on its own line, so it stays inside the card. */
-.more { display: contents; }
-.more-break { flex-basis: 100%; height: 0; margin-top: -8px; }
-.more-menu { margin-top: -8px; display: flex; flex-direction: column; align-items: stretch; width: max-content; max-width: 100%; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); animation: more-menu-in 150ms ease-out; }
+/**
+ * The menu floats above the More button, over the card's media, so opening it doesn't
+ * change the card's height. `MoreMenu.tsx` sets its `left` to keep it inside the action row.
+ */
+.more { position: relative; display: inline-flex; }
+.more-menu { position: absolute; bottom: calc(100% + 4px); z-index: 2; display: flex; flex-direction: column; align-items: stretch; width: max-content; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 16px rgb(0 0 0 / 16%); animation: more-menu-in 150ms ease-out; }
 
-/** The arrow turns to point up while the menu is open. */
+/** The arrow points up while the menu is closed and turns to point down while it's open. */
 .more-chevron { display: inline-flex; margin-left: 2px; transition: transform 150ms ease-out; }
 .more-chevron[data-up="true"] { transform: rotate(180deg); }
 
 /**
- * Opening: the menu fades in and slides down 4px into place. Only opacity and transform
- * animate, so the card's height (and its iframe) changes once, not on every frame.
+ * Opening: the menu fades in and slides up 4px into place. Only opacity and transform
+ * animate, so nothing around the menu moves.
  * Closing stays instant so the card feels responsive.
  */
 @keyframes more-menu-in {
-  from { opacity: 0; transform: translateY(-4px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 

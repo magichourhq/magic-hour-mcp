@@ -1,5 +1,5 @@
 /**
- * Where the More menu starts, in px from the left edge of the action row.
+ * Where the More menu starts horizontally, in px from the left edge of the action row.
  * Pure, with no DOM access, so it can be tested with `node --test`.
  * @module
  */
@@ -8,8 +8,8 @@
 export type Span = { left: number; right: number };
 
 /**
- * Calculates how far from the row's left edge the menu should start so it sits under
- * the More button, like a dropdown. The menu starts at the button's left edge. If that
+ * Calculates how far from the row's left edge the menu should start so it lines up with
+ * the More button. The menu starts at the button's left edge. If that
  * would run past the row's right edge, it ends at the button's right edge instead, but
  * never starts before the row's left edge.
  * @param row The action row the menu sits in.
