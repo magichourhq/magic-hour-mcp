@@ -1,0 +1,32 @@
+/**
+ * Styles for the More button and menu (`MoreMenu.tsx`). Uses the card's global color
+ * variables (`--line`, `--panel`, `--text`) and the shared `.action` button class from `styles.css`.
+ */
+
+/** The More menu is a flex item of the action row on its own line, so it stays inside the card. */
+.more { display: contents; }
+.more-break { flex-basis: 100%; height: 0; margin-top: -8px; }
+.more-menu { margin-top: -8px; display: flex; flex-direction: column; align-items: stretch; width: max-content; max-width: 100%; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); animation: more-menu-in 150ms ease-out; }
+
+/** The arrow turns to point up while the menu is open. */
+.more-chevron { display: inline-flex; margin-left: 2px; transition: transform 150ms ease-out; }
+.more-chevron[data-up="true"] { transform: rotate(180deg); }
+
+/**
+ * Opening: the menu fades in and slides down 4px into place. Only opacity and transform
+ * animate, so the card's height (and its iframe) changes once, not on every frame.
+ * Closing stays instant so the card feels responsive.
+ */
+@keyframes more-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/** No motion for people who ask their system to reduce it. */
+@media (prefers-reduced-motion: reduce) {
+  .more-menu { animation: none; }
+  .more-chevron { transition: none; }
+}
+.more-item { min-height: 36px; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.more-item:hover, .more-item:focus-visible { background: color-mix(in srgb, var(--text) 8%, transparent); outline: none; }
+.more-item:disabled { cursor: wait; opacity: .6; }

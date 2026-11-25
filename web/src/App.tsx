@@ -1,8 +1,12 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 import { captureUiError, captureUiResult } from "./analytics";
+import { draftReadyMessage, followUpsFor, sourceInstructionsFor, type FollowUp } from "./features/follow-ups/followUps";
+import { MoreMenu } from "./features/follow-ups/MoreMenu";
 
 type MediaType = "image" | "video" | "audio" | "media";
+/** Media types whose finished results can open follow-up drafts. */
+const DRAFT_MEDIA_TYPES: MediaType[] = ["image", "video", "audio"];
 const UI_READ_ORIGIN = "magic-hour/ui-read";
 type ReadAction = "status" | "preview" | "download";
 type ResultState = {
@@ -306,8 +310,13 @@ export default function App() {
   const chatGpt = (window as Window & { openai?: {
     openExternal?: (options: { href: string; redirectUrl: false }) => void | Promise<void>;
   } }).openai;
-  const canOpenDraft = Boolean(status === "complete" && ["image", "video"].includes(type) && project.project_type === type && projectId && downloadUrl
-    && hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
+  /** The host can put an unsent draft in the chat (ChatGPT's `openai/message`). */
+  const hostCanOpenDrafts = Boolean(hostCapabilities?.message?.text && hostCapabilities.experimental?.["openai/message"]);
+  const canOpenDraft = Boolean(status === "complete" && DRAFT_MEDIA_TYPES.includes(type) && project.project_type === type
+    && projectId && downloadUrl && hostCanOpenDrafts);
+  /** Follow-up actions for this result: on the card and under More. */
+  const followUps = followUpsFor(type, project.type);
+  const showFollowUps = canOpenDraft && followUps.visible.length > 0;
   const canReadProject = Boolean(projectId && ["image", "video", "audio"].includes(String(project.project_type))
     && !isFailed(status) && hostCapabilities?.serverTools);
   const waitingForResult = WAITING_STATUSES.has(status);
@@ -470,26 +479,22 @@ export default function App() {
     }
   };
 
-  const openDraft = async (action: "edit" | "animate" | "captions" | "edit-video" | "translate") => {
+  /**
+   * Opens an unsent draft in the same ChatGPT conversation for the selected output.
+   * It never calls a tool, so nothing is generated or charged until the user sends it.
+   * @param action The follow-up action the user clicked.
+   */
+  const openDraft = async (action: FollowUp) => {
     if (!app || !canOpenDraft || !projectId || !downloadUrl || openingDraft) return;
     const outputNumber = rawUrls.findIndex((value) => safeMediaUrl(value) === downloadUrl) + 1;
-    const instruction = {
-      edit: "Edit this image:",
-      animate: "Animate this image. The movement should be:",
-      captions: "Add captions to this video, preserving the full clip.",
-      "edit-video": "Edit this video:",
-      translate: "Translate this video's speech into:",
-    }[action];
-    const sourceInstructions = type === "video"
-      ? "Read the actual clip duration before setting segment times. Preserve the full clip unless the user requests a segment; explain any unsupported requirements instead of silently trimming. This source item is not a target language or edit instruction; ask only for missing instructions if needed. This source binding alone does not authorize generation or saving."
-      : "This source item is not an edit or movement instruction; ask only for the missing instruction if needed. It does not authorize generation or saving.";
+    const sourceInstructions = sourceInstructionsFor(type);
     const draft = {
       role: "user" as const,
       content: [
-        { type: "text" as const, text: instruction },
+        { type: "text" as const, text: action.instruction },
         {
           type: "text" as const,
-          text: `Source for this ${action} draft: Magic Hour ${type} project ${projectId}, output ${outputNumber}, path ${new URL(downloadUrl).pathname}. Retrieve that project and use this exact output. ${sourceInstructions} If several source items are ambiguous, ask which one to use.`,
+          text: `Source for this ${action.label} draft: Magic Hour ${type} project ${projectId}, output ${outputNumber}, path ${new URL(downloadUrl).pathname}. Retrieve that project and use this exact output. ${sourceInstructions} If several source items are ambiguous, ask which one to use.`,
           _meta: { "openai/title": `${name} · ${type} ${outputNumber}` },
         },
       ],
@@ -499,7 +504,7 @@ export default function App() {
     setDraftFeedback(null);
     try {
       const result = await app.sendMessage(draft);
-      setDraftFeedback(result.isError ? "Could not open the draft. Try again." : `Draft for ${name}, ${type} ${outputNumber}, is ready. ${type === "image" ? "Add your instructions" : "Review it"} in the chat, then send.`);
+      setDraftFeedback(result.isError ? "Could not open the draft. Try again." : draftReadyMessage(name, type, outputNumber, action));
     } catch {
       setDraftFeedback("Could not open the draft. Try again.");
     } finally {
@@ -615,15 +620,12 @@ export default function App() {
             </a>}
           </div>
         </div>
-        {canOpenDraft && <div className="media-actions">
-          {type === "image" ? <>
-            <button className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openDraft("edit")}>Edit this</button>
-            <button className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openDraft("animate")}>Animate this</button>
-          </> : <>
-            <button className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openDraft("captions")}>Add captions</button>
-            <button className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openDraft("edit-video")}>Edit this video</button>
-            <button className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openDraft("translate")}>Translate</button>
-          </>}
+        {showFollowUps && <div className="media-actions" role="group" aria-label="Follow-up actions">
+          {followUps.visible.map((action) => (
+            <button key={action.id} className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openDraft(action)}>{action.label}</button>
+          ))}
+          {/** Keyed by the selected output so changing it closes an open menu. */}
+          <MoreMenu key={`${projectId}:${downloadUrl}`} items={followUps.more} disabled={openingDraft} onSelect={(action) => void openDraft(action)} />
         </div>}
         {draftFeedback && <p className="draft-feedback" role="status">{draftFeedback}</p>}
       </section>
