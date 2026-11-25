@@ -340,8 +340,10 @@ def register_custom_tools(mcp: FastMCP) -> None:
     )
     async def create_credit_checkout(
         credit_shortfall: Annotated[float | None, Field(ge=1, description="Credits the refused request is missing.")] = None,
+        pack_count: Annotated[int | None, Field(ge=1, description="Credit packs to start with, when the user names a number. Takes priority over credit_shortfall.")] = None,
     ) -> dict[str, str]:
-        body = {"type": "credit_pack"} | ({} if credit_shortfall is None else {"credit_shortfall": credit_shortfall})
+        options = {"credit_shortfall": credit_shortfall, "pack_count": pack_count}
+        body = {"type": "credit_pack"} | {name: value for name, value in options.items() if value is not None}
         async with build_api_client() as client:
             response = await client.post("/v1/account/checkout", json=body, headers={"Authorization": current_authorization_header()})
             response.raise_for_status()
