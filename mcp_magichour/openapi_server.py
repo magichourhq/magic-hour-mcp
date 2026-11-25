@@ -68,6 +68,7 @@ from .project_result_app import (
     read_mcp_app_html,
 )
 from . import kept_files
+from .media_helpers_tool import register_media_helpers
 from .plan_request import register_plan_request
 from .tool_logging import ToolCallLoggingMiddleware
 from .video_production_tool import FILMS_PATH, film_file, register_video_production
@@ -246,6 +247,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
     register_workflow_guidance(mcp)
     register_plan_request(mcp)
     register_video_production(mcp)
+    register_media_helpers(mcp)
 
     @mcp.tool(
         name="upload_chatgpt_image",
