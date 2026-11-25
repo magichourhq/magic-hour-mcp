@@ -10,6 +10,7 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.shared.exceptions import McpError
 
+from . import gates
 from .chatgpt_media import attachment_fields
 from .openapi_policies import IMAGE_DEFAULT_MODELS, sorted_resolutions
 
@@ -226,6 +227,9 @@ def install_structured_tool_errors(mcp: FastMCP, tool_name_replacements: dict[st
         # OpenAPI-generated schemas omit additionalProperties; an unknown arg on a
         # parameterless GET would otherwise be sent upstream as a request body.
         schema = {"additionalProperties": False, **tool.parameters}
+        if gates.MODE in ("warn", "refuse") and request.params.name in gates.SPENDING:
+            # The gates add plan_token to the listed schema; the gate middleware removes it before the tool runs.
+            schema["properties"] = {**schema.get("properties", {}), "plan_token": {"type": "string"}}
         if request.params.arguments:
             request.params.arguments = _parse_stringified_attachments(
                 request.params.name, request.params.arguments
