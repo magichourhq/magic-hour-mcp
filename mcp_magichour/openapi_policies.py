@@ -90,8 +90,11 @@ API_TOOL_METADATA = {
         "Use a still portrait and an existing speech recording to make the portrait speak. "
         "A written script needs audio first. For a prepared ad image and written script, use "
         "create_spoken_ad_video. For existing video and replacement audio, use "
-        "create_lip_sync_video. Starts a background job that costs credits; returns a project id "
-        "for wait_for_video_project.",
+        "create_lip_sync_video. The video is at most as long as the recording: a longer one repeats "
+        "the recording's start (8 s asked, 4.8 s line, \"Hi ev\" again at 4.9 s). When the user "
+        "wants a longer video than the line, first pad the recording with silence to that length "
+        "(mix_audio: the voice as the one track, `seconds` the length). Starts a background job that "
+        "costs credits; returns a project id for wait_for_video_project.",
     ),
     ("POST", "/v1/ai-ugc-ad"): (
         "create_spoken_ad_video",
@@ -145,15 +148,31 @@ API_TOOL_METADATA = {
         "replace_character_in_video",
         "Replace character in video",
         "Replaces a subject in a video with a character from a reference image, or transfers the "
-        "video's motion onto that character. Starts a background job that costs credits; returns a "
-        "project id for wait_for_video_project.",
+        "video's motion onto that character. Use it, not swap_face_in_video, to put a person from a "
+        "photo into a video when their hair, skin or build differ a lot from the person in the video: "
+        "a face swap keeps the video person's hair and skin. The whole person is replaced, so the "
+        "clothes may change to the photo's; tell the user. For one of several people, use point "
+        "selection (selection_mode points) at that person's position in the first frame, not auto: "
+        "with auto the model chooses the person. One person per call: run it again on "
+        "the result for a second person, with that person's points. Starts a background job that costs credits (about 48 per second at 480p); "
+        "returns a project id for wait_for_video_project. Head swap in a video (the user's face and hair, everything else "
+        "kept): get_first_frame, swap_head_in_photo on that frame, then this tool with model wan-animate (free plan: minimax-h3), style.mode animate "
+        "and the head-swapped frame as the picture: the clothes, room, motion and sound stay.",
     ),
     ("POST", "/v1/face-swap"): (
         "swap_face_in_video",
         "Swap face in video",
         "Swaps faces in an existing video: all faces with a reference image, or selected faces "
-        "using detect_faces results. Starts a background job that costs credits; returns a project "
-        "id for wait_for_video_project.",
+        "using detect_faces results. It changes the face only: hair, skin tone and build stay those "
+        "of the person in the video. Before you use it, look at the photo and a frame of the video. "
+        "If the hair (colour, length, curl) or skin tone differ, the result does not look like the "
+        "photo's person (in testing, dark curly hair onto a blonde woman was not recognisable): "
+        "use the head swap route instead, even when the user says 'face': get_first_frame, swap_head_in_photo on "
+        "that frame, then replace_character_in_video (wan-animate or, on the free plan, minimax-h3; style.mode animate) with the head-swapped frame. In individual-faces mode, map every face crop of the "
+        "chosen person: detection lists one person more than once when the head turns (the man "
+        "facing the camera was 0-0, the same man turned away was 0-3; only 0-0 was mapped, so his own "
+        "face came back each time he turned). Starts a background job that costs credits; returns a "
+        "project id for wait_for_video_project.",
     ),
     ("POST", "/v1/image-to-video"): (
         "create_video_from_image",
@@ -172,7 +191,8 @@ API_TOOL_METADATA = {
         "Create lip sync video",
         "Use existing video and replacement audio to match the speaker's lip movements to "
         "the recording. For a still portrait and existing speech recording, use "
-        "create_talking_photo. Starts a background job that costs credits; returns a project id "
+        "create_talking_photo. The video is at most as long as the recording: a longer one repeats "
+        "the recording's start. Starts a background job that costs credits; returns a project id "
         "for wait_for_video_project.",
     ),
     ("POST", "/v1/text-to-video"): (
@@ -182,7 +202,9 @@ API_TOOL_METADATA = {
         "settings. If the user has not specified an aspect ratio, choose it for where the video "
         "will be used, such as 9:16 for TikTok or Reels. To animate an existing starting image, "
         "use create_video_from_image. Starts a "
-        "background job that costs credits; returns a project id for wait_for_video_project.",
+        "background job that costs credits; returns a project id for wait_for_video_project. "
+        "A video with a purpose beyond one action (an audience, a platform, a story, an ad, a product, "
+        "a spoken line, music or words on screen) goes to plan_video_production, also for one shot.",
     ),
     ("POST", "/v1/video-to-video"): (
         "restyle_video",
@@ -233,7 +255,11 @@ API_TOOL_METADATA = {
         "resolution or count, omit them; the API picks eligible defaults for the plan. "
         "Preserve an explicit model, "
         "resolution or count; if the plan can't use it, explain the limit and offer a supported "
-        "option before changing it. Check the chosen model's input limits; never drop references.",
+        "option before changing it. Check the chosen model's input limits; never drop references. "
+        "flux-2-klein keeps the input image's shape and ignores aspect_ratio; to change the shape, "
+        "use qwen-edit (it follows aspect_ratio), or reframe_media on the result. Words a model "
+        "draws are often misspelled: for exact words, edit without them and add them with "
+        "add_words_to_media.",
     ),
     ("POST", "/v1/ai-headshot-generator"): (
         "generate_headshot",
@@ -246,7 +272,9 @@ API_TOOL_METADATA = {
         "generate_image",
         "Generate image",
         "Generates one or more images from a text prompt, with model, output size and image count "
-        "options. Costs credits; returns a project id for wait_for_image_project.",
+        "options. Words a model draws are often misspelled: for exact words on a flat surface (a "
+        "poster, a label), make the picture without them and add them with add_words_to_media. "
+        "Costs credits; returns a project id for wait_for_image_project.",
     ),
     ("POST", "/v1/ai-image-upscaler"): (
         "upscale_image",
@@ -277,6 +305,7 @@ API_TOOL_METADATA = {
         "swap_face_in_photo",
         "Swap face in photo",
         "Swaps faces in a supplied photo using a source face image or selected face mappings. "
+        "It changes the face only; to carry the hair and head shape too, use swap_head_in_photo. "
         "Costs 10 credits; output size depends on subscription. Returns a project id for "
         "wait_for_image_project.",
     ),
@@ -284,7 +313,8 @@ API_TOOL_METADATA = {
         "swap_head_in_photo",
         "Swap head in photo",
         "Swaps a head from a supplied image onto a supplied body image. Costs 10 credits; returns "
-        "a project id for wait_for_image_project.",
+        "a project id for wait_for_image_project. It has no person choice: for several people in one photo, each with "
+        "their own new head, use swap_heads_in_photo.",
     ),
     ("POST", "/v1/image-background-remover"): (
         "remove_image_background",
@@ -372,6 +402,13 @@ GENERATION_PARAMETER_DESCRIPTIONS = {
     },
     "/v1/ai-voice-cloner": {
         ("style",): "Text to speak in the supplied voice, with language and speech-speed options.",
+    },
+    # Always pick the voice that matches the character, never the default. Hosts mostly took
+    # cv-0001 (the first voice listed) for every speaker.
+    "/v1/ai-voice-generator": {
+        ("style", "voice_name"): "The `id` of a stock voice from voices_list. Pick the voice that best matches the "
+        "person or character who speaks: gender, age, accent and style (each voice lists them). Do not take the first "
+        "voice in the list or the example as a default.",
     },
     "/v1/lip-sync": {
         ("style", "generation_mode"): "Select the lip-sync mode. `lite` costs 1 credit per video frame. "
