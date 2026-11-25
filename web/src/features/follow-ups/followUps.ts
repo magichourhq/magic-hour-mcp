@@ -32,7 +32,7 @@ const ACTIONS: Record<FollowUpId, Omit<FollowUp, "id">> = {
   "upscale-image": { label: "Upscale", instruction: "Upscale this image.", needs: "" },
   "swap-face-image": { label: "Swap Faces", instruction: "Swap the face in this image with this face:", needs: "the face image" },
   "remove-background": { label: "Remove Background", instruction: "Remove the background from this image.", needs: "" },
-  "talking-photo": { label: "Make a Talking Photo", instruction: "Make a talking photo from this image. It should say:", needs: "the audio or script" },
+  "talking-photo": { label: "Make a Talking Photo", instruction: "Make a talking photo from this image with this audio:", needs: "the audio" },
   "edit-video": { label: "Edit Video", instruction: "Edit this video:", needs: "your edit" },
   "swap-face-video": { label: "Swap Faces", instruction: "Swap the face in this video with this face:", needs: "the face image" },
   "lip-sync": { label: "Lip Sync", instruction: "Lip sync this video to this audio:", needs: "the audio" },

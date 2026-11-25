@@ -44,7 +44,8 @@ function nextFocusIndex(key: string, current: number, count: number): number | n
  * inside the action row's width, even in a narrow card. It works with the keyboard and
  * closes on Esc, Tab, an outside click or a selection.
  * @param props.items The actions to list, top to bottom. Nothing renders when it's empty.
- * @param props.disabled Disables the items, for example while a draft is opening.
+ * @param props.disabled Makes the items inert, for example while a draft is opening. They stay
+ *   focusable (`aria-disabled`), so the keyboard can still move through the menu and close it.
  * @param props.onSelect Called with the chosen action after the menu closes.
  * @returns The button and, while open, the menu; or `null` when there are no items.
  */
@@ -111,6 +112,7 @@ export function MoreMenu({ items, disabled, onSelect }: {
    * @param item The chosen action.
    */
   const selectItem = (item: FollowUp) => {
+    if (disabled) return;
     closeAndFocusButton();
     onSelect(item);
   };
@@ -138,8 +140,12 @@ export function MoreMenu({ items, disabled, onSelect }: {
       closeAndFocusButton();
       return;
     }
-    /** Tab leaves the menu; let focus move on naturally. */
+    /**
+     * Tab leaves the menu. Focus goes back to More first, so the browser's own Tab moves on
+     * from the button instead of from an item that's about to be removed.
+     */
     if (event.key === "Tab") {
+      buttonRef.current?.focus();
       setOpen(false);
       return;
     }
@@ -163,7 +169,7 @@ export function MoreMenu({ items, disabled, onSelect }: {
       {open && <div ref={menuRef} id={menuId} className="more-menu" role="menu" aria-label="More actions" onKeyDown={onMenuKeyDown}>
         {items.map((item, index) => (
           <button key={item.id} ref={(element) => { itemRefs.current[index] = element; }} className="more-item" type="button" role="menuitem"
-            tabIndex={-1} disabled={disabled} onClick={() => selectItem(item)}>
+            tabIndex={-1} aria-disabled={disabled} onClick={() => selectItem(item)}>
             {item.label}
           </button>
         ))}
