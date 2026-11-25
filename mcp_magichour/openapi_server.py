@@ -71,6 +71,7 @@ from . import kept_files
 from .media_helpers_tool import register_media_helpers
 from .plan_request import register_plan_request
 from .tool_plan import register_tool_plan
+from .tool_media import register_tool_media
 from .tool_logging import ToolCallLoggingMiddleware
 from .video_production_tool import FILMS_PATH, film_file, register_video_production
 from .workflow_guidance import register_workflow_guidance
@@ -248,6 +249,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
     register_workflow_guidance(mcp)
     register_plan_request(mcp)
     register_tool_plan(mcp)   # tool management, off unless MAGIC_HOUR_TOOL_PLAN=on
+    register_tool_media(mcp)   # tool management's new tools: MAGIC_HOUR_TOOL_PLAN or MAGIC_HOUR_CONVERSATION
     register_video_production(mcp)
     register_media_helpers(mcp)
 
