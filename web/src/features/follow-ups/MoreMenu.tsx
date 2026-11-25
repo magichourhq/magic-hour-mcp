@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { FollowUp } from "./followUps";
+import type { FollowUp } from "./follow-ups";
 import { menuOffset } from "./utils/menuOffset";
 import "./MoreMenu.css";
 

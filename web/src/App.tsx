@@ -1,7 +1,7 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 import { captureUiError, captureUiResult } from "./analytics";
-import { draftReadyMessage, followUpsFor, sourceInstructionsFor, type FollowUp } from "./features/follow-ups/followUps";
+import { draftReadyMessage, followUpsFor, sourceInstructionsFor, type FollowUp } from "./features/follow-ups/follow-ups";
 import { MoreMenu } from "./features/follow-ups/MoreMenu";
 
 type MediaType = "image" | "video" | "audio" | "media";
