@@ -70,6 +70,7 @@ from .project_result_app import (
 from . import kept_files
 from .media_helpers_tool import register_media_helpers
 from .plan_request import register_plan_request
+from .conversation_front import enabled as conversation_front_on, register_conversation_front
 from .tool_plan import register_tool_plan
 from .tool_media import register_tool_media
 from .tool_logging import ToolCallLoggingMiddleware
@@ -247,7 +248,10 @@ def create_mcp() -> FastMCP:
 
 def register_custom_tools(mcp: FastMCP) -> None:
     register_workflow_guidance(mcp)
-    register_plan_request(mcp)
+    if conversation_front_on():
+        register_conversation_front(mcp)   # replaces plan_request; on by default, MAGIC_HOUR_CONVERSATION=off for the old one
+    else:
+        register_plan_request(mcp)
     register_tool_plan(mcp)   # tool management, off unless MAGIC_HOUR_TOOL_PLAN=on
     register_tool_media(mcp)   # tool management's new tools: MAGIC_HOUR_TOOL_PLAN or MAGIC_HOUR_CONVERSATION
     register_video_production(mcp)
