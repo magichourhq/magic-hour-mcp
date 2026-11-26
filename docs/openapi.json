@@ -1867,7 +1867,7 @@
                     },
                     "type": {
                       "type": "string",
-                      "description": "The type of the video project. Possible values are ANIMATION, AUTO_SUBTITLE, VIDEO_TO_VIDEO, FACE_SWAP, TEXT_TO_VIDEO, IMAGE_TO_VIDEO, LIP_SYNC, TALKING_PHOTO, AVATAR, VIDEO_UPSCALER, VIDEO_EDITOR, CHARACTER_REPLACE, VIDEO_COLORIZER, VIDEO_WATERMARK_REMOVER, VIDEO_COLOR_GRADER, VIDEO_TRANSLATOR, MUSIC_VIDEO, EXTEND, AUDIO_TO_VIDEO, VIDEO_EXPANDER, UGC_AD",
+                      "description": "The type of the video project. Possible values are ANIMATION, AUTO_SUBTITLE, VIDEO_TO_VIDEO, FACE_SWAP, TEXT_TO_VIDEO, IMAGE_TO_VIDEO, LIP_SYNC, TALKING_PHOTO, AVATAR, VIDEO_UPSCALER, VIDEO_EDITOR, CHARACTER_REPLACE, VIDEO_COLORIZER, VIDEO_WATERMARK_REMOVER, VIDEO_COLOR_GRADER, VIDEO_TRANSLATOR, MUSIC_VIDEO, VIDEO_REMIXER, EXTEND, AUDIO_TO_VIDEO, VIDEO_EXPANDER, UGC_AD",
                       "example": "FACE_SWAP"
                     },
                     "created_at": {
@@ -2393,7 +2393,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiTalkingPhoto.createTalkingPhoto",
         "requestBody": {
           "required": true,
@@ -2731,7 +2741,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiUgcAd.createVideo",
         "requestBody": {
           "required": true,
@@ -3040,7 +3060,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiVideoEditor.createVideo",
         "requestBody": {
           "required": true,
@@ -3416,7 +3446,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiVideoTranslator.createVideo",
         "requestBody": {
           "required": true,
@@ -3783,7 +3823,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiVideoUpscaler.createVideo",
         "requestBody": {
           "required": true,
@@ -4091,7 +4141,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "animation.createVideo",
         "requestBody": {
           "required": true,
@@ -4580,7 +4640,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "audioToVideo.createVideo",
         "requestBody": {
           "required": true,
@@ -4903,7 +4973,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "autoSubtitleGenerator.createVideo",
         "requestBody": {
           "required": true,
@@ -5268,7 +5348,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "characterReplace.createVideo",
         "requestBody": {
           "required": true,
@@ -5659,7 +5749,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "faceSwap.createVideo",
         "requestBody": {
           "required": true,
@@ -6038,7 +6138,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "imageToVideo.createVideo",
         "requestBody": {
           "required": true,
@@ -6394,7 +6504,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "lipSync.createVideo",
         "requestBody": {
           "required": true,
@@ -6738,7 +6858,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "textToVideo.createVideo",
         "requestBody": {
           "required": true,
@@ -7121,7 +7251,17 @@
         "tags": [
           "Video Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "videoToVideo.createVideo",
         "requestBody": {
           "required": true,
@@ -8471,7 +8611,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiClothesChanger.createImage",
         "requestBody": {
           "required": true,
@@ -8769,7 +8919,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiFaceEditor.editImage",
         "requestBody": {
           "required": true,
@@ -9188,7 +9348,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiGifGenerator.createImage",
         "requestBody": {
           "required": true,
@@ -9479,7 +9649,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiImageEditor.createImage",
         "requestBody": {
           "required": true,
@@ -9842,7 +10022,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiHeadshotGenerator.createImage",
         "requestBody": {
           "required": true,
@@ -10132,7 +10322,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiImageGenerator.createImage",
         "requestBody": {
           "required": true,
@@ -10512,7 +10712,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiImageUpscaler.createImage",
         "requestBody": {
           "required": true,
@@ -10824,7 +11034,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiMemeGenerator.createImage",
         "requestBody": {
           "required": true,
@@ -11218,7 +11438,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiQrCodeGenerator.createImage",
         "requestBody": {
           "required": true,
@@ -11502,7 +11732,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "bodySwap.createImage",
         "requestBody": {
           "required": true,
@@ -11801,7 +12041,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "faceSwapPhoto.createImage",
         "requestBody": {
           "required": true,
@@ -12132,7 +12382,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "headSwap.createImage",
         "requestBody": {
           "required": true,
@@ -12424,7 +12684,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "imageBackgroundRemover.createImage",
         "requestBody": {
           "required": true,
@@ -12708,7 +12978,17 @@
         "tags": [
           "Image Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "photoColorizer.createImage",
         "requestBody": {
           "required": true,
@@ -13500,7 +13780,17 @@
         "tags": [
           "Audio Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiMusicGenerator.createAudio",
         "requestBody": {
           "required": true,
@@ -13800,7 +14090,17 @@
         "tags": [
           "Audio Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiVoiceCloner.createAudio",
         "requestBody": {
           "required": true,
@@ -14194,7 +14494,17 @@
         "tags": [
           "Audio Projects"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "A unique string for this request, such as a UUID. Sending the same key again within 24 hours returns the original project instead of creating and charging for a new one. A key applies across all video, image, and audio endpoints on your account, so use a new key for every project.",
+              "example": "5f3c1b9e-8a41-4a0e-9d3e-2f6a1c7b9e10"
+            }
+          }
+        ],
         "operationId": "aiVoiceGenerator.createAudio",
         "requestBody": {
           "required": true,
