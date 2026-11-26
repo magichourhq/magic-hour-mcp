@@ -1,14 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { FollowUp } from "./follow-ups";
-import { menuOffset } from "./utils/menu-offset";
 import "./more-menu.css";
 
-/**
- * The arrow on the More button. It points up while the menu is closed, toward where the
- * menu opens, and down while it's open; the rotation is animated in `more-menu.css`.
- * @param props.up `true` while the arrow should point up.
- * @returns A decorative arrow, hidden from screen readers.
- */
 function Chevron({ up }: { up: boolean }) {
   return (
     <span className="more-chevron" data-up={up} aria-hidden="true">
@@ -19,13 +12,6 @@ function Chevron({ up }: { up: boolean }) {
   );
 }
 
-/**
- * Works out which menu item a navigation key moves focus to. Arrows wrap around at the ends.
- * @param key The pressed key, for example `"ArrowDown"`.
- * @param current Index of the focused item, or -1 when none is focused.
- * @param count Number of items in the menu.
- * @returns The index to focus, or `null` when the key doesn't move focus.
- */
 function nextFocusIndex(key: string, current: number, count: number): number | null {
   switch (key) {
     case "ArrowDown": return (current + 1) % count;
@@ -36,19 +22,6 @@ function nextFocusIndex(key: string, current: number, count: number): number | n
   }
 }
 
-/**
- * The More button and its menu of extra follow-up actions.
- *
- * The menu opens upward and floats over the card's media, so the card keeps its height
- * and the conversation around it doesn't move. It lines up with the More button and stays
- * inside the action row's width, even in a narrow card. It works with the keyboard and
- * closes on Esc, Tab, an outside click or a selection.
- * @param props.items The actions to list, top to bottom. Nothing renders when it's empty.
- * @param props.disabled Makes the items inert, for example while a draft is opening. They stay
- *   focusable (`aria-disabled`), so the keyboard can still move through the menu and close it.
- * @param props.onSelect Called with the chosen action after the menu closes.
- * @returns The button and, while open, the menu; or `null` when there are no items.
- */
 export function MoreMenu({ items, disabled, onSelect }: {
   items: FollowUp[];
   disabled: boolean;
@@ -60,40 +33,33 @@ export function MoreMenu({ items, disabled, onSelect }: {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  /** Set when ↑ opens the menu, so focus starts on the last item, the one next to the button. */
   const focusLastOnOpen = useRef(false);
 
-  /** Aligns the open menu with the More button, and again when the card is resized. */
   useLayoutEffect(() => {
     if (!open) return;
-    /** Measures the row, button and menu, and lines the menu up with the button. */
     const align = () => {
       const menu = menuRef.current;
-      /** The menu must stay inside the action row, the parent of `.more`. */
       const row = rootRef.current?.parentElement;
       const button = buttonRef.current;
       if (!menu || !row || !button) return;
       const rowBox = row.getBoundingClientRect();
       const buttonBox = button.getBoundingClientRect();
-      /** `menuOffset` measures from the row; the menu is positioned from `.more`, which starts at the button. */
-      const offset = menuOffset(rowBox, buttonBox, menu.offsetWidth);
-      menu.style.left = `${offset - (buttonBox.left - rowBox.left)}px`;
+      const buttonStart = buttonBox.left - rowBox.left;
+      const fits = buttonStart + menu.offsetWidth <= rowBox.width;
+      const offset = fits ? buttonStart : Math.max(0, buttonBox.right - rowBox.left - menu.offsetWidth);
+      /** `offset` is measured from the row, but `left` is relative to `.more`, which starts at the button. */
+      menu.style.left = `${offset - buttonStart}px`;
     };
     align();
     window.addEventListener("resize", align);
     return () => window.removeEventListener("resize", align);
   }, [open]);
 
-  /**
-   * Focuses the first item when the menu opens, or the last one when ↑ opened it, and
-   * closes the menu on a click outside.
-   */
   useEffect(() => {
     if (!open) return;
     const items = itemRefs.current.filter((item): item is HTMLButtonElement => item !== null);
     (focusLastOnOpen.current ? items[items.length - 1] : items[0])?.focus();
     focusLastOnOpen.current = false;
-    /** Closes the menu when a pointer goes down outside the button and menu. */
     const closeOutside = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -101,27 +67,17 @@ export function MoreMenu({ items, disabled, onSelect }: {
     return () => document.removeEventListener("pointerdown", closeOutside);
   }, [open]);
 
-  /** Closes the menu and returns focus to the More button, so keyboard users don't lose their place. */
   const closeAndFocusButton = () => {
     setOpen(false);
     buttonRef.current?.focus();
   };
 
-  /**
-   * Runs a menu item: closes the menu first, then hands the action to the card.
-   * @param item The chosen action.
-   */
   const selectItem = (item: FollowUp) => {
     if (disabled) return;
     closeAndFocusButton();
     onSelect(item);
   };
 
-  /**
-   * Opens the menu from the keyboard: ↑ focuses the last item and ↓ the first. Enter and
-   * Space already open it through `onClick`, on the first item.
-   * @param event The key event on the button.
-   */
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if ((event.key !== "ArrowUp" && event.key !== "ArrowDown") || open) return;
     event.preventDefault();
@@ -129,20 +85,16 @@ export function MoreMenu({ items, disabled, onSelect }: {
     setOpen(true);
   };
 
-  /**
-   * Keyboard handling inside the open menu: Esc closes and returns focus, Tab closes and
-   * lets focus move on, and arrows, Home and End move between items.
-   * @param event The key event from the menu or one of its items.
-   */
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" || (event.key === "Tab" && event.shiftKey)) {
       event.preventDefault();
       closeAndFocusButton();
       return;
     }
     /**
      * Tab leaves the menu. Focus goes back to More first, so the browser's own Tab moves on
-     * from the button instead of from an item that's about to be removed.
+     * from the button instead of from an item that's about to be removed. Shift+Tab stops on
+     * More (above), since the menu sits right after it.
      */
     if (event.key === "Tab") {
       buttonRef.current?.focus();
