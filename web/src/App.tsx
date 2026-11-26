@@ -17,6 +17,12 @@ type ResultState = {
   feedback: { message: string; action: ReadAction; label?: string } | null;
 };
 
+const reloadStates: Record<string, { heading: string; body: string; buy: boolean; plan?: string }> = {
+  auto_reload_pending: { heading: "Auto Reload is adding credits", body: "Your image, prompt and settings are kept here while the refill processes.", buy: false },
+  payment_failed: { heading: "Auto Reload paused", body: "Your card was declined. Update your payment method to turn Auto Reload back on.", buy: false, plan: "Update payment method" },
+  spending_limit_reached: { heading: "Auto Reload paused", body: "You've reached your monthly Auto Reload limit. Add credits to finish this video.", buy: true, plan: "Manage limit" },
+};
+
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null
     ? value as Record<string, unknown>
@@ -514,6 +520,11 @@ export default function App() {
   const apiError = record(project.error);
   if (apiError.code === "insufficient_credits") {
     const shortfall = typeof apiError.credit_shortfall === "number" ? apiError.credit_shortfall : null;
+    const reason = String(record(apiError.auto_reload).reason);
+    const openPage = async (href: string) => {
+      if (chatGpt?.openExternal) await chatGpt.openExternal({ href, redirectUrl: false });
+      else await app?.openLink({ url: href });
+    };
     const addCredits = async () => {
       if (openingDraft) return;
       setOpeningDraft(true);
@@ -523,24 +534,21 @@ export default function App() {
       const prefilled = Boolean(checkoutUrl?.startsWith("https://pay.magichour.ai/"));
       if (!prefilled) captureUiError("checkout_fallback");
       const href = prefilled && checkoutUrl ? checkoutUrl : "https://magichour.ai/pricing#credit-pack";
-      try {
-        if (chatGpt?.openExternal) await chatGpt.openExternal({ href, redirectUrl: false });
-        else await app?.openLink({ url: href });
-      } finally {
-        setOpeningDraft(false);
-      }
+      await openPage(href).finally(() => setOpeningDraft(false));
     };
     const resume = async () => {
-      const sent = await app?.sendMessage({ role: "user", content: [{ type: "text", text: "I added credits. Continue with the same request and the same settings." }] }).catch(() => null);
+      const sent = await app?.sendMessage({ role: "user", content: [{ type: "text", text: `${reason in reloadStates ? "" : "I added credits. "}Continue with the same request and the same settings.` }] }).catch(() => null);
       setDraftFeedback(sent && !sent.isError ? null : "Could not continue. Ask ChatGPT to continue with the same request.");
     };
+    const reload = reloadStates[reason] ?? { heading: "Add credits to continue", body: "Nothing was generated or charged.", buy: true };
     return (
       <main className="card" aria-live="polite">
         <section className="content">
-          <h1>Add credits to continue</h1>
-          <p className="draft-feedback">{shortfall ? `This request needs ${shortfall} more credits.` : "This request needs more credits."} Nothing was generated or charged.</p>
+          <h1>{reload.heading}</h1>
+          <p className="draft-feedback">{shortfall ? `This request needs ${shortfall} more credits.` : "This request needs more credits."} {reload.body}</p>
           <div className="media-actions">
-            <button className="action" type="button" disabled={openingDraft} onClick={addCredits}>{openingDraft ? "Opening checkout…" : "Add credits"}</button>
+            {reload.buy && <button className="action" type="button" disabled={openingDraft} onClick={addCredits}>{openingDraft ? "Opening checkout…" : "Add credits"}</button>}
+            {reload.plan && <button className="action action-secondary" type="button" onClick={() => void openPage("https://magichour.ai/my-plan")}>{reload.plan}</button>}
             <button className="action action-secondary" type="button" onClick={resume}>Continue</button>
           </div>
           {draftFeedback && <p className="draft-feedback" role="status">{draftFeedback}</p>}

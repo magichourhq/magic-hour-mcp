@@ -14,6 +14,22 @@ from .chatgpt_media import attachment_fields
 from .openapi_policies import IMAGE_DEFAULT_MODELS, sorted_resolutions
 
 
+_AUTO_RELOAD_ACTIONS = {
+    "auto_reload_pending": (
+        "The account's Auto Reload is adding credits now. Say so, and do not offer a purchase unless the user asks. "
+        "When the user asks to continue, refresh get_account_info and resubmit the same request once the balance covers it."
+    ),
+    "payment_failed": (
+        "Auto Reload is paused because the card was declined. Offer "
+        "[Update payment method](https://magichour.ai/my-plan) before any credit purchase."
+    ),
+    "spending_limit_reached": (
+        "Auto Reload is paused at the account's monthly limit. Offer a credit purchase, and "
+        "[Manage limit](https://magichour.ai/my-plan) as the alternative."
+    ),
+}
+
+
 class APIErrorRecoveryMiddleware(Middleware):
     """Give canonical API rejections a recovery action without retrying requests."""
 
@@ -116,6 +132,11 @@ class APIErrorRecoveryMiddleware(Middleware):
                                 and not isinstance(shortfall, bool)
                             ):
                                 payload["error"]["credit_shortfall"] = shortfall
+                            reload = body.get("auto_reload")
+                            reload_reason = reload.get("reason") if isinstance(reload, dict) else None
+                            if code == "insufficient_credits" and reload_reason in _AUTO_RELOAD_ACTIONS:
+                                payload["error"]["auto_reload"] = {"reason": reload_reason}
+                                payload["error"]["next_action"] = _AUTO_RELOAD_ACTIONS[reload_reason] + " " + next_action
                             return ToolResult(
                                 content=json.dumps(payload), structured_content=payload,
                                 # ChatGPT shows no card for an error result.
