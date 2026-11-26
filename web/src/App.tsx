@@ -2,6 +2,7 @@ import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 import { captureUiError, captureUiResult } from "./analytics";
 import { draftReadyMessage, followUpsFor, sourceInstructionsFor, type FollowUp } from "./features/follow-ups/follow-ups";
+import { MoreMenu } from "./features/follow-ups/more-menu";
 
 type MediaType = "image" | "video" | "audio" | "media";
 /** Media types whose finished results can open follow-up drafts. */
@@ -623,6 +624,8 @@ export default function App() {
           {followUps.visible.map((action) => (
             <button key={action.id} className="action action-secondary" type="button" disabled={openingDraft} onClick={() => openDraft(action)}>{action.label}</button>
           ))}
+          {/** Keyed by the selected output's path, so picking another output closes the menu but a re-signed URL doesn't. */}
+          <MoreMenu key={`${projectId}:${new URL(downloadUrl).pathname}`} items={followUps.more} disabled={openingDraft} onSelect={(action) => void openDraft(action)} />
         </div>}
         {draftFeedback && <p className="draft-feedback" role="status">{draftFeedback}</p>}
       </section>
