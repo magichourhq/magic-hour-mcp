@@ -195,8 +195,6 @@ Notes:
   returned; never append expiration metadata.
 - Image and audio wait tools also return inline media when supported.
 
-Rebuild and type-check the MCP App UI with `cd web && npm ci && npm run build`.
-
 ### Result delivery metrics
 
 `media_project_resolved` includes `project_id`, `project_type`, `status` and
@@ -236,3 +234,44 @@ a separate upload UI or bridge; see `docs/future-chat-ui-handoff.md`.
 Voice Generator uses the voice presets in the Magic Hour API schema. Voice Cloner
 takes an audio sample and text. Use your own voice or a voice you have permission
 to clone. Meme Generator accepts the templates listed in its tool schema.
+
+# MCP App UI
+
+`web/` is the result card that ChatGPT can show for Magic Hour projects. It is a
+React app built with [Vite+](https://viteplus.dev), which also formats, lints and tests it.
+
+## Setup
+
+Use Node ^22.18, ^24.11 or 26+ (CI uses Node 24).
+
+```sh
+cd web
+npm ci
+```
+
+## Build and run locally
+
+```sh
+npm run build
+```
+
+`npm run build` type-checks with Vite+ (`npm run typecheck`) and writes the bundle to
+`mcp_magichour/static/project-result/`. Start the server from the repository root with
+`python main.py`; it serves the card at `/app/project-result` and its assets at
+`/app/project-result-assets/`. Outside Vercel previews, the built page loads those
+assets from `https://mcp.magichour.ai`, so a local host shows your build only if it
+routes that origin to `http://127.0.0.1:8000`.
+
+## Format, lint and test
+
+From `web/`:
+
+- `npm run check` runs the format check, lint and type check together;
+  `npm run check -- --fix` formats and applies safe lint fixes.
+- `npm run fmt` formats the code; `npm run fmt:check` only reports files that need it.
+- `npm run lint` lints with Oxlint, including type-aware rules;
+  `npm run lint -- --fix` applies safe fixes.
+- `npm test` runs the Vitest tests (`*.test.ts` / `*.test.tsx`); import the test API from
+  `vite-plus/test`. `npx vp test watch` reruns them on save.
+
+CI runs the format check, lint, tests and build on every pull request.
