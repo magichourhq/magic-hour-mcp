@@ -3,9 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run typecheck && vite build",
-    "typecheck": "tsc",
-    "test": "node --test 'src/**/*.test.ts'"
+    "build": "npm run typecheck && vp build",
+    "check": "vp check",
+    "typecheck": "vp check --no-fmt --no-lint",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check",
+    "lint": "vp lint",
+    "test": "vp test"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "1.7.5",
@@ -18,7 +22,10 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "6.1.0",
-    "typescript": "7.0.2",
-    "vite": "8.3.5"
+    "vite-plus": "1.8.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@8.3.8001",
+    "vitest": "5.1.1"
   }
 }

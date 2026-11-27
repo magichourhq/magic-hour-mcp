@@ -1,4 +1,4 @@
-name: Test
+name: CI
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -26,6 +26,10 @@ jobs:
           python-version: "3.12"
       # The MCP App tests read the built frontend, the same build Vercel runs.
       - run: npm --prefix web ci
+      # TODO: Remove continue-on-error once web/src is formatted (ENG-7075 PR 2).
+      - run: npm --prefix web run fmt:check
+        continue-on-error: true
+      - run: npm --prefix web run lint
       - run: npm --prefix web test
       - run: npm --prefix web run build
       - run: pip install -e .
