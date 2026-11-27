@@ -7,7 +7,7 @@ import mimetypes
 import os
 import re
 from base64 import b64encode
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
@@ -151,6 +151,16 @@ def _customize_openapi_tool(route: Any, component: Any) -> None:
 
 
 class _ChatGPTPresignedUploadGuard(ToolMiddleware):
+    async def on_list_tools(
+        self,
+        context: MiddlewareContext[mt.ListToolsRequest],
+        call_next: CallNext[mt.ListToolsRequest, Sequence[Tool]],
+    ) -> Sequence[Tool]:
+        tools = await call_next(context)
+        if _is_chatgpt_request():
+            return [tool for tool in tools if tool.name != "get_upload_urls"]
+        return tools
+
     async def on_call_tool(
         self,
         context: MiddlewareContext[CallToolRequestParams],
