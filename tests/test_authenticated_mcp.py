@@ -54,6 +54,7 @@ class AuthenticatedMCPTests(unittest.IsolatedAsyncioTestCase):
                     "tier": "free",
                     "credits": 10,
                     "subscription": None,
+                    "auto_reload": {"status": "disabled"},
                 },
             )
 
