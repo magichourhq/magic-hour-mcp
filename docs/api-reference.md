@@ -99,6 +99,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/ai-meme-generator` | Image Projects | Create meme |
 | POST | `/v1/ai-qr-code-generator` | Image Projects | AI QR Code Generator |
 | POST | `/v1/body-swap` | Image Projects | Body Swap |
+| GET | `/v1/estimate/image` | Image Projects | Estimate image credits |
 | POST | `/v1/face-swap-photo` | Image Projects | Face Swap Photo |
 | POST | `/v1/head-swap` | Image Projects | Head Swap |
 | POST | `/v1/image-background-remover` | Image Projects | Image Background Remover |
@@ -817,6 +818,22 @@ Body Swap
 **Response 200:**
 - `id` (string, required): Unique ID of the image. Use it with the [Get image Project API](https://docs.magichour.ai/api-reference/image-projects/get-image-details) to fetch status and downloads.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the image. We charge credits right when the request is made.
+
+#### GET /v1/estimate/image
+`operationId: estimate.image`
+
+Estimate image credits
+
+**Path Parameters:**
+- `tool` (query, required): The create endpoint to price, named by its path. For example `ai-image-editor` for `POST /v1/ai-image-editor`.
+- `model` (query, optional): The `model` of the create request. Used by `ai-image-generator`, `ai-image-editor`.
+- `resolution` (query, optional): The `resolution` of the create request. Used by `ai-image-generator`, `ai-image-editor`, `body-swap`. One of `640px`, `1k`, `2k`, `4k`.
+- `image_count` (query, optional): The `image_count` of the create request. Used by `ai-image-generator`, `ai-image-editor`. Defaults to 1.
+- `scale_factor` (query, optional): The `scale_factor` of the create request. Used by `ai-image-upscaler`. One of `2`, `4`.
+- `mode` (query, optional): The `style.mode` of the create request. Used by `ai-image-upscaler`. One of `preserve`, `balanced`, `creative`. Defaults to `balanced`.
+
+**Response 200:**
+- `estimated_credits` (integer, required): Credits a create request with these fields charges.
 
 #### POST /v1/face-swap-photo
 `operationId: faceSwapPhoto.createImage`
