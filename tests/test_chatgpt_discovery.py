@@ -35,10 +35,11 @@ Create and edit images and video, generate music and speech, clone voices, and r
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote. Estimates never authorize spending.
 get_workflow_guide gives static inputs/docs/review, not account eligibility.
-After creation, use matching wait_for_*_project with the returned id.
+After creation, use matching wait_for_*_project unless a video card shows.
 For *_file_path, never send sandbox paths (/mnt/data/...). Upload native attachments with upload_chatgpt_image or upload_chatgpt_media; use returned file_path. PUT other local bytes via get_upload_urls. Public URLs must fetch raw bytes. Preserve signed URLs and query parameters; never append expiry metadata.
-Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
-On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
+Omit unrequested options only when defaults are eligible. Image Editor defaults fit the plan; omit model, resolution and count unless the user chose them.
+Balance does not unlock restricted settings.
+If only credits are short, still submit: refusal is free.
 On tier restrictions, explain the block; never retry unchanged or blindly remove fields.
 
 Choose video from inputs:
@@ -290,6 +291,11 @@ class ChatGPTDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         for name in ("wait_for_video_project", "wait_for_image_project", "wait_for_audio_project"):
             tool = next(tool for tool in tools if tool["name"] == name)
             self.assertEqual(tool["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+        # Video creates open the card when the render is accepted; image creates don't.
+        create_video = next(tool for tool in tools if tool["name"] == "create_video_from_text")
+        self.assertEqual(create_video["_meta"]["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+        generate_image = next(tool for tool in tools if tool["name"] == "generate_image")
+        self.assertNotIn("openai/toolInvocation", generate_image.get("_meta", {}))
 
         listed_resources = await client.post(
             "/",

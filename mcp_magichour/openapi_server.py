@@ -53,6 +53,7 @@ from .openapi_policies import (
     current_tool_replacements,
     image_model_resolutions,
     customize_openapi_component,
+    VIDEO_CREATE_INVOCATION,
 )
 from .posthog_client import PostHogFlushMiddleware, analytics, api_key_distinct_id
 from .project_result_app import (
@@ -114,10 +115,11 @@ Create and edit images and video, generate music and speech, clone voices, and r
 Tool calls require authentication.
 When exposed, use a matching estimate with the exact create body; resolve blocked/unavailable. For a complete request, default to one eligible result without a budget question. Respect explicit settings and limits; never invent a quote. Estimates never authorize spending.
 get_workflow_guide gives static inputs/docs/review, not account eligibility.
-After creation, use matching wait_for_*_project with the returned id.
+After creation, use matching wait_for_*_project unless a video card shows.
 For *_file_path, never send sandbox paths (/mnt/data/...). Upload native attachments with upload_chatgpt_image or upload_chatgpt_media; use returned file_path. PUT other local bytes via get_upload_urls. Public URLs must fetch raw bytes. Preserve signed URLs and query parameters; never append expiry metadata.
-Omit unrequested options only when defaults are eligible. Image Editor defaults to paid-tier nano-banana.
-On Free, use Image Editor model=flux-2-klein, resolution=640px, image_count=1 only if suitable. Balance does not unlock restricted settings.
+Omit unrequested options only when defaults are eligible. Image Editor defaults fit the plan; omit model, resolution and count unless the user chose them.
+Balance does not unlock restricted settings.
+If only credits are short, still submit: refusal is free.
 On tier restrictions, explain the block; never retry unchanged or blindly remove fields.
 
 Choose video from inputs:
@@ -132,6 +134,12 @@ Choose video from inputs:
 - Use Text-to-Video when no supplied starting image is required.
 - Reuse references; preserve identity, style, color, lighting and aspect ratio across scenes.
   """.strip()
+VIDEO_ACCEPTED_MESSAGE = "Magic Hour accepted this video request. Rendering has not finished yet."
+# For the model, not the card. In ChatGPT a wait call would replace the live card with its own.
+VIDEO_NEXT_STEP = (
+    "The result card tracks this render until Play and Download appear. "
+    "Call wait_for_video_project with this id only if the user asks or no card is shown."
+)
 MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json"
 MCP_CLIENT_CONFIG_PATHS = ("/mcp.json", "/.well-known/mcp.json")
 GLAMA_VERIFICATION_PATH = "/.well-known/glama.json"
@@ -268,7 +276,7 @@ def create_mcp() -> FastMCP:
     install_structured_tool_errors(mcp, current_tool_replacements(source_spec))
     analytics.instrument_mcp(mcp)
     install_ui_read_origin(mcp)
-    mcp.add_middleware(_VideoProjectCard())
+    mcp.add_middleware(_ProjectResultCard())
     return mcp
 
 
@@ -330,7 +338,7 @@ def register_custom_tools(mcp: FastMCP) -> None:
         mime_type=MCP_APP_MIME_TYPE,
         meta={
             "openai/widgetDomain": MCP_APP_ORIGIN,
-            "openai/widgetCSP": {"redirect_domains": [MCP_APP_MEDIA_ORIGIN]},
+            "openai/widgetCSP": {"redirect_domains": [MCP_APP_MEDIA_ORIGIN, "https://magichour.ai", "https://pay.magichour.ai"]},
             "openai/widgetDescription": (
                 "Displays Magic Hour project status, generated image, video, or audio previews, "
                 "download controls, and expandable generation details, including errors or canceled projects. "
@@ -359,6 +367,27 @@ def register_custom_tools(mcp: FastMCP) -> None:
         "account access or upstream API health."
     ))]:
         return "pong"
+
+    @mcp.tool(
+        name="create_credit_checkout",
+        title="Create Credit Checkout",
+        description=(
+            "Returns a checkout link for a one-time credit pack purchase on the connected Magic Hour account. "
+            "Pass credit_shortfall from an insufficient_credits refusal to start with enough packs. "
+            "Charges nothing; the user pays on the checkout page. Show checkout_url unchanged."
+        ),
+        annotations=ToolAnnotations(title="Create Credit Checkout", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False),
+    )
+    async def create_credit_checkout(
+        credit_shortfall: Annotated[float | None, Field(ge=1, description="Credits the refused request is missing.")] = None,
+        pack_count: Annotated[int | None, Field(ge=1, description="Credit packs to start with, when the user names a number. Takes priority over credit_shortfall.")] = None,
+    ) -> dict[str, str]:
+        options = {"credit_shortfall": credit_shortfall, "pack_count": pack_count}
+        body = {"type": "credit_pack"} | {name: value for name, value in options.items() if value is not None}
+        async with build_api_client() as client:
+            response = await client.post("/v1/account/checkout", json=body, headers={"Authorization": current_authorization_header()})
+            response.raise_for_status()
+            return {"checkout_url": response.json()["checkout_url"]}
 
     @mcp.tool(
         name="wait_for_video_project",
@@ -486,10 +515,10 @@ def _register_media_fetch_tool(mcp: FastMCP, media_type: ProjectType) -> None:
         "configured Magic Hour media host. Read-only; inline content is limited to 8 MiB, or a smaller requested "
         "max_bytes. Returns the original-file download link when the media exceeds this limit."
     )
-    if media_type == "video":
+    if media_type in {"video", "image", "audio"}:
         description += (
             " For playback or downloads in ChatGPT, open Magic Hour’s result card with "
-            "get_video_project or wait_for_video_project using the existing project ID. "
+            f"get_{media_type}_project or wait_for_{media_type}_project using the existing project ID. "
             "When this tool shows a result card in ChatGPT, use its Download control. Do not put the signed URL in a chat link."
         )
 
@@ -876,7 +905,18 @@ def _project_download_urls(project: dict[str, Any]) -> list[str]:
     return urls
 
 
-class _VideoProjectCard(ToolMiddleware):
+class _ProjectResultCard(ToolMiddleware):
+    async def _is_accepted_video_create(
+        self, context: MiddlewareContext[mt.CallToolRequestParams], project: Any,
+    ) -> bool:
+        """A video create that returned a project id. The card starts it at "queued" and polls that id."""
+        if not isinstance(project, dict) or not project.get("id") or "error" in project:
+            return False
+        # is_video_create_operation marked these tools with the video labels when the tools were built.
+        server = context.fastmcp_context.fastmcp if context.fastmcp_context else None
+        tool = await server.get_tool(context.message.name) if server else None
+        return bool(tool and (tool.meta or {}).get("openai/toolInvocation") == VIDEO_CREATE_INVOCATION)
+
     async def on_call_tool(
         self,
         context: MiddlewareContext[mt.CallToolRequestParams],
@@ -884,11 +924,25 @@ class _VideoProjectCard(ToolMiddleware):
     ) -> ToolResult:
         result = await call_next(context)
         project = result.structured_content
-        if context.message.name == "get_video_project" and project and project.get("id"):
+        project_type = {
+            "get_video_project": "video",
+            "get_image_project": "image",
+            "get_audio_project": "audio",
+        }.get(context.message.name)
+        if project_type and project and project.get("id"):
             structured = _project_structured_content_for_agent(project)
             if "downloads" in project:
                 structured["downloads"] = project["downloads"]
-            result.structured_content = {**structured, "project_type": "video"}
+            result.structured_content = {**structured, "project_type": project_type}
+        elif await self._is_accepted_video_create(context, project):
+            # Clients without cards read the text content, so only the structured content changes.
+            result.structured_content = {
+                **project,
+                "project_type": "video",
+                "status": "queued",
+                "message": VIDEO_ACCEPTED_MESSAGE,
+                "next_step": VIDEO_NEXT_STEP,
+            }
         return result
 
 

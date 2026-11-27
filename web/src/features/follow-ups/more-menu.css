@@ -1,0 +1,77 @@
+/* The menu floats above More, over the card's media, so opening it doesn't change the card's height. */
+.more {
+  position: relative;
+  display: inline-flex;
+}
+
+.more-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: max-content;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 16%);
+  animation: more-menu-in 150ms ease-out;
+}
+
+.more-chevron {
+  display: inline-flex;
+  margin-left: 2px;
+  transition: transform 150ms ease-out;
+}
+
+.more-chevron[data-up="true"] {
+  transform: rotate(180deg);
+}
+
+.more-item {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.more-item:hover,
+.more-item:focus-visible {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  outline: none;
+}
+
+.more-item[aria-disabled="true"] {
+  cursor: wait;
+  opacity: .6;
+}
+
+@keyframes more-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .more-menu {
+    animation: none;
+  }
+
+  .more-chevron {
+    transition: none;
+  }
+}

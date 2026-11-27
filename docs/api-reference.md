@@ -112,6 +112,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
 | GET | `/v1/voices` | Audio Projects | List voices |
 | GET | `/v1/account` | Account | Get account details |
+| POST | `/v1/account/checkout` | Account | Create checkout |
 
 ## Per-endpoint detail
 
@@ -206,6 +207,8 @@ List saved items
 
 AI Talking Photo
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Talking Photo - dateTime: Give your video a custom name for easy identification.
@@ -228,6 +231,8 @@ AI Talking Photo
 
 AI UGC Ad Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `assets` (object, required):
@@ -246,6 +251,8 @@ AI UGC Ad Generator
 
 AI Video Editor
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Video Editor - dateTime: Give your video a custom name for easy identification.
@@ -271,6 +278,8 @@ AI Video Editor
 
 AI Video Translator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Video Translator - dateTime: Give your video a custom name for easy identification.
@@ -290,6 +299,8 @@ AI Video Translator
 
 AI Video Upscaler
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Video Upscaler - dateTime: Give your video a custom name for easy identification.
@@ -308,6 +319,8 @@ AI Video Upscaler
 
 Animation
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Animation - dateTime: Give your video a custom name for easy identification.
@@ -337,6 +350,8 @@ Animation
 
 Audio-to-Video
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Audio To Video - dateTime: Give your video a custom name for easy identification.
@@ -358,6 +373,8 @@ Audio-to-Video
 
 Auto Subtitle Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Auto Subtitle - dateTime: Give your video a custom name for easy identification.
@@ -387,6 +404,8 @@ Auto Subtitle Generator
 
 Character Replace
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Character Replace - dateTime: Give your video a custom name for easy identification.
@@ -416,6 +435,8 @@ Character Replace
 
 Face Swap Video
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your video a custom name for easy identification.
@@ -443,6 +464,8 @@ Face Swap Video
 
 Image-to-Video
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Image To Video - dateTime: Give your video a custom name for easy identification.
@@ -465,6 +488,8 @@ Image-to-Video
 
 Lip Sync
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Lip Sync - dateTime: Give your video a custom name for easy identification.
@@ -488,6 +513,8 @@ Lip Sync
 
 Text-to-Video
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Text To Video - dateTime: Give your video a custom name for easy identification.
@@ -549,6 +576,8 @@ Delete video
 
 Video-to-Video
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Video To Video - dateTime: Give your video a custom name for easy identification.
@@ -582,6 +611,8 @@ Video-to-Video
 
 AI Clothes Changer
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Clothes Changer - dateTime: Give your image a custom name for easy identification.
@@ -599,6 +630,8 @@ AI Clothes Changer
 
 AI Face Editor
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Face Editor - dateTime: Give your image a custom name for easy identification.
@@ -630,6 +663,8 @@ AI Face Editor
 
 AI GIF Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Ai Gif - dateTime: Give your gif a custom name for easy identification.
@@ -646,6 +681,8 @@ AI GIF Generator
 
 AI Headshot Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Ai Headshot - dateTime: Give your image a custom name for easy identification.
@@ -663,11 +700,13 @@ AI Headshot Generator
 
 AI Image Editor
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Ai Image Editor - dateTime: Give your image a custom name for easy identification.
 - `image_count` (number, optional) enum=[1, 4, 9, 16] default=1: Number of images to generate. Maximum varies by model. Defaults to 1 if not specified.
-- `model` (string, optional) enum=[16 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'flux-2-klein', 'nano-banana-pro', 'seedream-v5-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[17 values, e.g. ['default', 'qwen-image-2.1', 'gpt-image-2', 'flux-2-klein', 'flux-3-klein', 'nano-banana-pro'], ...]: The AI model to use for image editing. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['auto', '16:9', '9:16', '4:3', '3:2', '1:1', '4:5', '2:3']: The aspect ratio of the output image(s). If not specified, defaults to `auto`. Ignored for `krea-2` and `flux-2-klein` when an input image is provided; the output keeps the source image's aspect ratio.
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k']: Maximum resolution (longest edge) for the output image.
 - `style` (object, required):
@@ -685,11 +724,13 @@ AI Image Editor
 
 AI Image Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Ai Image - dateTime: Give your image a custom name for easy identification.
 - `image_count` (integer, required) range=[1,16]: Number of images to generate. Maximum varies by model.
-- `model` (string, optional) enum=[18 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'nano-banana-2.1'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
+- `model` (string, optional) enum=[19 values, e.g. ['default', 'z-image-turbo', 'gpt-image-2', 'qwen-image-2.1', 'flux-2-klein', 'flux-3-klein'], ...]: The AI model to use for image generation. Each model has different capabilities and costs.
 - `aspect_ratio` (string, optional) enum=['1:1', '16:9', '9:16']: The aspect ratio of the output image(s). If not specified, defaults to `1:1` (square).
 - `resolution` (string, optional) enum=['auto', '640px', '1k', '2k', '4k'] default=auto: Maximum resolution (longest edge) for the output image.
 - `style` (object, required): The art style to use for image generation.
@@ -705,6 +746,8 @@ AI Image Generator
 
 AI Image Upscaler
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Image Upscaler - dateTime: Give your image a custom name for easy identification.
@@ -724,6 +767,8 @@ AI Image Upscaler
 
 Create meme
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional): The name of the meme.
@@ -741,6 +786,8 @@ Create meme
 
 AI QR Code Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Qr Code - dateTime: Give your image a custom name for easy identification.
@@ -757,6 +804,8 @@ AI QR Code Generator
 
 Body Swap
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Body Swap - dateTime: Give your image a custom name for easy identification.
@@ -774,6 +823,8 @@ Body Swap
 
 Face Swap Photo
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Face Swap - dateTime: Give your image a custom name for easy identification.
@@ -795,6 +846,8 @@ Face Swap Photo
 
 Head Swap
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Head Swap - dateTime: Give your image a custom name for easy identification.
@@ -812,6 +865,8 @@ Head Swap
 
 Image Background Remover
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Background Remover - dateTime: Give your image a custom name for easy identification.
@@ -861,6 +916,8 @@ Delete image
 
 Photo Colorizer
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Photo Colorizer - dateTime: Give your image a custom name for easy identification.
@@ -879,6 +936,8 @@ Photo Colorizer
 
 AI Music Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=AI Music Generator: Give your audio a custom name for easy identification.
@@ -897,6 +956,8 @@ AI Music Generator
 
 AI Voice Cloner
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Voice Cloner - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.
@@ -916,6 +977,8 @@ AI Voice Cloner
 
 AI Voice Generator
 
+**Path Parameters:**
+- `Idempotency-Key` (header, optional): 
 
 **Request Body:**
 - `name` (string, optional) default=Voice Generator - dateTime: Optional project name for identifying this output. Omit to use the API's default project name.

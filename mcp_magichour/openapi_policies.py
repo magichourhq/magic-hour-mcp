@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
+from collections.abc import Iterable
 from typing import Any
 
 from fastmcp.tools.base import Tool
@@ -23,6 +24,11 @@ PROJECT_WAIT_TOOL_BY_ASSET = {
 }
 
 MCP_APP_VIEW_URI = "ui://magic-hour/project-result-v1.html"
+
+VIDEO_CREATE_INVOCATION = {
+    "invoking": "Starting your video…",
+    "invoked": "Video request sent",
+}
 
 PROJECT_CONTENT_BLOCK_GUIDANCE = (
     "Say the project was blocked by a content check. Use a specific reason only when "
@@ -195,8 +201,9 @@ API_TOOL_METADATA = {
     ("GET", "/v1/image-projects/{id}"): (
         "get_image_project",
         "Get image project",
-        "Returns an image project's status and, once complete, its download URLs. Use to check "
-        "progress with the id from an image create tool. Read-only.",
+        "Open a saved image in Magic Hour’s result card with the image and Download in ChatGPT. "
+        "Use when someone asks to see, download or reopen an existing image. "
+        "Pass the existing project ID. Read-only.",
     ),
     ("DELETE", "/v1/image-projects/{id}"): (
         "delete_image_project",
@@ -228,11 +235,11 @@ API_TOOL_METADATA = {
         "Edit image",
         "Edits one or more supplied images using a text prompt. For prompt-only creation use "
         "generate_image. Costs credits; returns a project id for wait_for_image_project. Model "
-        "eligibility depends on the account plan. Read get_account_info first; do not assume an "
-        "API default is eligible. For a Free account with no requested model, "
-        "flux-2-klein at 640px with image_count=1 is an available option when it supports the "
-        "supplied inputs and requested edit. Check the current model's input limits; never drop "
-        "references or change an explicit model, resolution or count to fit this option.",
+        "eligibility depends on the account plan. When the user has not chosen a model, "
+        "resolution or count, omit them; the API picks eligible defaults for the plan. "
+        "Preserve an explicit model, "
+        "resolution or count; if the plan can't use it, explain the limit and offer a supported "
+        "option before changing it. Check the chosen model's input limits; never drop references.",
     ),
     ("POST", "/v1/ai-headshot-generator"): (
         "generate_headshot",
@@ -300,8 +307,9 @@ API_TOOL_METADATA = {
     ("GET", "/v1/audio-projects/{id}"): (
         "get_audio_project",
         "Get audio project",
-        "Returns an audio project's status and, once complete, its download URLs. Use to check "
-        "progress with the id from an audio create tool. Read-only.",
+        "Open a saved audio project in Magic Hour’s result card with playback and Download in ChatGPT. "
+        "Use when someone asks to hear, download or reopen an existing audio project. "
+        "Pass the existing project ID. Read-only.",
     ),
     ("DELETE", "/v1/audio-projects/{id}"): (
         "delete_audio_project",
@@ -499,6 +507,16 @@ def image_model_resolutions(openapi_spec: dict[str, Any]) -> dict[str, dict[str,
                 models["default"] = models[IMAGE_DEFAULT_MODELS[tool]]
             rules[tool] = models
     return rules
+
+
+def is_video_create_operation(method: str, path: str, tags: Iterable[str] | None) -> bool:
+    """True for operations that start a video render. Their results open the result card."""
+    return (
+        method == "POST"
+        and "Video Projects" in (tags or ())
+        and path not in GENERATION_ESTIMATE_PATHS
+        and (method, path) in API_TOOL_METADATA
+    )
 
 
 def normalize_mcp_tool_name(operation_id: str) -> str:
@@ -717,6 +735,15 @@ def _append_mcp_guidance(description: str, additions: list[str]) -> str:
     return f"{guidance}\n\n{existing}"
 
 
+def _attach_result_card(component: Tool, invoking: str, invoked: str) -> None:
+    """Show the project result card for this tool, with ChatGPT's in-progress and done labels."""
+    component.meta = {
+        **(component.meta or {}),
+        "ui": {"resourceUri": MCP_APP_VIEW_URI},
+        "openai/toolInvocation": {"invoking": invoking, "invoked": invoked},
+    }
+
+
 def customize_openapi_component(route: Any, component: Any) -> None:
     """Small runtime component policy for tags; text policy is applied to the spec."""
     tags = getattr(component, "tags", None)
@@ -741,15 +768,23 @@ def customize_openapi_component(route: Any, component: Any) -> None:
             destructiveHint=method == "DELETE",
             openWorldHint=bool(re.search(r"_file_paths?\b|_urls?\b|direct URL|searchWeb\b", repr(component.parameters))),
         )
-        if method == "GET" and path == "/v1/video-projects/{id}":
-            component.meta = {
-                **(component.meta or {}),
-                "ui": {"resourceUri": MCP_APP_VIEW_URI},
-                "openai/toolInvocation": {
-                    "invoking": "Opening your video project…",
-                    "invoked": "Video project opened",
-                },
-            }
+        reopen_labels = {
+            "/v1/video-projects/{id}": ("Opening your video project…", "Video project opened"),
+            "/v1/image-projects/{id}": ("Opening your image project…", "Image project opened"),
+            "/v1/audio-projects/{id}": ("Opening your audio project…", "Audio project opened"),
+        }
+        if is_video_create_operation(method, path, route_tags):
+            _attach_result_card(component, VIDEO_CREATE_INVOCATION["invoking"], VIDEO_CREATE_INVOCATION["invoked"])
+        elif method == "GET" and path in reopen_labels:
+            _attach_result_card(component, *reopen_labels[path])
+
+    is_generation = bool(route_tags.intersection(PROJECT_TAG_TO_ASSET)) and method == "POST" and not is_estimate
+    if isinstance(component, Tool) and is_generation:
+        # Lets a refused create call show the Add credits card.
+        component.meta = {**(component.meta or {}), "ui": {"resourceUri": MCP_APP_VIEW_URI}}
+        # The refusal is a non-error result with no project id.
+        if component.output_schema:
+            component.output_schema = {**component.output_schema, "required": []}
 
     if is_estimate:
         tags.add("read-operation")

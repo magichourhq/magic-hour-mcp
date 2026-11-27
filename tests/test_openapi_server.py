@@ -52,6 +52,70 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(content.meta["openai/widgetDomain"], MCP_APP_ORIGIN)
         self.assertIn("csp", content.meta["ui"])
 
+    async def test_image_and_audio_getters_show_the_card_and_keep_downloads(self):
+        from mcp_magichour.openapi_auth import BearerPassthroughAuth, _authorization_header
+        from mcp_magichour.project_result_app import MCP_APP_VIEW_URI
+
+        downloads = {
+            "image": [
+                {"url": "https://videos.magichour.ai/demo/image-1.png?sig=1", "expires_at": "2026-11-19T18:00:00.000Z"},
+                {"url": "https://videos.magichour.ai/demo/image-2.png?sig=1", "expires_at": "2026-11-19T18:00:00.000Z"},
+            ],
+            "audio": [
+                {"url": "https://videos.magichour.ai/demo/audio.wav?sig=1", "expires_at": "2026-11-19T18:00:00.000Z"},
+            ],
+        }
+        seen = []
+
+        def upstream(request):
+            seen.append((request.method, request.url.path))
+            kind = request.url.path.split("/")[2].removesuffix("-projects")
+            return httpx.Response(
+                200,
+                json={
+                    "id": f"{kind}-1",
+                    "name": "Example Name",
+                    "status": "complete",
+                    "image_count": len(downloads[kind]),
+                    "type": "AI_IMAGE" if kind == "image" else "VOICE_GENERATOR",
+                    "created_at": "2024-10-19T04:16:19.027Z",
+                    "enabled": True,
+                    "credits_charged": 1,
+                    "downloads": downloads[kind],
+                    "error": None,
+                },
+            )
+
+        token = _authorization_header.set("Bearer synthetic-test-token")
+        try:
+            async with httpx.AsyncClient(
+                base_url="https://api.example.test",
+                auth=BearerPassthroughAuth(),
+                transport=httpx.MockTransport(upstream),
+            ) as api:
+                with patch("mcp_magichour.openapi_server.build_api_client", return_value=api):
+                    server = create_mcp()
+                async with Client(server) as caller:
+                    tools = {tool.name: tool for tool in await caller.list_tools()}
+                    results = {
+                        kind: await caller.call_tool(f"get_{kind}_project", {"id": f"{kind}-1"})
+                        for kind in downloads
+                    }
+        finally:
+            _authorization_header.reset(token)
+
+        self.assertEqual(seen, [("GET", "/v1/image-projects/image-1"), ("GET", "/v1/audio-projects/audio-1")])
+        for kind, expected in downloads.items():
+            with self.subTest(kind=kind):
+                self.assertEqual(tools[f"get_{kind}_project"].meta["ui"]["resourceUri"], MCP_APP_VIEW_URI)
+                project = results[kind].structured_content
+                self.assertEqual(project["project_type"], kind)
+                self.assertEqual(project["exact_download_urls"], [item["url"] for item in expected])
+                self.assertEqual(
+                    [item["expires_at"] for item in project["download_expiration_metadata"]],
+                    [item["expires_at"] for item in expected],
+                )
+
     async def test_metadata_fits_claude_code_utf8_budget(self):
         from mcp_magichour.openapi_server import MCP_SERVER_INSTRUCTIONS
 
@@ -137,6 +201,14 @@ class OpenApiServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("fetch_image_download", names)
         self.assertIn("fetch_audio_download", names)
         self.assertIn("fetch_video_download", names)
+        by_name = {tool.name: tool for tool in tools}
+        for media_type in ("image", "audio"):
+            with self.subTest(media_type=media_type):
+                description = by_name[f"fetch_{media_type}_download"].description or ""
+                self.assertIn("result card", description)
+                self.assertIn(f"get_{media_type}_project", description)
+                self.assertIn(f"wait_for_{media_type}_project", description)
+                self.assertIn("Download", description)
         self.assertIn("wait_for_video_project", names)
         self.assertIn("wait_for_image_project", names)
         self.assertIn("wait_for_audio_project", names)

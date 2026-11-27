@@ -1,5 +1,7 @@
 # Magic Hour MCP Server
 
+[![Magic Hour MCP server on Glama](https://glama.ai/mcp/servers/magichourhq/magic-hour-mcp/badges/score.svg)](https://glama.ai/mcp/servers/magichourhq/magic-hour-mcp)
+
 OpenAPI-backed MCP server for Magic Hour image and video generation and editing,
 music generation, uploads, completion waiting and retrieval of existing audio projects.
 
