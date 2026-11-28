@@ -1,0 +1,103 @@
+{
+  "id": "C10",
+  "title": "Perfume and two people, four seasons",
+  "decides": "A pictured product held by two people described in words, in four places: does the bottle hold, do the people hold, and how should it split?",
+  "aspect": "9:16",
+  "audio": false,
+  "seconds": 20,
+  "setting": "A perfume advertisement shot like a gentle short film: natural light, soft colour, steady camera, shallow depth of field.",
+  "subjects": [
+    {
+      "id": "mara",
+      "role": "person",
+      "words": "Mara, a woman in her thirties with short curly red hair, round gold glasses and a mustard-yellow wool coat"
+    },
+    {
+      "id": "theo",
+      "role": "person",
+      "words": "Theo, a tall man in his sixties with a white beard, a navy flat cap and a long grey scarf"
+    },
+    {
+      "id": "bottle",
+      "role": "product",
+      "picture": "bench-mockup-fragrance.png",
+      "words": "The perfume: a clear rectangular glass bottle with clear liquid, a square brushed-grey cap and the words MOCKUP FRAGRANCE in black serif letters printed on the glass; no label panel, no box"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 5,
+      "place": "spring",
+      "subjects": [
+        "mara",
+        "bottle"
+      ],
+      "text": "Spring. Mara stands under a cherry tree in blossom and holds the perfume bottle up near her face, label towards the camera, as pink petals fall."
+    },
+    {
+      "seconds": 5,
+      "place": "summer",
+      "subjects": [
+        "theo",
+        "bottle"
+      ],
+      "link": "new",
+      "text": "Summer. Theo stands on a bright beach at the edge of the waves and holds the perfume bottle in his open hand, label towards the camera."
+    },
+    {
+      "seconds": 5,
+      "place": "autumn",
+      "subjects": [
+        "theo",
+        "bottle"
+      ],
+      "link": "moves",
+      "text": "Autumn. Theo sits on a park bench among red and orange leaves and sprays the perfume once on his wrist."
+    },
+    {
+      "seconds": 5,
+      "place": "winter",
+      "subjects": [
+        "mara",
+        "bottle"
+      ],
+      "link": "new",
+      "text": "Winter. Mara stands in falling snow, holds the perfume bottle against her coat, label towards the camera, and smiles."
+    }
+  ],
+  "variants": [
+    {
+      "name": "one-call",
+      "strategy": "one"
+    },
+    {
+      "name": "one-per-season",
+      "strategy": "manual",
+      "cuts": [
+        2,
+        3,
+        4
+      ],
+      "chain": false
+    },
+    {
+      "name": "rule",
+      "strategy": "person",
+      "max_seconds": 15
+    },
+    {
+      "name": "medium-only",
+      "strategy": "time",
+      "max_seconds": 10
+    }
+  ],
+  "checks": [
+    "One file, 20 s, 9:16",
+    "Spring, summer, autumn, winter, in order, each once",
+    "Mara, Theo, Theo, Mara: the right person in each season",
+    "Same bottle in every season: clear glass, grey cap, MOCKUP FRAGRANCE letters, no box",
+    "Mara looks the same in spring and winter",
+    "Theo looks the same in summer and autumn",
+    "No season is left in the next season's frames"
+  ]
+}

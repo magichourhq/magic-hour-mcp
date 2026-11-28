@@ -1,0 +1,105 @@
+{
+  "id": "C4",
+  "from": "B2",
+  "title": "Walk Anyway",
+  "decides": "Four shots of one place and two people, 26 s, with a card at each end: how small must the clips be?",
+  "aspect": "16:9",
+  "audio": true,
+  "seconds": 30,
+  "setting": "A short film at night in steady rain: a glass bus shelter on an empty city street, wet asphalt, cool blue streetlight with warm reflections. Sound is rain only; no music, no narrator.",
+  "subjects": [
+    {
+      "id": "woman",
+      "role": "person",
+      "words": "A tall woman with a silver bob, a red raincoat and yellow boots"
+    },
+    {
+      "id": "man",
+      "role": "person",
+      "words": "An older man with a grey beard, a green coat and a black umbrella"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 2,
+      "kind": "card",
+      "exact_words": [
+        "WALK ANYWAY"
+      ],
+      "text": "A title card: a plain solid black background with the words in white capital letters, centred."
+    },
+    {
+      "seconds": 7,
+      "place": "bus_stop",
+      "subjects": [
+        "woman"
+      ],
+      "text": "Wide shot. The woman waits alone at the bus stop and looks down the empty street."
+    },
+    {
+      "seconds": 6,
+      "place": "bus_stop",
+      "subjects": [
+        "woman",
+        "man"
+      ],
+      "link": "event",
+      "text": "The man walks up with his umbrella open and stops beside her."
+    },
+    {
+      "seconds": 6,
+      "place": "bus_stop",
+      "subjects": [
+        "woman",
+        "man"
+      ],
+      "link": "event",
+      "text": "Close on both of them. He says out loud, once: \"You came back.\" She smiles. Nobody else speaks."
+    },
+    {
+      "seconds": 7,
+      "place": "bus_stop",
+      "subjects": [
+        "woman",
+        "man"
+      ],
+      "link": "event",
+      "text": "Seen from behind, they walk away together down the street under the umbrella."
+    },
+    {
+      "seconds": 2,
+      "kind": "card",
+      "exact_words": [
+        "WALK ANYWAY"
+      ],
+      "text": "A title card: a plain solid black background with the words in white capital letters, centred."
+    }
+  ],
+  "variants": [
+    {
+      "name": "scene-in-one-call",
+      "strategy": "idea",
+      "max_seconds": 30
+    },
+    {
+      "name": "two-halves",
+      "strategy": "idea",
+      "max_seconds": 15
+    },
+    {
+      "name": "one-per-shot",
+      "strategy": "event",
+      "max_seconds": 15
+    }
+  ],
+  "baseline": "current MCP, one 30 s call: 3 yes, 3 partly, 1 no",
+  "checks": [
+    "One file, 30 s, 16:9",
+    "Title card for the first 2 s: black, white WALK ANYWAY",
+    "Four shots in order, each once",
+    "Woman: silver bob, red raincoat, yellow boots in every shot. Man: grey beard, green coat, black umbrella in every shot",
+    "He says \"You came back.\" once; no other words",
+    "Rain; no music, no narrator",
+    "The same title card for the last 2 s"
+  ]
+}
