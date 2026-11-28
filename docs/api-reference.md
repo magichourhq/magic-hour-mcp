@@ -82,6 +82,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/audio-to-video` | Video Projects | Audio-to-Video |
 | POST | `/v1/auto-subtitle-generator` | Video Projects | Auto Subtitle Generator |
 | POST | `/v1/character-replace` | Video Projects | Character Replace |
+| GET | `/v1/estimate/video` | Video Projects | Estimate video credits |
 | POST | `/v1/face-swap` | Video Projects | Face Swap Video |
 | POST | `/v1/image-to-video` | Video Projects | Image-to-Video |
 | POST | `/v1/lip-sync` | Video Projects | Lip Sync |
@@ -111,6 +112,7 @@ Magic Hour supports HMAC-SHA256 signed webhooks for image, video, and audio `sta
 | POST | `/v1/ai-voice-generator` | Audio Projects | AI Voice Generator |
 | GET | `/v1/audio-projects/{id}` | Audio Projects | Get audio details |
 | DELETE | `/v1/audio-projects/{id}` | Audio Projects | Delete audio |
+| GET | `/v1/estimate/audio` | Audio Projects | Estimate audio credits |
 | GET | `/v1/voices` | Audio Projects | List voices |
 | GET | `/v1/account` | Account | Get account details |
 | POST | `/v1/account/checkout` | Account | Create checkout |
@@ -430,6 +432,23 @@ Character Replace
 **Response 200:**
 - `id` (string, required): Unique ID of the video. Use it with the [Get video Project API](https://docs.magichour.ai/api-reference/video-projects/get-video-details) to fetch status and downloads.
 - `credits_charged` (integer, required): The amount of credits deducted from your account to generate the video. If the status is not 'complete', this value is an estimate and may be adjusted upon completion based on the actual FPS of the output video.
+
+#### GET /v1/estimate/video
+`operationId: estimate.video`
+
+Estimate video credits
+
+**Path Parameters:**
+- `tool` (query, required): The create endpoint to price, named by its path. For example `image-to-video` for `POST /v1/image-to-video`.
+- `end_seconds` (query, required): The `end_seconds` of the create request. Used by every tool.
+- `start_seconds` (query, optional): The `start_seconds` of the create request, for tools whose create request has it. Defaults to 0.
+- `model` (query, optional): The `model` of the create request. Used by `image-to-video`, `text-to-video`, `ai-ugc-ad`, `ai-video-editor`, `character-replace`.
+- `resolution` (query, optional): The `resolution` of the create request. Used by `image-to-video`, `text-to-video`, `ai-ugc-ad`, `ai-video-editor`, `character-replace`, `audio-to-video`, `ai-video-translator`, `ai-video-upscaler`. `ai-video-translator` defaults to `480p`.
+- `audio` (query, optional): The `audio` of the create request. Used by `image-to-video`, `text-to-video`. Defaults to `false`.
+- `has_video_reference` (query, optional): Whether any of the create request's `references` is a video. Used by `text-to-video`. Defaults to `false`.
+
+**Response 200:**
+- `estimated_credits` (integer, required): Credits a create request with these fields charges.
 
 #### POST /v1/face-swap
 `operationId: faceSwap.createVideo`
@@ -1040,6 +1059,19 @@ Delete audio
 
 **Path Parameters:**
 - `id` (path, required): Unique ID of the audio project. This value is returned by all of the POST APIs that create an audio.
+
+#### GET /v1/estimate/audio
+`operationId: estimate.audio`
+
+Estimate audio credits
+
+**Path Parameters:**
+- `tool` (query, required): The create endpoint to price, named by its path. For example `ai-voice-generator` for `POST /v1/ai-voice-generator`.
+- `character_count` (query, optional): The number of characters in the `style.prompt` of the create request. Used by `ai-voice-generator`, `ai-voice-cloner`.
+- `duration` (query, optional): The `duration` of the create request. Used by `ai-music-generator`.
+
+**Response 200:**
+- `estimated_credits` (integer, required): Credits a create request with these fields charges.
 
 #### GET /v1/voices
 `operationId: voices.list`
