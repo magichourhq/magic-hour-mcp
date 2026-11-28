@@ -105,7 +105,7 @@ CHATGPT_STORAGE_HOSTS = frozenset({
 })
 MCP_SERVER_NAME = "magic-hour"
 MCP_SERVER_TITLE = "Magic Hour"
-MCP_WEBSITE_URL = "https://docs.magichour.ai/integration/model-context-protocol"
+MCP_WEBSITE_URL = "https://magichour.ai/mcp"
 MCP_SERVER_ICONS = [Icon(src="https://mcp.magichour.ai/logo.png", mimeType="image/png", sizes=["256x256"])]
 MCP_SERVER_VERSION = "0.1.0"
 MCP_USER_AGENT = f"magic-hour-mcp/{MCP_SERVER_VERSION}"
