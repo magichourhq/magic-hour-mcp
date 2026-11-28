@@ -618,7 +618,7 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
         elif default_resolutions:
             resolution_guidance += (
                 f"`default` is {default_model}, which supports only {', '.join(sorted_resolutions(default_resolutions))}; "
-                "for anything higher, choose a model that lists it. "
+                "for anything higher, check model and plan eligibility before choosing. "
             )
         if resolution_guidance not in model.get("description", ""):
             model["description"] = resolution_guidance + model.get("description", "")
@@ -661,10 +661,11 @@ def _apply_operation_policy(*, path: str, method: str, operation: dict[str, Any]
     if method == "POST" and asset_type and not is_estimate:
         guidance = (
             " Before choosing settings, read get_account_info and the current parameter "
-            "constraints. A listed model, resolution, duration or count is not necessarily "
-            "available together or on this account. Preserve explicit requirements and all "
-            "supplied inputs; explain a genuine block instead of submitting an incompatible "
-            "request. Account balance alone does not prove a request is affordable."
+            "constraints. For a Free account, choose models and settings available on Free. "
+            "If the request needs a paid-only option, explain the requirement and any verified "
+            "cost, and get explicit user opt-in before submitting it. Preserve explicit "
+            "requirements and supplied inputs. Explain incompatible combinations instead of "
+            "submitting them. Credit balance alone does not establish eligibility or affordability."
         )
         if guidance not in operation.get("description", ""):
             operation["description"] = operation.get("description", "") + guidance
