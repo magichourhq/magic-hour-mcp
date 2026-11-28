@@ -68,7 +68,12 @@ from .project_result_app import (
     install_ui_read_origin,
     read_mcp_app_html,
 )
+from . import kept_files
+from .media_helpers_tool import register_media_helpers
+from .plan_request import register_plan_request
+from .tool_plan import register_tool_plan
 from .tool_logging import ToolCallLoggingMiddleware
+from .video_production_tool import FILMS_PATH, film_file, register_video_production
 from .workflow_guidance import register_workflow_guidance
 
 DEFAULT_API_BASE_URL = "https://api.magichour.ai"
@@ -249,6 +254,10 @@ def create_mcp() -> FastMCP:
 
 def register_custom_tools(mcp: FastMCP) -> None:
     register_workflow_guidance(mcp)
+    register_plan_request(mcp)
+    register_tool_plan(mcp)   # tool management, off unless MAGIC_HOUR_TOOL_PLAN=on
+    register_video_production(mcp)
+    register_media_helpers(mcp)
 
     @mcp.tool(
         name="upload_chatgpt_image",
@@ -590,6 +599,7 @@ async def _upload_chatgpt_file(file: ChatGPTFile, media_type: ProjectType) -> di
             )
             uploaded = await files.put(item["upload_url"], content=bytes(media))
             uploaded.raise_for_status()
+            await asyncio.to_thread(kept_files.keep_if_possible, item["file_path"], bytes(media))   # read again by join / last frame
             return {"file_path": item["file_path"]}
 
     try:
@@ -1049,6 +1059,13 @@ async def favicon(_: Request) -> FileResponse:
     return FileResponse(FAVICON_PATH, media_type="image/x-icon")
 
 
+async def film_download(request: Request) -> FileResponse | PlainTextResponse:
+    """A film that join_production_clips made on this machine."""
+    file = film_file(request.path_params["name"])
+    from .video_production_tool import FILM_TYPES
+    return FileResponse(file, media_type=FILM_TYPES.get(file.suffix, "video/mp4")) if file else PlainTextResponse("Not found", status_code=404)
+
+
 async def logo(_: Request) -> FileResponse:
     return FileResponse(LOGO_PATH, media_type="image/png")
 
@@ -1119,6 +1136,7 @@ app = create_oauth_compatibility_app(
     public_routes=[
         Route("/app/events", app_events, methods=["POST", "OPTIONS"]),
         Route("/favicon.ico", favicon, methods=["GET"]),
+        Route(FILMS_PATH + "/{name}", film_download, methods=["GET"]),
         Route("/logo.png", logo, methods=["GET"]),
         *[Route(path, mcp_client_config, methods=["GET"]) for path in MCP_CLIENT_CONFIG_PATHS],
         Route(MCP_APP_VIEW_PATH, mcp_app_http_view, methods=["GET"]),
