@@ -12,6 +12,9 @@ dependencies = [
     "posthog==7.51.2",
     "starlette>=1.0.1",
     "uvicorn>=0.35.0",
+    # ffmpeg (joins, trims, frames) and Pillow (head swap, captions, cards); the hosted server needs both.
+    "imageio-ffmpeg>=0.5",
+    "pillow>=10.1",
 ]
 
 [build-system]
@@ -22,7 +25,7 @@ build-backend = "setuptools.build_meta"
 include = ["mcp_magichour*"]
 
 [tool.setuptools.package-data]
-mcp_magichour = ["openapi.json", "favicon.ico", "logo.png", "static/project-result/index.html", "static/project-result/assets/*"]
+mcp_magichour = ["openapi.json", "tool_notes.json", "question_sheets.json", "fonts/*", "favicon.ico", "logo.png", "static/project-result/index.html", "static/project-result/assets/*"]
 
 [tool.vercel.scripts]
 build = "npm --prefix web ci && npm --prefix web run build"
