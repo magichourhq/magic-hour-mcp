@@ -1,0 +1,93 @@
+{
+  "id": "C5",
+  "from": "B1",
+  "title": "Mockup Fragrance",
+  "decides": "Three shots with two pictured subjects and an end card, 30 s: which single picture goes into each clip?",
+  "aspect": "9:16",
+  "audio": false,
+  "seconds": 30,
+  "setting": "A perfume advertisement in soft warm sunlight with gentle shadows, a calm neutral palette, slow elegant camera moves.",
+  "subjects": [
+    {
+      "id": "presenter",
+      "role": "person",
+      "picture": "bench-presenter.png",
+      "words": "The presenter: a woman with long parted dark brown hair and a dark charcoal blazer"
+    },
+    {
+      "id": "bottle",
+      "role": "product",
+      "picture": "bench-mockup-fragrance.png",
+      "words": "The perfume: a clear rectangular glass bottle with clear liquid, a square brushed-grey cap and the words MOCKUP FRAGRANCE in black serif letters printed on the glass; no label panel, no box"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 8,
+      "place": "tabletop",
+      "subjects": [
+        "bottle"
+      ],
+      "text": "The bottle stands alone on a light ivory surface. The camera slides slowly past it."
+    },
+    {
+      "seconds": 9,
+      "place": "room",
+      "subjects": [
+        "presenter",
+        "bottle"
+      ],
+      "link": "moves",
+      "text": "The presenter holds the bottle up in one hand with the label toward the camera and looks at it."
+    },
+    {
+      "seconds": 9,
+      "place": "room",
+      "subjects": [
+        "presenter",
+        "bottle"
+      ],
+      "link": "event",
+      "text": "She lifts the cap off, sprays the perfume once on her other wrist, and a fine mist shows."
+    },
+    {
+      "seconds": 4,
+      "kind": "card",
+      "exact_words": [
+        "MOCKUP FRAGRANCE",
+        "Available 12 December"
+      ],
+      "text": "An end card: a plain solid deep purple background, colour #3B1F6B, with two centred lines of clean white text."
+    }
+  ],
+  "variants": [
+    {
+      "name": "presenter-in-one-call",
+      "strategy": "idea",
+      "max_seconds": 30
+    },
+    {
+      "name": "one-per-shot",
+      "strategy": "event",
+      "max_seconds": 15
+    },
+    {
+      "name": "person-first",
+      "strategy": "person",
+      "max_seconds": 15
+    }
+  ],
+  "baseline": "current MCP, one 30 s call: 2 yes, 6 partly, 2 no",
+  "not_tested_here": [
+    "voice-over",
+    "captions",
+    "music"
+  ],
+  "checks": [
+    "One file, 30 s, 9:16",
+    "Bottle alone, then she holds it, then she sprays her wrist, then the end card, each once",
+    "Same bottle and label, no box",
+    "Same presenter in both shots",
+    "End card for the last 4 s, exact text on #3B1F6B"
+  ]
+}
