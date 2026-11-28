@@ -58,9 +58,10 @@ API_TOOL_METADATA = {
     ("POST", "/v1/files/upload-urls"): (
         "get_upload_urls",
         "Get upload URLs",
-        "Creates presigned upload URL and file-path pairs for local media. Use when a generation "
-        "needs a file the user has locally: upload raw bytes to the returned upload_url, then pass "
-        "its file_path to the create tool. Does not upload file bytes or start a generation.",
+        "Creates presigned upload URL and file-path pairs for local media. Use when your client "
+        "can PUT the raw bytes to upload_url, then pass file_path to the create tool. For a "
+        "ChatGPT attachment, use the creation tool's attachment field, upload_chatgpt_image, "
+        "or upload_chatgpt_media. This tool only issues upload URLs.",
     ),
     ("GET", "/v1/face-detection/{id}"): (
         "get_face_detection_results",
