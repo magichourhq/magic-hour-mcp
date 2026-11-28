@@ -75,6 +75,19 @@ class ParameterDocumentationTests(unittest.TestCase):
         self.assertIn("v3 requires a supplied reference image", updated["description"])
         self.assertNotIn("not v3", updated["description"])
 
+    def test_stock_voice_is_picked_to_match_the_speaker(self):
+        # Pick the voice that matches the character, never the default.
+        updated = apply_magic_hour_policies(self.spec)["paths"]["/v1/ai-voice-generator"]["post"]
+        style = updated["requestBody"]["content"]["application/json"]["schema"]["properties"]["style"]
+        said = style["properties"]["voice_name"]["description"]
+        self.assertIn("best matches the person or character who speaks", said)
+        self.assertIn("Do not take the first voice in the list or the example as a default", said)
+        sheets = json.loads((Path(__file__).parent.parent / "mcp_magichour/question_sheets.json").read_text())
+        rows = {r.get("id"): r for f in sheets["families"].values() for r in f["rows"]}
+        for row, answer in (("presenter", "photo"), ("presenter", "video with a presenter"), ("voices", "one voice")):
+            with self.subTest(row=row, answer=answer):
+                self.assertIn("not the first voice listed", rows[row]["answers"][answer])
+
 
 class ParameterWireTests(unittest.IsolatedAsyncioTestCase):
     async def test_omitted_and_explicit_names_and_references_are_forwarded_unchanged(self):

@@ -1,0 +1,88 @@
+{
+  "id": "C8",
+  "title": "Through the door",
+  "decides": "One person goes from one season to the next through a door: where is the best place to cut?",
+  "aspect": "16:9",
+  "audio": false,
+  "seconds": 12,
+  "setting": "A gentle short film in natural light, soft colour, steady camera, shallow depth of field.",
+  "subjects": [
+    {
+      "id": "mara",
+      "role": "person",
+      "words": "Mara, a woman in her thirties with short curly red hair, round gold glasses and a mustard-yellow wool coat"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 4,
+      "place": "spring",
+      "subjects": [
+        "mara"
+      ],
+      "text": "Mara walks through a walled spring garden under cherry blossom, petals in the air, toward a blue wooden door in the wall. She is seen from the side."
+    },
+    {
+      "seconds": 2,
+      "place": "spring",
+      "subjects": [
+        "mara"
+      ],
+      "link": "continues",
+      "text": "She stops at the blue door and puts her hand on the handle, her face in profile."
+    },
+    {
+      "seconds": 2,
+      "place": "doorway",
+      "subjects": [
+        "mara"
+      ],
+      "link": "continues",
+      "text": "She pulls the door open. Through the doorway: a bright summer beach, white sand and blue sea."
+    },
+    {
+      "seconds": 4,
+      "place": "summer",
+      "subjects": [
+        "mara"
+      ],
+      "link": "continues",
+      "text": "She steps through the doorway onto the summer beach. The sea is in front of her and the blue door stands open behind her."
+    }
+  ],
+  "variants": [
+    {
+      "name": "no-cut",
+      "strategy": "one"
+    },
+    {
+      "name": "cut-before-the-door-opens",
+      "strategy": "manual",
+      "cuts": [
+        3
+      ]
+    },
+    {
+      "name": "cut-in-the-open-doorway",
+      "strategy": "manual",
+      "cuts": [
+        4
+      ]
+    },
+    {
+      "name": "hard-cut-no-chain",
+      "strategy": "manual",
+      "cuts": [
+        4
+      ],
+      "chain": false
+    }
+  ],
+  "checks": [
+    "One file, 12 s, 16:9",
+    "Garden, door, door opens, beach: in order, each once",
+    "Mara is the same person before and after the cut",
+    "The summer beach is where she arrives (no spring garden after the door)",
+    "No visible jump at the cut"
+  ]
+}

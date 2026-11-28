@@ -1,0 +1,964 @@
+{
+  "_about": "Question sheets for tool management. Read by plan_tool_call with tool_notes.json. One sheet per request family: what the user asks for, not how the tool works. Each row: kind (deciding = picks the tool; required = the result fails if it is wrong), ask (plain words for the user), read_from (how to answer it from the user's words or files first), answers (what each answer means for the tool and settings), default (used on 'your call' or when the user does not answer), why (the tool note and benchmark cases behind it). A row is asked only when it applies and the user's words and files do not answer it.",
+  "rules": [
+    "Answer every row from the user's words and attached files first. Ask only the deciding and required rows that are still open.",
+    "Use as few tool calls as possible: one call that does the whole job beats a chain. Add a step only when the result needs it.",
+    "Tool priority: generation tools first (generate_image, edit_image, the video and audio generators), because they cover more cases. Deterministic code tools (reframe_media, add_words_to_media, trim_media, adjust_colours, put_pictures_side_by_side, put_picture_on_video, make_card_clip, mix_audio, add_sound_to_video, join_videos) last: only when generation cannot do the job, or the user asks for their media to stay exactly as it is.",
+    "Words: text that is part of a designed picture (a headline, a poster, a flyer, a logo, a thumbnail, a carousel slide, a card) goes in the generation prompt, quoted exactly, with where it goes. add_words_to_media is only for captions or overlays on top of existing media (a caption on the user's photo, a watermark, subtitles-style lines on a video). After generating words, check the spelling in the result; if it is wrong, fix it with edit_image.",
+    "Ask as few questions as possible: only those whose answer would change the result and that the user's words and files do not answer. Ask them all together in one message, once, in plain words, each with what happens if the user skips it. Never ask a second round: anything still open after the user answers takes its default.",
+    "'Your call', 'you pick', or no answer: use the row's default. A row with `your_call` (words the result shows) uses that instead when the user hands it over.",
+    "Keep every concrete detail the user gave (counts, colours, materials, names, exact words) in the tool's prompt word for word. 'matte black on marble' became a silver bottle on white when the details were dropped.",
+    "Free-tier models only (tool_notes.json, free_models). Never name a paid model.",
+    "Keep the user's media unless the user asked for it to be redrawn or re-made.",
+    "When no tool does the job (a GAP row), say so plainly and offer the nearest real option. Do not send the user's media through a tool that redraws it instead.",
+    "A request for a film of several shots or scenes is the film family of plan_conversation (then plan_video_production), not these sheets.",
+    "Passing a result to the next tool: Magic Hour's own tools (generate_image, edit_image, create_video_from_image, swap_*, add_subtitles_to_video and the other API tools) take a file_path or a download URL, not a project id; pass the finished project's download URL or the file_path a code tool returned. The code tools (reframe_media, trim_media, add_words_to_media, mix_audio, join_videos, get_last_frame, add_sound_to_video, adjust_colours, put_pictures_side_by_side, put_picture_on_video, make_card_clip) also take a finished project id."
+  ],
+  "families": {
+    "new_picture": {
+      "is": "A new picture from words: a product shot, an illustration, a post, a flyer, a logo, a thumbnail, a meme.",
+      "tools": [
+        "generate_image",
+        "add_words_to_media",
+        "edit_image",
+        "remove_image_background",
+        "create_meme",
+        "reframe_media"
+      ],
+      "settings": {
+        "generate_image": {
+          "model": "qwen-image-2.1",
+          "resolution": "640px",
+          "style.tool": "ai-illustration-generator for an illustration, else none; never ai-photo-generator or movie-poster-generator"
+        }
+      },
+      "rows": [
+        {
+          "id": "look",
+          "kind": "required",
+          "ask": "What should it look like: the colour and material of the subject, the setting or background, and the light?",
+          "read_from": [
+            "Colours, materials, finishes ('matte black', 'amber glass', 'white leather').",
+            "A setting or surface ('on marble', 'on a café table', 'plain white background').",
+            "Light or mood ('soft light', 'premium', 'warm').",
+            "Only the subject named ('a water bottle') → open: ask."
+          ],
+          "answers": {
+            "any": "Put every detail in the prompt word for word."
+          },
+          "default": "A clean product look: the subject centred on a plain light background, soft light.",
+          "why": "The user had 'matte black on marble' in mind; without the question the bottle came out steel on grey (2). With the planner asking: 4, 4, 4. generate_image limit: a vague user's details get lost."
+        },
+        {
+          "id": "exact_words",
+          "kind": "deciding",
+          "ask": "Should the picture have any words on it? If so, what exactly should they say?",
+          "read_from": [
+            "Text in quotes, or after 'headline', 'saying', 'text:', 'title'.",
+            "A brand or shop name the user spelled out.",
+            "'No text', 'no words' → none."
+          ],
+          "answers": {
+            "none": "generate_image; say 'no text' in the prompt.",
+            "exact words": "generate_image with the exact words in the prompt, quoted, and where they go (qwen-image-2.1). Check the spelling in the result; if wrong, edit_image to fix the words."
+          },
+          "default": "No words.",
+          "why": "Words in a designed picture are generated, not drawn on top. Spelling risk: flux-2-klein misspelt headlines in the bench ('CEAN UP YOUR BACH'); qwen-image-2.1 is the model to use; check and fix with edit_image.",
+          "your_call": "Words that fit the request, written by you (a short headline or call to action), quoted in the prompt. Never invent a price, a date or a web address."
+        },
+        {
+          "id": "shape",
+          "kind": "required",
+          "ask": "What shape: square, wide (16:9), tall (9:16, for stories), or 4:5 (for a feed post)?",
+          "read_from": [
+            "'Story', 'reel', 'TikTok', 'vertical', 'tall' → 9:16.",
+            "'YouTube thumbnail', 'banner', 'wide', 'landscape' → 16:9.",
+            "'Instagram post', 'square', 'logo' → 1:1.",
+            "'4:5', 'portrait post' → 4:5."
+          ],
+          "answers": {
+            "1:1, 16:9, 9:16": "generate_image aspect_ratio (one shape; for several shapes, `set` decides).",
+            "4:5": "generate_image 1:1, then edit_image (qwen-image-2.1, aspect_ratio 4:5); reframe_media has no 4:5."
+          },
+          "default": "1:1.",
+          "why": "generate_image limit: aspect setting is 1:1, 16:9, 9:16 only. 4:5 flyers made by edit_image with qwen: 3.6."
+        },
+        {
+          "id": "set",
+          "kind": "deciding",
+          "ask": "One picture, or a set that must match (several sizes, carousel slides, a poster with a story and a reel)?",
+          "read_from": [
+            "'In three sizes', '1:1, 9:16 and 16:9', 'for feed and stories' → a set of sizes.",
+            "'Carousel', 'slides', 'a series', 'matching', 'pack', 'campaign' → a set."
+          ],
+          "answers": {
+            "one": "As in `shape`.",
+            "set": "Make ONE master picture first (generate_image, qwen-image-2.1, the first size or slide, words in the prompt). Then make every other piece FROM the master with edit_image (qwen-image-2.1, the master as the input image): same style, palette, typography and layout, changing only what that piece needs (its aspect_ratio, its words). A video in the set: create_video_from_image from the master or the matching piece, not create_video_from_text, so it keeps the look. This replaces `shape`'s one-shape instruction."
+          },
+          "default": "set when the user names several sizes or pieces.",
+          "why": "Separate generations broke the set ('look like a set' not done: borders differ; 'matching event pack' not done: the reel was photoreal, the poster illustrated; earlier: the green shapes differ). A master plus edits from it keeps one design."
+        },
+        {
+          "id": "transparent",
+          "kind": "deciding",
+          "ask": "Do you need a transparent background (to put the picture on other things)?",
+          "read_from": [
+            "'Transparent', 'PNG with no background', 'cut out'."
+          ],
+          "answers": {
+            "no": "Nothing extra.",
+            "yes": "generate_image with the words in the prompt, then remove_image_background; check the letters after the cut-out."
+          },
+          "default": "No.",
+          "why": "remove_image_background antitype: thin letters fade or smear (2.7)."
+        },
+        {
+          "id": "meme_kind",
+          "kind": "deciding",
+          "applies": "only for a meme",
+          "ask": "A meme with your own picture and your own words, or a known meme template with a joke on your topic?",
+          "read_from": [
+            "An attached picture, or top and bottom text given → own.",
+            "'Make a meme about X' with no picture or text → template."
+          ],
+          "answers": {
+            "own": "add_words_to_media on the user's picture (top and bottom caption: text on top of existing media).",
+            "template": "create_meme."
+          },
+          "default": "Template when no picture is attached, else own.",
+          "why": "create_meme antitype: it uses its templates and writes its own caption, which can drift off the topic."
+        }
+      ]
+    },
+    "change_picture": {
+      "is": "A change to the user's own picture: a new shape, words on it, an edit, bigger, a cut-out.",
+      "tools": [
+        "reframe_media",
+        "add_words_to_media",
+        "edit_image",
+        "upscale_image",
+        "remove_image_background",
+        "adjust_colours",
+        "put_pictures_side_by_side",
+        "change_clothes_in_photo"
+      ],
+      "settings": {
+        "edit_image": {
+          "model": "qwen-image-2.1",
+          "resolution": "640px",
+          "aspect_ratio": "the shape asked, else auto"
+        },
+        "upscale_image": {
+          "scale_factor": 2
+        }
+      },
+      "rows": [
+        {
+          "id": "keep_or_redraw",
+          "kind": "deciding",
+          "ask": "Should I keep your picture exactly and only reshape it or add words, or redraw it with a change?",
+          "read_from": [
+            "'Square', 'vertical', 'fit', 'crop', 'resize', 'add a caption', 'put text on' → keep.",
+            "'Change X to Y', 'remove', 'replace', 'make it look like', 'put it on a new background' → redraw."
+          ],
+          "answers": {
+            "keep": "For a new shape: edit_image (qwen-image-2.1) with the new aspect_ratio, asking to extend the scene around the picture and keep the subject unchanged (generation first). reframe_media only if the extension changes the subject or the user wants nothing added. For a caption on top of the photo: add_words_to_media.",
+            "redraw": "edit_image with qwen-image-2.1."
+          },
+          "default": "Keep.",
+          "why": "edit_image antitype: a new shape came back 640x384 (1.0 to 1.3); words misspelt. Test: 1 → 4, 2 → 4 with the code tools. Extend the image with generation before reframing."
+        },
+        {
+          "id": "shape_how",
+          "kind": "required",
+          "applies": "a new shape",
+          "ask": "To fit the new shape, may I extend the scene around the picture, or should I keep it exactly and add bars or a blurred copy?",
+          "read_from": [
+            "'Keep the whole', 'don't crop', 'don't cut off' → pad or fill.",
+            "'Plain padding', 'bars', 'match the background' → pad, colour of the background.",
+            "'Blurred copy' → fill.",
+            "'Crop', 'zoom in', 'fill the frame' → crop."
+          ],
+          "answers": {
+            "extend": "edit_image with the new aspect_ratio, extending the scene (default).",
+            "crop": "reframe_media how=crop, focus on the subject.",
+            "bars": "reframe_media how=pad, color from the user or the background.",
+            "blurred": "reframe_media how=fill."
+          },
+          "default": "extend (edit_image); reframe_media only if the user wants nothing added.",
+          "why": "reframe_media type and limits (fill 4, pad 3)."
+        },
+        {
+          "id": "subject_place",
+          "kind": "required",
+          "applies": "a crop",
+          "ask": "Where in the picture is the part that must stay in?",
+          "read_from": [
+            "Look at the attached picture (Read).",
+            "'The shoe is on the left' → focus 0."
+          ],
+          "answers": {
+            "left/top": "focus 0 to 0.3.",
+            "middle": "focus 0.5.",
+            "right/bottom": "focus 0.7 to 1."
+          },
+          "default": "Look at the picture; else 0.5.",
+          "why": "'don't just crop the middle'."
+        },
+        {
+          "id": "words",
+          "kind": "required",
+          "applies": "words on the picture",
+          "ask": "What exactly should it say, and where: top, middle, bottom or a corner?",
+          "read_from": [
+            "Quoted text.",
+            "'Near the bottom', 'at the top', 'in the corner'."
+          ],
+          "answers": {
+            "any": "add_words_to_media with text, place, size, style."
+          },
+          "default": "Place bottom, size large, style shadow.",
+          "why": "add_words_to_media (4, 4 in a test run)."
+        },
+        {
+          "id": "on_object",
+          "kind": "deciding",
+          "applies": "words on the picture",
+          "ask": "Should the words sit on top of the photo like a caption, or be part of the picture (a sign, a label, a headline in the design)?",
+          "read_from": [
+            "'Chalkboard saying', 'a sign that reads', 'on the label' → on an object.",
+            "'Caption', 'over the photo', 'text on top' → on top."
+          ],
+          "answers": {
+            "on top": "add_words_to_media (a caption on top of the user's photo).",
+            "part of the picture": "edit_image with the exact words in the prompt (a sign, a label, a headline that belongs to the design)."
+          },
+          "default": "On top.",
+          "why": "add_words_to_media antitype: drawn words do not follow an object."
+        },
+        {
+          "id": "bigger_or_fixed",
+          "kind": "deciding",
+          "applies": "bigger, sharper, restore",
+          "ask": "Only bigger, or also cleaned up (scratches, blur)? Cleaning up can change faces slightly.",
+          "read_from": [
+            "'Upscale', 'bigger', 'higher resolution' → bigger.",
+            "'Restore', 'clean up', 'old photo', 'scratches', 'blurry' → also fixed."
+          ],
+          "answers": {
+            "bigger": "upscale_image, scale 2.",
+            "fixed": "upscale_image, scale 2, and tell the user faces may be redrawn slightly."
+          },
+          "default": "Bigger.",
+          "why": "upscale_image antitype and limits: faces regenerated (2.0); preserve 3 in a test run, faces still smoothed. Mode undecided: preserve scored 2 and balanced 3 (one run each)."
+        },
+        {
+          "id": "colour_only",
+          "kind": "required",
+          "applies": "a colour change of the whole picture",
+          "ask": "Which colour change: warmer, cooler, black and white, brighter, or more contrast? And how strong: a little or a lot?",
+          "read_from": [
+            "'Warmer', 'cosier', 'golden' → warmer.",
+            "'Cooler', 'colder', 'blue tint' → cooler.",
+            "'Black and white', 'grayscale', 'remove the colour' → black and white.",
+            "'Brighter', 'lighter' → brighter; 'punchier', 'more contrast' → contrast."
+          ],
+          "answers": {
+            "warmer": "adjust_colours warmth 0.3 (a lot: 0.6).",
+            "cooler": "adjust_colours warmth -0.3 (a lot: -0.6).",
+            "black and white": "adjust_colours saturation 0.",
+            "brighter": "adjust_colours brightness 0.1 (a lot: 0.2).",
+            "more contrast": "adjust_colours contrast 1.2 (a lot: 1.4)."
+          },
+          "default": "A little (warmth 0.3).",
+          "why": "adjust_colours: changes only the colours, nothing redrawn. Before: edit_image redrew the picture. Not benchmarked yet."
+        },
+        {
+          "id": "several_in_one",
+          "kind": "deciding",
+          "applies": "two or more pictures in one (side by side, before and after, a collage)",
+          "ask": "Keep each photo exactly as it is, side by side (or in a grid), or redraw them into one new picture?",
+          "read_from": [
+            "'Side by side', 'before and after', 'keep both photos as they are' → side by side.",
+            "'Show how it could look', 'make a combined picture' → redraw."
+          ],
+          "answers": {
+            "side by side": "put_pictures_side_by_side with layout, aspect and labels (e.g. ['Before', 'After']); the photos are kept whole.",
+            "redraw": "edit_image (qwen-image-2.1) with both pictures; tell the user the photos will be redrawn."
+          },
+          "default": "Side by side.",
+          "why": "put_pictures_side_by_side. Before: edit_image redrew and cropped both photos (2.0, 1.7). Not benchmarked yet."
+        },
+        {
+          "id": "exact_change",
+          "kind": "deciding",
+          "applies": "a follow-up that asks for an exact change to a picture already made (bigger or smaller text by an amount, the same font, the same position, move one thing, 'leave everything else alone')",
+          "ask": "(Read from the user's words.) Does the follow-up ask for an exact, measurable change with everything else kept?",
+          "read_from": [
+            "'About half again as big', 'same font and centre point', 'move it 2 cm left', 'leave everything else alone' → exact.",
+            "'Make it pop', 'a bit bigger', 'try another style' → not exact."
+          ],
+          "answers": {
+            "not exact": "edit_image on the delivered picture with the change described.",
+            "exact": "edit_image on the delivered picture with the exact instruction (the scale factor, 'same font', 'same centre point', 'change nothing else'), one call. Tell the user plainly that resizing or moving words in a generated picture is close but not exact (the size can drift and nearby parts can be redrawn), and offer another try."
+          },
+          "default": "not exact.",
+          "why": "One run: regeneration drifted (1.28x). Another run: edit_image with the exact instruction drifted (1.78x, the cup redrawn) and the host skipped a compare-and-fall-back step. One edit_image, and say it is approximate. A deterministic redraw would change the font."
+        },
+        {
+          "id": "outfit",
+          "kind": "deciding",
+          "applies": "new clothes on a person in a photo",
+          "ask": "(Read from the files and words.) Is the new outfit a picture or words, and which part changes?",
+          "read_from": [
+            "An attached outfit picture.",
+            "'A navy blazer', 'jeans instead', 'a red dress'."
+          ],
+          "answers": {
+            "outfit picture": "change_clothes_in_photo with the person's photo and the outfit picture; garment_type upper_body (a shirt, a jacket), lower_body (trousers, a skirt), else entire_outfit.",
+            "outfit in words": "edit_image: change only the clothes to the user's words; keep the face, hair, pose and background."
+          },
+          "default": "An outfit picture when one is attached, else outfit in words.",
+          "why": "Copied from the faces sheet. In a test run, this family listed no clothes tool and the host used edit_image for an outfit picture."
+        }
+      ]
+    },
+    "faces": {
+      "is": "A face or head from one picture onto a person in a photo or video, or a headshot from a photo.",
+      "tools": [
+        "swap_head_in_photo",
+        "swap_heads_in_photo",
+        "swap_face_in_photo",
+        "swap_face_in_video",
+        "detect_faces",
+        "trim_media",
+        "edit_image",
+        "generate_headshot",
+        "change_clothes_in_photo",
+        "place_person_in_scene",
+        "replace_character_in_video",
+        "get_first_frame"
+      ],
+      "settings": {
+        "swap_face_in_video": {
+          "face_swap_mode": "individual-faces when several people each get their own face"
+        }
+      },
+      "rows": [
+        {
+          "id": "consent",
+          "kind": "required",
+          "ask": "(Not asked: a rule.) A real public figure without consent, a child's face, or a fake endorsement: refuse and say why.",
+          "read_from": [
+            "A celebrity's name, 'without permission', a child's photo."
+          ],
+          "answers": {
+            "none": "Go ahead: an adult's own face, or a person who agreed.",
+            "any of these": "Refuse plainly. Offer an invented or illustrated person instead (for a child: a generic illustrated child). Do not ask for another photo of the person."
+          },
+          "default": "none",
+          "why": "Dry run: declined, but kept asking for the boy's photo and offered no illustrated alternative."
+        },
+        {
+          "id": "photo_or_video",
+          "kind": "deciding",
+          "ask": "(Read from the files.) Is the target a photo or a video?",
+          "read_from": [
+            "The attached files."
+          ],
+          "answers": {
+            "photo": "swap_head_in_photo (face, hair and head shape). Also when the user says 'just the face' or 'keep their hair': do not offer a face-only swap, a face swap is a blend that does not look like the person ('should be a head swap, not just a face swap', though that request said 'keep their hair'). Tell the user the hair comes from their photo. Several people, each a new head: swap_heads_in_photo.",
+            "video": "Head swap for video, one person: get_first_frame of the video; swap_head_in_photo with that frame as body_file_path and the user's photo as head_file_path (wait_for_image_project); then replace_character_in_video with model wan-animate (free plan: minimax-h3), style.mode animate, the original video as video_file_path, the head-swapped frame's download URL as image_file_path, the resolution nearest the video's, start 0 and end the video length (or the chosen part). The video's motion, mouth, room, clothes and sound stay. About 48 credits per second at 480p. Several people in a video: swap_face_in_video individual-faces."
+          },
+          "default": "—",
+          "why": "Head swap for faces. Test: 1.5 → 4; head swap clearly the person, face swap a blend. swap_face_in_video limit (2.7). Test: head-swapped first frame + wan-animate animate kept the kitchen, clothes, hand pose and sound; the mouth moves with the speech.",
+          "applies": "a face or head swap"
+        },
+        {
+          "id": "which_person",
+          "kind": "required",
+          "applies": "more than one person in the target",
+          "ask": "There are several people in the picture. Which one gets the new face?",
+          "read_from": [
+            "'The woman on the right', 'the pilot', 'the one in blue'.",
+            "Look at the picture (Read)."
+          ],
+          "answers": {
+            "one person": "swap_head_in_photo; if it changes the wrong person, detect_faces then swap_face_in_photo individual-faces.",
+            "each a different face": "Photo: swap_heads_in_photo with one {person, head} per person (person 1 = the leftmost face); it finds the faces itself. Video: detect_faces, then swap_face_in_video individual-faces."
+          },
+          "default": "Ask; do not guess. Still open after the user was asked: make nothing and say why.",
+          "why": "Asked which person, then head swap: 4. swap_face_in_photo individual-faces was a blend ('didn't work out'). Test: swap_heads_in_photo changed each person to their portrait and kept the beach; a second plain head swap on the whole photo changed both people. Dry run: face detection stayed queued about 2 minutes and the host stopped polling after 40 s, so the tool waits for detection itself.",
+          "no_default": "Which person in the picture gets the new face: with several people, a guess can change the wrong person."
+        },
+        {
+          "id": "which_part",
+          "kind": "required",
+          "applies": "a video",
+          "ask": "The whole clip, or only part of it? If part, from when to when?",
+          "read_from": [
+            "'The first 5 seconds', 'from 0:10 to 0:20'."
+          ],
+          "answers": {
+            "whole": "The whole clip: end = the video length.",
+            "part": "trim_media first, then the video route of photo_or_video."
+          },
+          "default": "The whole clip.",
+          "why": "swap_face_in_video antitype: asked for 5 s, delivered all 10 s."
+        },
+        {
+          "id": "headshot_look",
+          "kind": "deciding",
+          "applies": "a headshot",
+          "ask": "Any shape or background you need (for example square, plain grey)?",
+          "read_from": [
+            "'Square', 'LinkedIn', 'plain grey background', 'navy blazer'."
+          ],
+          "answers": {
+            "set shape or background": "edit_image (qwen-image-2.1) with the shape and background in the prompt; reframe_media 1:1 if needed.",
+            "no preference": "edit_image, or generate_headshot."
+          },
+          "default": "Square, plain light background.",
+          "why": "generate_headshot antitype: 928x1152 and an office background for 'square, plain grey' (3.0). Test: 5 with edit_image."
+        },
+        {
+          "id": "outfit",
+          "kind": "deciding",
+          "applies": "new clothes on a person in a photo",
+          "ask": "(Read from the files and words.) Is the new outfit a picture or words, and which part changes?",
+          "read_from": [
+            "An attached outfit picture.",
+            "'A navy blazer', 'jeans instead', 'a red dress'."
+          ],
+          "answers": {
+            "outfit picture": "change_clothes_in_photo with the person's photo and the outfit picture; garment_type upper_body (a shirt, a jacket), lower_body (trousers, a skirt), else entire_outfit.",
+            "outfit in words": "edit_image: change only the clothes to the user's words; keep the face, hair, pose and background."
+          },
+          "default": "An outfit picture when one is attached, else outfit in words.",
+          "why": "Draft from the tool's inputs; not tested yet."
+        },
+        {
+          "id": "scene",
+          "kind": "deciding",
+          "applies": "a person put into another scene",
+          "ask": "(Read from the files and words.) Is the scene a picture or words?",
+          "read_from": [
+            "An attached scene picture.",
+            "'On a beach', 'in front of the Eiffel Tower'."
+          ],
+          "answers": {
+            "scene picture": "place_person_in_scene with the person's photo and the scene picture, resolution 1k (2k or 4k only for print or when the user asks).",
+            "scene in words": "generate_image the scene with no people in it first, then place_person_in_scene with it, resolution 1k."
+          },
+          "default": "A scene picture when one is attached, else scene in words.",
+          "why": "Draft from the tool's inputs; not tested yet."
+        },
+        {
+          "id": "character",
+          "kind": "deciding",
+          "applies": "a person in a video replaced by, or copied onto, a character from a picture",
+          "ask": "Should your character take the person's place in the video, or should your picture copy the video's movement?",
+          "read_from": [
+            "'Replace the man with my character', 'put me in this video' (replace).",
+            "'Make my picture dance like this', 'copy the moves' (animate)."
+          ],
+          "answers": {
+            "replace": "replace_character_in_video, style.mode replace, model minimax-h3 on the free plan; the times from which_part as start_seconds and end_seconds. With several people: style.selection_mode point on the chosen person.",
+            "animate": "replace_character_in_video, style.mode animate: the picture moves like the person in the video."
+          },
+          "default": "Replace.",
+          "why": "Draft from the tool's inputs; not tested yet."
+        }
+      ]
+    },
+    "change_video": {
+      "is": "A change to the user's own video: a new shape, a cut, words or a watermark, subtitles, a new ending, music or a voice over it.",
+      "tools": [
+        "reframe_media",
+        "trim_media",
+        "add_words_to_media",
+        "add_subtitles_to_video",
+        "join_videos",
+        "get_last_frame",
+        "create_video_from_image",
+        "edit_video",
+        "add_sound_to_video",
+        "put_picture_on_video",
+        "make_card_clip",
+        "translate_video"
+      ],
+      "settings": {
+        "create_video_from_image": {
+          "model": "minimax-h3",
+          "resolution": "480p"
+        }
+      },
+      "rows": [
+        {
+          "id": "keep_or_remake",
+          "kind": "deciding",
+          "ask": "Should I keep your footage exactly and only cut it, reshape it or add text, or re-make the whole video in a new look?",
+          "read_from": [
+            "'Vertical', 'square', 'trim', 'cut', 'shorter', 'add a watermark', 'add subtitles' → keep.",
+            "'Make it look like anime', 'restyle', 'change the scene' → re-make."
+          ],
+          "answers": {
+            "keep": "Video by code (reframe_media, trim_media, add_words_to_media) or add_subtitles_to_video.",
+            "re-make": "edit_video; tell the user nothing of the original is kept."
+          },
+          "default": "Keep.",
+          "why": "edit_video antitype: never the right tool in 36 runs (1.7). Test: 1 → 4, 1 → 4, 2.5 → 5 with the code tools."
+        },
+        {
+          "id": "shape_how",
+          "kind": "required",
+          "applies": "a new shape",
+          "ask": "Who or what must stay in the frame? May I cut the sides, or should I keep the whole picture with bars?",
+          "read_from": [
+            "'Keep her centred' → crop, focus on her.",
+            "'Two people talking', 'show whoever is speaking' → follow the speaker.",
+            "'Keep the whole picture', 'with bars', 'padding' → pad."
+          ],
+          "answers": {
+            "one subject": "reframe_media crop with focus on the subject (get_last_frame to see where).",
+            "follow the speaker": "trim_media at each change of speaker, reframe_media each part with its own focus, join_videos.",
+            "whole picture": "reframe_media pad (color from the user)."
+          },
+          "default": "Crop on the middle; pad when the user says keep everything.",
+          "why": "reframe_media (4 in a test run); a case with two speakers."
+        },
+        {
+          "id": "range",
+          "kind": "required",
+          "applies": "a cut",
+          "ask": "Which part should I keep: from when to when? I can't watch the clip, so if you want 'the best part', tell me roughly where it is.",
+          "read_from": [
+            "'The first 5 seconds', 'from 0:12 to 0:20', 'cut the end'.",
+            "'The best 10 seconds', 'the boring parts' → ask where."
+          ],
+          "answers": {
+            "times": "trim_media start, end.",
+            "several parts": "trim_media each part, join_videos."
+          },
+          "default": "From the start, the length asked; say the part was picked without watching.",
+          "why": "trim_media limit: 'the best part' picked blind (3 in a test run)."
+        },
+        {
+          "id": "new_ending",
+          "kind": "deciding",
+          "applies": "change only part of a clip",
+          "ask": "Keep the start as it is and make a new ending from where it stops?",
+          "read_from": [
+            "'Change only the ending', 'keep the first five seconds'."
+          ],
+          "answers": {
+            "yes": "trim_media the start, get_last_frame, create_video_from_image for the new part, join_videos."
+          },
+          "default": "Yes when the user says 'only the ending'.",
+          "why": "One benchmark case."
+        },
+        {
+          "id": "words",
+          "kind": "required",
+          "applies": "words or a watermark",
+          "ask": "What exactly should it say, where, and for the whole clip or only part of it?",
+          "read_from": [
+            "Quoted text; 'bottom right', 'corner'; 'watermark', 'subtle', 'see-through'."
+          ],
+          "answers": {
+            "watermark": "add_words_to_media: corner, size small, style shadow, opacity 0.6.",
+            "title or caption": "add_words_to_media with place and start/end (text on top of the user's video)."
+          },
+          "default": "Whole clip.",
+          "why": "1 → 4 in a test run with the watermark settings."
+        },
+        {
+          "id": "subtitle_language",
+          "kind": "deciding",
+          "applies": "subtitles",
+          "ask": "Subtitles in the language that is spoken, or translated into another language?",
+          "read_from": [
+            "'Spanish subtitles' on an English clip → translated.",
+            "'Subtitles', 'captions' alone → spoken language."
+          ],
+          "answers": {
+            "spoken language": "add_subtitles_to_video, style.template highlight.",
+            "translated": "GAP: tell the user; translate_video changes the voice, not only the subtitles."
+          },
+          "default": "Spoken language.",
+          "why": "add_subtitles_to_video antitype (2.0); best_settings highlight (weak)."
+        },
+        {
+          "id": "has_speech",
+          "kind": "required",
+          "applies": "subtitles",
+          "ask": "(Not asked.) If the clip has no speech, say so and make nothing.",
+          "read_from": [
+            "The user says it may be silent; the subtitle job fails."
+          ],
+          "answers": {
+            "no speech": "No call; tell the user."
+          },
+          "default": "—",
+          "why": "add_subtitles_to_video antitype."
+        },
+        {
+          "id": "sound_on_video",
+          "kind": "required",
+          "applies": "music or a voice-over on the user's video",
+          "ask": "Should your video's own sound stay clear with the music under it, be lowered, or be replaced by the new sound?",
+          "read_from": [
+            "'Keep my voice', 'under the radio calls', 'keep the conversation' → keep.",
+            "'Replace the sound', 'instead of the conversation', 'new soundtrack' → replace.",
+            "'Add some music' alone → under."
+          ],
+          "answers": {
+            "keep": "Make the sound (generate_music, or the voice generator), then add_sound_to_video original=keep.",
+            "under": "Make the sound, then add_sound_to_video original=under.",
+            "replace": "Make the sound, then add_sound_to_video original=replace."
+          },
+          "default": "keep when the video has speech, else under.",
+          "why": "add_sound_to_video: six benchmark cases (2.0 and 1.3 to 2.0) had no tool. Not benchmarked yet."
+        },
+        {
+          "id": "logo_or_card",
+          "kind": "deciding",
+          "applies": "a logo or picture on the video, or a card before or after it",
+          "ask": "Where should the logo go (which corner), how big, and for the whole clip? (For a card: what words, what colour, how long, before or after the clip?)",
+          "read_from": [
+            "'In the top-right corner', 'small', 'throughout' → place, size, whole clip.",
+            "'End card', '2-second black card with white text' → card: words, colour, seconds, after."
+          ],
+          "answers": {
+            "logo": "remove_image_background first if the logo has a background, then put_picture_on_video (place, size 0.15, opacity).",
+            "card": "A generated card: generate_image with qwen-image-2.1, the exact words quoted, the colour named, the user's clip's shape (edit_image with the logo when the card shows it); check the spelling, make a misspelled card again (at most 3 in all) and keep the best one: a small misspelling beats words drawn by code. Then make_card_clip with that picture, background none, seconds, like_video = the user's clip and attach=after (an end card) or before (a title card): one file, the clip's sound kept. A drawn card (make_card_clip with words on a colour) only when the user asks for a plain drawn card.",
+            "words only": "add_words_to_media."
+          },
+          "default": "Logo: top_right, size 0.15, the whole clip. Card: 2 s, generated, black with white words, after the clip.",
+          "why": "put_picture_on_video, make_card_clip. Before: no tool (1.3, 2.0). Not benchmarked yet. In a test run, join_videos failed (media_tools.join calls ffmpeg by name), so the card tool attaches the card itself. Every card is generated; a drawn card only when the user asks for one; a small misspelling on a generated card is kept."
+        },
+        {
+          "id": "speech_language",
+          "kind": "required",
+          "applies": "the speech itself in another language (a dub, not subtitles)",
+          "ask": "Which language should the video speak?",
+          "read_from": [
+            "'In Spanish', 'for our French customers'."
+          ],
+          "answers": {
+            "a language": "translate_video with target_language. The translator picks the voice and it may not sound like the speaker: do not promise their own voice; if the user asks for it, say so before the call. One call takes 1 to 30 s: for a longer video, translate 30 s parts in order and join_videos."
+          },
+          "default": "The language the user writes in (the request's own language).",
+          "why": "Draft from the tool's inputs; not tested yet."
+        },
+        {
+          "id": "longer",
+          "kind": "deciding",
+          "applies": "the whole video made longer (more at the end)",
+          "ask": "How many seconds longer, and what should happen in the new part?",
+          "read_from": [
+            "'5 more seconds', 'have him walk away at the end'."
+          ],
+          "answers": {
+            "exact words": "get_last_frame, then create_video_from_image from that frame with the user's new action (end_seconds = the added seconds), then join_videos with the original first.",
+            "not stated": "Add 5 s where the same action goes on: get_last_frame, create_video_from_image, join_videos with the original first."
+          },
+          "default": "5 s more; the same action goes on.",
+          "why": "Draft from the tool's inputs; not tested yet."
+        }
+      ]
+    },
+    "new_video": {
+      "is": "One new clip from words or from a picture. Several shots or scenes go to video composition.",
+      "tools": [
+        "create_video_from_text",
+        "create_video_from_image",
+        "reframe_media",
+        "add_words_to_media",
+        "trim_media",
+        "create_video_from_audio"
+      ],
+      "settings": {
+        "create_video_from_text": {
+          "model": "minimax-h3",
+          "resolution": "480p"
+        },
+        "create_video_from_image": {
+          "model": "minimax-h3",
+          "resolution": "480p"
+        }
+      },
+      "rows": [
+        {
+          "id": "from_picture",
+          "kind": "deciding",
+          "ask": "(Read from the files.) Start from your picture, or from words only?",
+          "read_from": [
+            "An attached picture → from the picture."
+          ],
+          "answers": {
+            "picture": "create_video_from_image; it keeps the picture's shape, so reframe_media after if another shape was asked.",
+            "words": "create_video_from_text."
+          },
+          "default": "—",
+          "why": "create_video_from_image limit: no shape setting."
+        },
+        {
+          "id": "length",
+          "kind": "required",
+          "ask": "How long, in seconds?",
+          "read_from": [
+            "'8-second', 'a short clip' (ask), '10 s'."
+          ],
+          "answers": {
+            "1 to 60 s": "end_seconds. Over 30 s: model ltx-2.5 (minimax-h3 makes at most 30 s)."
+          },
+          "default": "5 s.",
+          "why": "plan_request asked 'a short clip' as 8 s when the user wanted 6 s (benchmark)."
+        },
+        {
+          "id": "shape",
+          "kind": "required",
+          "ask": "Wide (16:9), tall (9:16) or square?",
+          "read_from": [
+            "'Widescreen', 'vertical', 'TikTok', 'square'."
+          ],
+          "answers": {
+            "any": "aspect_ratio (text to video); reframe_media after (picture to video)."
+          },
+          "default": "16:9.",
+          "why": "9:16 asked, 16:9 delivered."
+        },
+        {
+          "id": "sound",
+          "kind": "required",
+          "ask": "With sound, or silent?",
+          "read_from": [
+            "'Silent', 'no sound', 'with music'."
+          ],
+          "answers": {
+            "silent": "audio off.",
+            "sound": "audio on."
+          },
+          "default": "Natural sound on.",
+          "why": "Sound came back when silence was asked. Every video has natural sound unless the user asks for silence."
+        },
+        {
+          "id": "exact_words",
+          "kind": "deciding",
+          "ask": "Any words that must appear on screen, spelled exactly?",
+          "read_from": [
+            "Quoted text, 'with the title', 'label'."
+          ],
+          "answers": {
+            "none": "No words in the prompt.",
+            "exact words": "Make the clip without words, then add_words_to_media."
+          },
+          "default": "None.",
+          "why": "create_video_from_text antitype: labels missing.",
+          "your_call": "Words that fit the request, written by you (a short title), made the way the 'exact words' answer says. Never invent a price, a date or a web address."
+        },
+        {
+          "id": "song",
+          "kind": "deciding",
+          "applies": "a video made for a song or a sound file the user gave",
+          "ask": "(Read from the files and words.) The whole track, or only part of it?",
+          "read_from": [
+            "The attached sound file.",
+            "'The chorus', 'the first 20 seconds'."
+          ],
+          "answers": {
+            "whole track": "create_video_from_audio from 0 to the track's seconds (media facts); style.prompt from the user's words, else the song's mood; the user's picture as image_file_path when given. This replaces the length row.",
+            "a part": "create_video_from_audio with start_seconds and end_seconds from the user's words."
+          },
+          "default": "The whole track.",
+          "why": "Draft from the tool's inputs; not tested yet."
+        }
+      ]
+    },
+    "talking": {
+      "is": "A person in a photo or video speaks given words.",
+      "tools": [
+        "create_talking_photo",
+        "ai_voice_generator_create_audio",
+        "create_lip_sync_video",
+        "create_spoken_ad_video",
+        "trim_media",
+        "reframe_media",
+        "add_sound_to_video"
+      ],
+      "settings": {
+        "create_talking_photo": {
+          "style.generation_mode": "realistic",
+          "resolution": "480p"
+        }
+      },
+      "rows": [
+        {
+          "id": "presenter",
+          "kind": "deciding",
+          "ask": "(Read from the files.) Is there a person on screen who should say the words?",
+          "read_from": [
+            "A photo of a person → talking photo.",
+            "A video of a presenter → lip sync.",
+            "No person → a voice-over (GAP on the user's video)."
+          ],
+          "answers": {
+            "photo": "Make the line's audio first: ai_voice_generator_create_audio (a stock voice that matches the person: gender, age, accent, style; not the first voice listed) or the user's own recording; then create_talking_photo with the photo and that audio file (it takes audio, not words).",
+            "video with a presenter": "Make the line's audio first: ai_voice_generator_create_audio (a stock voice that matches the person: gender, age, accent, style; not the first voice listed) or the user's own recording; then create_lip_sync_video; tell the user the footage may be re-made.",
+            "no presenter": "Voice-over on the video: make the voice, then add_sound_to_video (change_video sound_on_video)."
+          },
+          "default": "—",
+          "why": "Narration with a presenter uses lip sync, without one the voice cloner. create_lip_sync_video antitype."
+        },
+        {
+          "id": "line",
+          "kind": "required",
+          "ask": "What exactly should they say? Or shall I write it?",
+          "read_from": [
+            "Quoted line; 'say exactly'.",
+            "'You write it' → write it, with no invented facts (prices, dates)."
+          ],
+          "answers": {
+            "line": "The script, word for word."
+          },
+          "default": "Write a short line from the request, no invented facts.",
+          "why": "Two benchmark cases."
+        },
+        {
+          "id": "length",
+          "kind": "required",
+          "ask": "(Not asked.) Set the length from the line: about 2.5 words a second, plus half a second.",
+          "read_from": [
+            "The line."
+          ],
+          "answers": {
+            "—": "end_seconds from the line; if the user asked a longer clip, say the end will be silent, or trim_media after."
+          },
+          "default": "—",
+          "why": "create_talking_photo limit: 8 s clip, 4.5 s of speech, 3 s silent."
+        },
+        {
+          "id": "shape",
+          "kind": "required",
+          "ask": "Square, tall or wide?",
+          "read_from": [
+            "'Square video', 'for stories'."
+          ],
+          "answers": {
+            "any": "reframe_media after: create_talking_photo keeps the photo's shape."
+          },
+          "default": "The photo's shape.",
+          "why": "create_talking_photo antitype: 1024x1536 for 'square'."
+        },
+        {
+          "id": "own_sound",
+          "kind": "deciding",
+          "applies": "the user gave the sound to mouth (a song or a recording)",
+          "ask": "(Read from the files.) The person mouths the user's sound file, not a written line.",
+          "read_from": [
+            "An attached sound file and 'lip sync', 'make him sing this', 'mouth my recording'."
+          ],
+          "answers": {
+            "video": "create_lip_sync_video with the video and the sound: start_seconds 0, end_seconds the shorter of the two (media facts), generation_mode standard (1 credit a frame, the same as lite; it needs the mouth to move in the first seconds of the video: if the API refuses for that, call again with lite). The line row takes 'your_call' and is not used.",
+            "photo": "create_talking_photo with the photo and the sound file. The line row takes 'your_call' and is not used."
+          },
+          "default": "Video when the person is in a video, else photo.",
+          "why": "Draft from the tool's inputs; not tested yet."
+        }
+      ]
+    },
+    "sound": {
+      "is": "Music or voice as a sound file: a music bed, a voice-over, a podcast intro, a dialogue.",
+      "tools": [
+        "generate_music",
+        "trim_media",
+        "mix_audio",
+        "join_videos",
+        "ai_voice_generator_create_audio",
+        "add_sound_to_video",
+        "ai_voice_cloner_create_audio"
+      ],
+      "settings": {
+        "generate_music": {
+          "duration": "15 or more"
+        }
+      },
+      "rows": [
+        {
+          "id": "on_its_own",
+          "kind": "deciding",
+          "ask": "(Read from the files.) A sound file on its own, or on your video?",
+          "read_from": [
+            "An attached video and 'add music to this' → on the video."
+          ],
+          "answers": {
+            "on its own": "This sheet.",
+            "on the video": "Make the sound, then add_sound_to_video (change_video sound_on_video)."
+          },
+          "default": "—",
+          "why": "Three benchmark cases."
+        },
+        {
+          "id": "length",
+          "kind": "required",
+          "ask": "How long, in seconds?",
+          "read_from": [
+            "'10-second', 'a 20-second intro'."
+          ],
+          "answers": {
+            "15 s or more": "generate_music duration.",
+            "under 15 s": "generate_music 15 s, then trim_media or mix_audio to the length, with a short fade-out."
+          },
+          "default": "15 s.",
+          "why": "generate_music antitype: API minimum 15 s. Test: 2.5 → 4 with the cut."
+        },
+        {
+          "id": "mood",
+          "kind": "required",
+          "ask": "What mood or style? With or without vocals?",
+          "read_from": [
+            "'Lo-fi', 'warm', 'tense', 'upbeat'; 'no vocals', 'instrumental'."
+          ],
+          "answers": {
+            "any": "style prompt; instrumental when no vocals."
+          },
+          "default": "Warm and upbeat, no vocals.",
+          "why": "4.0 with the tool's own choice."
+        },
+        {
+          "id": "voices",
+          "kind": "deciding",
+          "applies": "a voice-over or a dialogue",
+          "ask": "One voice or several? Over music or on its own?",
+          "read_from": [
+            "'Two hosts', 'two voices', 'A says, B says'; 'with music behind'."
+          ],
+          "answers": {
+            "one voice": "ai_voice_generator_create_audio with the stock voice that matches the speaker: gender, age, accent, style; not the first voice listed.",
+            "several voices": "ai_voice_generator_create_audio per line, a matching stock voice per speaker, then join_videos (sound files).",
+            "over music": "Then mix_audio: music first, voice from a few seconds in, music at about 0.25."
+          },
+          "default": "One voice, no music.",
+          "why": "The voice generator is listed again (upstream)."
+        },
+        {
+          "id": "own_voice",
+          "kind": "deciding",
+          "applies": "the words read in the user's own voice",
+          "ask": "(Not asked: a rule.) The voice sample is the user's own voice or a voice they may use. Another real person's voice without consent: refuse.",
+          "read_from": [
+            "'In my voice', 'sounds like me', an attached recording of the user.",
+            "A celebrity's or another person's name."
+          ],
+          "answers": {
+            "own or permitted": "ai_voice_cloner_create_audio with the voice sample, the words as style.prompt, language auto, speed 1.",
+            "another real person": "Refuse plainly; offer a stock voice (ai_voice_generator_create_audio)."
+          },
+          "default": "Own or permitted.",
+          "why": "Draft from the tool's inputs; not tested yet."
+        }
+      ]
+    }
+  }
+}
