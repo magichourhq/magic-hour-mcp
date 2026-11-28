@@ -1,0 +1,98 @@
+{
+  "id": "C7",
+  "title": "Two people, four seasons",
+  "decides": "Do people described in words stay the same between clips? One person opens and closes; another has the two seasons between.",
+  "aspect": "16:9",
+  "audio": false,
+  "seconds": 20,
+  "setting": "A gentle short film in natural light, soft colour, steady camera, shallow depth of field.",
+  "subjects": [
+    {
+      "id": "mara",
+      "role": "person",
+      "words": "Mara, a woman in her thirties with short curly red hair, round gold glasses and a mustard-yellow wool coat"
+    },
+    {
+      "id": "theo",
+      "role": "person",
+      "words": "Theo, a tall man in his sixties with a white beard, a navy flat cap and a long grey scarf"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 5,
+      "place": "spring",
+      "subjects": [
+        "mara"
+      ],
+      "text": "Spring. Mara stands under a cherry tree in blossom, looks at the camera and holds out a hand as pink petals fall."
+    },
+    {
+      "seconds": 5,
+      "place": "summer",
+      "subjects": [
+        "theo"
+      ],
+      "link": "new",
+      "text": "Summer. Theo walks barefoot along a bright beach at the edge of the waves and tips his cap to the sun."
+    },
+    {
+      "seconds": 5,
+      "place": "autumn",
+      "subjects": [
+        "theo"
+      ],
+      "link": "moves",
+      "text": "Autumn. Theo sits on a park bench among red and orange leaves and catches a falling leaf."
+    },
+    {
+      "seconds": 5,
+      "place": "winter",
+      "subjects": [
+        "mara"
+      ],
+      "link": "new",
+      "text": "Winter. Mara stands in falling snow, pulls her coat closed, smiles at the camera and waves goodbye."
+    }
+  ],
+  "variants": [
+    {
+      "name": "rule",
+      "strategy": "person",
+      "max_seconds": 15
+    },
+    {
+      "name": "one-per-season-chained",
+      "strategy": "manual",
+      "cuts": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "name": "one-per-season-words-only",
+      "strategy": "manual",
+      "cuts": [
+        2,
+        3,
+        4
+      ],
+      "chain": false
+    },
+    {
+      "name": "medium-only",
+      "strategy": "time",
+      "max_seconds": 10,
+      "why": "cut only on a change of medium (card, scene, still) or the length cap; cap cuts balanced (10 + 10)"
+    }
+  ],
+  "checks": [
+    "One file, 20 s, 16:9",
+    "Spring, summer, autumn, winter, in order, each once",
+    "Mara, Theo, Theo, Mara: the right person in each season",
+    "Mara is the same person in spring and winter",
+    "Theo is the same person in summer and autumn",
+    "No season is left in the next season's frames"
+  ]
+}

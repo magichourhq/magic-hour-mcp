@@ -1,0 +1,89 @@
+{
+  "id": "C1",
+  "title": "The bowl",
+  "decides": "Is time alone a reason to split? One scene, one continuous action, 30 s.",
+  "aspect": "16:9",
+  "audio": false,
+  "seconds": 30,
+  "setting": "A small pottery studio in soft morning window light, warm earth tones, shallow depth of field. One continuous shot with a slow push in.",
+  "subjects": [
+    {
+      "id": "potter",
+      "role": "person",
+      "words": "A potter in her fifties with short grey curls, a clay-stained denim apron and rolled sleeves"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 5,
+      "place": "wheel",
+      "subjects": [
+        "potter"
+      ],
+      "text": "She centres a ball of wet clay on the spinning wheel with both palms."
+    },
+    {
+      "seconds": 5,
+      "place": "wheel",
+      "subjects": [
+        "potter"
+      ],
+      "link": "continues",
+      "text": "She presses her thumbs into the centre and opens the clay into a thick ring."
+    },
+    {
+      "seconds": 5,
+      "place": "wheel",
+      "subjects": [
+        "potter"
+      ],
+      "link": "continues",
+      "text": "She pulls the wall upward between her fingers and the bowl grows taller."
+    },
+    {
+      "seconds": 5,
+      "place": "wheel",
+      "subjects": [
+        "potter"
+      ],
+      "link": "continues",
+      "text": "She widens the rim with a wooden rib and the curve flares outward."
+    },
+    {
+      "seconds": 5,
+      "place": "wheel",
+      "subjects": [
+        "potter"
+      ],
+      "link": "continues",
+      "text": "She smooths the lip with a wet sponge as the wheel slows."
+    },
+    {
+      "seconds": 5,
+      "place": "wheel",
+      "subjects": [
+        "potter"
+      ],
+      "link": "continues",
+      "text": "She cuts the bowl free with a wire and lifts it toward the window light."
+    }
+  ],
+  "variants": [
+    {
+      "name": "one-call",
+      "strategy": "one"
+    },
+    {
+      "name": "time-15",
+      "strategy": "time",
+      "max_seconds": 15
+    }
+  ],
+  "checks": [
+    "One file, 30 s, 16:9",
+    "Six actions, each once, in order",
+    "No action repeats",
+    "Same potter, apron and studio from start to end",
+    "No visible jump at 15 s"
+  ]
+}
