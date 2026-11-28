@@ -68,6 +68,8 @@ from .project_result_app import (
     install_ui_read_origin,
     read_mcp_app_html,
 )
+from . import kept_files
+from .plan_request import register_plan_request
 from .tool_logging import ToolCallLoggingMiddleware
 from .workflow_guidance import register_workflow_guidance
 
@@ -249,6 +251,7 @@ def create_mcp() -> FastMCP:
 
 def register_custom_tools(mcp: FastMCP) -> None:
     register_workflow_guidance(mcp)
+    register_plan_request(mcp)
 
     @mcp.tool(
         name="upload_chatgpt_image",
@@ -590,6 +593,7 @@ async def _upload_chatgpt_file(file: ChatGPTFile, media_type: ProjectType) -> di
             )
             uploaded = await files.put(item["upload_url"], content=bytes(media))
             uploaded.raise_for_status()
+            await asyncio.to_thread(kept_files.keep_if_possible, item["file_path"], bytes(media))   # read again by join / last frame
             return {"file_path": item["file_path"]}
 
     try:
