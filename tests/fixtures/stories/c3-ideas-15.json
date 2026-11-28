@@ -1,0 +1,48 @@
+{
+  "id": "C3",
+  "title": "Three animals",
+  "decides": "Three separate ideas inside 15 s: one call or three calls?",
+  "aspect": "16:9",
+  "audio": false,
+  "seconds": 15,
+  "setting": "A wildlife film in natural light, rich colour, steady camera, shallow depth of field.",
+  "subjects": [],
+  "beats": [
+    {
+      "seconds": 5,
+      "place": "rock",
+      "text": "A male lion lies on a sandstone rock at sunrise and lifts his head toward the light."
+    },
+    {
+      "seconds": 5,
+      "place": "pool",
+      "link": "new",
+      "text": "Two penguins dive from an icy ledge into clear blue water, seen at water level."
+    },
+    {
+      "seconds": 5,
+      "place": "treetops",
+      "link": "new",
+      "text": "A giraffe stretches its neck and pulls leaves from the top of an acacia tree, seen from below."
+    }
+  ],
+  "variants": [
+    {
+      "name": "one-call",
+      "strategy": "time",
+      "max_seconds": 15
+    },
+    {
+      "name": "one-per-idea",
+      "strategy": "idea",
+      "max_seconds": 15
+    }
+  ],
+  "checks": [
+    "One file, 15 s, 16:9",
+    "Lion, then penguins, then giraffe, in order",
+    "Each animal about 5 s",
+    "No two animals in one frame",
+    "No animal appears twice"
+  ]
+}
