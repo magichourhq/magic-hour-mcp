@@ -1,0 +1,78 @@
+{
+  "id": "C6",
+  "title": "Four seasons",
+  "decides": "One pictured product in four separate places, 20 s: one call or one call for each idea?",
+  "aspect": "9:16",
+  "audio": false,
+  "seconds": 20,
+  "setting": "A perfume advertisement photographed like a still life: soft natural light, shallow depth of field, one slow camera move in each scene.",
+  "subjects": [
+    {
+      "id": "bottle",
+      "role": "product",
+      "picture": "bench-mockup-fragrance.png",
+      "words": "The perfume: a clear rectangular glass bottle with clear liquid, a square brushed-grey cap and the words MOCKUP FRAGRANCE in black serif letters printed on the glass; no label panel, no box"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 5,
+      "place": "spring",
+      "subjects": [
+        "bottle"
+      ],
+      "text": "Spring. The bottle stands on a mossy stone under a cherry tree. Pink petals drift down past it."
+    },
+    {
+      "seconds": 5,
+      "place": "summer",
+      "subjects": [
+        "bottle"
+      ],
+      "link": "moves",
+      "text": "Summer. The bottle stands in pale sand on a bright beach. Sunlight sparkles on the glass and a wave slides in behind it."
+    },
+    {
+      "seconds": 5,
+      "place": "autumn",
+      "subjects": [
+        "bottle"
+      ],
+      "link": "moves",
+      "text": "Autumn. The bottle stands on a wooden bench among red and orange fallen leaves. One leaf lands beside it."
+    },
+    {
+      "seconds": 5,
+      "place": "winter",
+      "subjects": [
+        "bottle"
+      ],
+      "link": "moves",
+      "text": "Winter. The bottle stands in fresh snow. Snowflakes fall and frost edges the glass."
+    }
+  ],
+  "variants": [
+    {
+      "name": "one-call",
+      "strategy": "one"
+    },
+    {
+      "name": "one-per-season",
+      "strategy": "person",
+      "max_seconds": 15
+    },
+    {
+      "name": "medium-only",
+      "strategy": "time",
+      "max_seconds": 10,
+      "why": "cut only on a change of medium (card, scene, still) or the length cap; cap cuts balanced (10 + 10)"
+    }
+  ],
+  "checks": [
+    "One file, 20 s, 9:16",
+    "Spring, summer, autumn, winter, in order, each once",
+    "Each season about 5 s",
+    "Same bottle in all four: clear glass, grey cap, MOCKUP FRAGRANCE letters, no box",
+    "No two seasons in one frame"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "id": "C2",
+  "title": "The barber",
+  "decides": "Same place and people, an important new event, inside 15 s: one call or a cut at the event?",
+  "aspect": "16:9",
+  "audio": false,
+  "seconds": 14,
+  "setting": "A small neighbourhood barber shop on a quiet afternoon: one black leather chair in front of a wide mirror with round bulbs, a worn wooden counter, warm tungsten light inside and soft daylight from the front window.",
+  "subjects": [
+    {
+      "id": "marcus",
+      "role": "person",
+      "words": "Marcus, the barber, mid-forties, shaved head, grey beard, black apron over a white t-shirt"
+    },
+    {
+      "id": "dev",
+      "role": "person",
+      "words": "Dev, the customer, early twenties, short dark hair in a fresh fade, a black cape over his shoulders"
+    }
+  ],
+  "beats": [
+    {
+      "seconds": 7,
+      "place": "shop",
+      "subjects": [
+        "marcus",
+        "dev"
+      ],
+      "text": "Dev sits in the chair. Marcus dusts Dev's neck with a talc brush, then takes hold of the cape at Dev's shoulders."
+    },
+    {
+      "seconds": 7,
+      "place": "shop",
+      "subjects": [
+        "marcus",
+        "dev"
+      ],
+      "link": "event",
+      "text": "Marcus pulls the cape off with a flick. Dev stands up, runs a hand over the fade in the mirror and grins. They shake hands."
+    }
+  ],
+  "variants": [
+    {
+      "name": "one-call",
+      "strategy": "idea",
+      "max_seconds": 15
+    },
+    {
+      "name": "cut-at-event",
+      "strategy": "event",
+      "max_seconds": 15
+    }
+  ],
+  "checks": [
+    "One file, 14 s, 16:9",
+    "Neck dusted, then cape off, then Dev stands, then the handshake, in order",
+    "Dev stands up (he does not stay in the chair)",
+    "Same two men and the same shop from start to end",
+    "No visible jump at the cut"
+  ]
+}
