@@ -163,6 +163,18 @@ class _ChatGPTMediaMiddleware(ToolMiddleware):
         context: MiddlewareContext[CallToolRequestParams],
         call_next: CallNext[CallToolRequestParams, ToolResult],
     ) -> ToolResult:
+        if context.message.name == "get_upload_urls":
+            request = context.fastmcp_context.request_context if context.fastmcp_context else None
+            meta = request.meta.model_dump() if request and request.meta else {}
+            session = meta.get("openai/session")
+            if isinstance(session, str) and session:
+                raise ToolError(
+                    "For ChatGPT attachments, pass the file in the creation tool's attachment "
+                    "field, or call upload_chatgpt_image or upload_chatgpt_media and use the "
+                    "returned file_path. Keep the requested settings. If the file is unavailable, "
+                    "ask the user to attach it again."
+                )
+
         original = context.message.arguments or {}
         arguments, uploads = prepare_chatgpt_media(context.message.name, original)
         if not uploads:
