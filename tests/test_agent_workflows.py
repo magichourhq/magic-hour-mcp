@@ -50,7 +50,10 @@ class AgentWorkflowTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(request.url.host, "api.example.test", "Unexpected network target")
             path = request.url.path
             if path == "/v1/account":
-                return httpx.Response(200, json={"id": "test-account", "credits": 1000, "tier": "pro", "subscription": None, "email": None})
+                return httpx.Response(200, json={
+                    "id": "test-account", "credits": 1000, "tier": "pro",
+                    "subscription": None, "email": None, "auto_reload": {"status": "disabled"},
+                })
             if path == "/v1/files/upload-urls":
                 items = json.loads(request.content)["items"]
                 return httpx.Response(200, json={"items": [{

@@ -142,6 +142,26 @@
                       ],
                       "nullable": true,
                       "description": "Details of the account's subscription plan. `null` if the account has no subscription, e.g. a free account, an account that only purchased credit packs, or an account on usage-based API pricing.\n\nReflects the plan currently configured on the subscription. If a plan change is scheduled, `tier` stays on the current plan until the next payment succeeds, so `tier` and `name` can briefly disagree."
+                    },
+                    "auto_reload": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "disabled",
+                            "active",
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ],
+                          "example": "active",
+                          "description": "State of Auto Reload on the account.\n- `disabled`: off or never set up.\n- `active`: on, with no refill processing or blocked.\n- `auto_reload_pending`: a refill is processing. Check again shortly.\n- `payment_failed`: the last refill payment failed and paused Auto Reload until the payment method is updated.\n- `spending_limit_reached`: the monthly limit blocked the last refill.\n\nAfter an `insufficient_credits` rejection, resubmit the same request once `credits` reaches that rejection's `credits_required`."
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
                     }
                   },
                   "required": [
@@ -149,7 +169,8 @@
                     "email",
                     "tier",
                     "credits",
-                    "subscription"
+                    "subscription",
+                    "auto_reload"
                   ]
                 }
               }
@@ -404,6 +425,223 @@
           }
         ],
         "x-excluded": true
+      }
+    },
+    "/v1/estimate/image": {
+      "get": {
+        "description": "Get the credits an image create request charges. Pass `tool`, then the fields below that the tool's create request uses, with the same values. Does not create a project or spend credits. It prices the fields passed here. It does not check your plan, your balance or the rest of the create request.",
+        "summary": "Estimate image credits",
+        "tags": [
+          "Image Projects"
+        ],
+        "parameters": [
+          {
+            "name": "tool",
+            "in": "query",
+            "description": "The create endpoint to price, named by its path. For example `ai-image-editor` for `POST /v1/ai-image-editor`.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ai-image-generator",
+                "ai-image-editor",
+                "ai-image-upscaler",
+                "body-swap",
+                "head-swap",
+                "face-swap-photo",
+                "ai-clothes-changer",
+                "ai-face-editor",
+                "ai-gif-generator",
+                "ai-headshot-generator",
+                "ai-meme-generator",
+                "ai-qr-code-generator",
+                "image-background-remover",
+                "photo-colorizer"
+              ],
+              "example": "ai-image-editor"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "description": "The `model` of the create request. Used by `ai-image-generator`, `ai-image-editor`.",
+            "schema": {
+              "type": "string",
+              "example": "nano-banana-2.1"
+            }
+          },
+          {
+            "name": "resolution",
+            "in": "query",
+            "description": "The `resolution` of the create request. Used by `ai-image-generator`, `ai-image-editor`, `body-swap`. One of `640px`, `1k`, `2k`, `4k`.",
+            "schema": {
+              "type": "string",
+              "example": "2k"
+            }
+          },
+          {
+            "name": "image_count",
+            "in": "query",
+            "description": "The `image_count` of the create request. Used by `ai-image-generator`, `ai-image-editor`. Defaults to 1.",
+            "schema": {
+              "type": "integer",
+              "example": 4
+            }
+          },
+          {
+            "name": "scale_factor",
+            "in": "query",
+            "description": "The `scale_factor` of the create request. Used by `ai-image-upscaler`. One of `2`, `4`.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "description": "The `style.mode` of the create request. Used by `ai-image-upscaler`. One of `preserve`, `balanced`, `creative`. Defaults to `balanced`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "operationId": "estimate.image",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "estimated_credits": {
+                      "type": "integer",
+                      "description": "Credits a create request with these fields charges.",
+                      "example": 150
+                    }
+                  },
+                  "required": [
+                    "estimated_credits"
+                  ],
+                  "description": "Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request"
+                      ],
+                      "description": "Machine-readable error code.\n\n- `invalid_request`: Fix request syntax or validation errors before retrying."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unauthorized"
+                      ],
+                      "description": "Machine-readable error code.\n\n- `unauthorized`: Provide a valid API key before retrying."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unprocessable_entity"
+                      ],
+                      "description": "Machine-readable error code.\n\n- `unprocessable_entity`: Change the request values before retrying."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "internal_server_error"
+                      ],
+                      "description": "Machine-readable error code.\n\n- `internal_server_error`: Retry later or contact support if the error continues."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable error message."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/v1/saved-items": {
@@ -1090,6 +1328,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -1408,6 +1680,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -1688,6 +1994,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -1867,7 +2207,7 @@
                     },
                     "type": {
                       "type": "string",
-                      "description": "The type of the video project. Possible values are ANIMATION, AUTO_SUBTITLE, VIDEO_TO_VIDEO, FACE_SWAP, TEXT_TO_VIDEO, IMAGE_TO_VIDEO, LIP_SYNC, TALKING_PHOTO, AVATAR, VIDEO_UPSCALER, VIDEO_EDITOR, CHARACTER_REPLACE, VIDEO_COLORIZER, VIDEO_WATERMARK_REMOVER, VIDEO_COLOR_GRADER, VIDEO_TRANSLATOR, MUSIC_VIDEO, VIDEO_REMIXER, EXTEND, AUDIO_TO_VIDEO, VIDEO_EXPANDER, UGC_AD",
+                      "description": "The type of the video project. Possible values are ANIMATION, AUTO_SUBTITLE, VIDEO_TO_VIDEO, FACE_SWAP, TEXT_TO_VIDEO, IMAGE_TO_VIDEO, LIP_SYNC, TALKING_PHOTO, AVATAR, VIDEO_UPSCALER, VIDEO_EDITOR, CHARACTER_REPLACE, VIDEO_COLORIZER, VIDEO_WATERMARK_REMOVER, VIDEO_COLOR_GRADER, VIDEO_TRANSLATOR, MUSIC_VIDEO, VIDEO_REMIXER, MOTION_GRAPHICS, TRANSITIONS, EXTEND, AUDIO_TO_VIDEO, VIDEO_EXPANDER, UGC_AD",
                       "example": "FACE_SWAP"
                     },
                     "created_at": {
@@ -2060,6 +2400,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -2261,6 +2635,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -2609,6 +3017,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -2928,6 +3370,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -3314,6 +3790,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -3691,6 +4201,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -4009,6 +4553,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -4508,6 +5086,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -4841,6 +5453,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -5216,6 +5862,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -5617,6 +6297,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -6006,6 +6720,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -6372,6 +7120,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -6726,6 +7508,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -7119,6 +7935,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -7961,6 +8811,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -8305,6 +9189,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -8506,6 +9424,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -8787,6 +9739,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -9216,6 +10202,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -9517,6 +10537,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -9890,6 +10944,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -10190,6 +11278,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -10580,6 +11702,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -10902,6 +12058,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -11306,6 +12496,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -11600,6 +12824,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -11909,6 +13167,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -12250,6 +13542,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -12552,6 +13878,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -12846,6 +14206,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -13136,6 +14530,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -13474,6 +14902,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -13675,6 +15137,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -13958,6 +15454,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -14362,6 +15892,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -16508,6 +18072,40 @@
                     "credit_shortfall": {
                       "type": "number",
                       "description": "Credits missing from the account balance for this request. Only present for `insufficient_credits`."
+                    },
+                    "credits_available": {
+                      "type": "number",
+                      "description": "Account balance when the request was checked. Only present for `insufficient_credits`."
+                    },
+                    "credits_required": {
+                      "type": "number",
+                      "description": "Credits the request costs. Resubmit the same request once the account balance from `GET /v1/account` reaches this. Only present for `insufficient_credits`."
+                    },
+                    "next_action": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "reason"
+                      ],
+                      "description": "What the account owner can do about the rejection, when the API knows more than the error code says. Currently only present for `insufficient_credits` on image-to-video requests from an account with Auto Reload on. `check_balance`: a refill is processing; resubmit the same request once the account balance covers it.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "check_balance",
+                            "update_payment_method",
+                            "buy_credits"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "auto_reload_pending",
+                            "payment_failed",
+                            "spending_limit_reached"
+                          ]
+                        }
+                      }
                     }
                   }
                 }
